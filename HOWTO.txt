@@ -1,0 +1,51 @@
+When you change command logic
+(e.g. edit /w3c.js, fix a bug, change output)
+
+Do this:
+
+pm2 restart w3cstats
+
+
+That’s it. No re-registration needed.
+
+When you add a new command file
+(e.g. add commands/utility/newcmd.js)
+
+Do this:
+
+pm2 restart w3cstats
+pm2 resurrect
+node index.js
+
+
+
+Again, that’s it.
+
+When you change command structure
+(name, description, options, choices, etc.)
+
+This is the only time there’s an extra step.
+
+Re-register slash commands:
+
+node deploy-commands.js
+
+
+Restart the bot:
+
+pm2 restart w3cstats
+
+
+Reason: Discord caches slash-command schemas. Code changes don’t update them automatically.
+
+Quick mental checklist
+
+Output wrong? → pm2 restart
+
+Logic changed? → pm2 restart
+
+New option / renamed command? → deploy-commands.js then restart
+
+Nothing showing up? → You forgot to redeploy commands
+
+Once you internalize that, Discord bots stop being mysterious and start being boring — which is exactly what you want.
