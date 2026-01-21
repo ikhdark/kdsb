@@ -1,9 +1,16 @@
-import { redirect } from "next/navigation";
+import { redirect, notFound } from "next/navigation";
+import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
 
-export default function PlayerIndex({
-  params,
-}: {
+type PageProps = {
   params: { battletag: string };
-}) {
-  redirect(`/stats/player/${params.battletag}/summary`);
+};
+
+export default async function PlayerIndex({ params }: PageProps) {
+  const raw = decodeURIComponent(params.battletag).trim();
+  if (!raw) notFound();
+
+  const canonicalBattleTag = await resolveBattleTagViaSearch(raw);
+  if (!canonicalBattleTag) notFound();
+
+  redirect(`/stats/player/${encodeURIComponent(canonicalBattleTag)}/summary`);
 }

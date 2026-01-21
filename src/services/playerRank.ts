@@ -1,15 +1,69 @@
+// src/services/playerRank.ts
+// Next.js-friendly ESM/TypeScript service (no Discord logic)
+
 import {
-  fetchPlayerProfile,
   fetchCountryLadder,
-} from "../services/w3cApi";
+  fetchPlayerProfile,
+  type PlayerProfile,
+} from "@/services/w3cApi";
 
-import {
-  RACE_MAP,
-  flattenCountryLadder,
-  rankByMMR,
-} from "../lib/ranking";
+import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
+import { flattenCountryLadder, rankByMMR } from "@/lib/ranking";
 
-/* -------------------- CONSTANTS -------------------- */
+/* =========================
+   RACE MAP (local)
+========================= */
+
+const RACE_MAP: Record<number, string> = {
+  1: "Human",
+  2: "Orc",
+  4: "Night Elf",
+  8: "Undead",
+  0: "Random",
+};
+
+/* =========================
+   TYPES
+========================= */
+
+type LadderPlayerStats = {
+  games?: number;
+  wins?: number;
+  won?: number;
+  mmr?: number;
+};
+
+type LadderEntry = {
+  race?: number | string;
+  // IMPORTANT: despite the name, in practice this may be a BattleTag string on the ladder endpoint.
+  player1Id?: string;
+  player?: LadderPlayerStats;
+};
+
+type RankRow = {
+  race: string;
+  raceId: number;
+  globalRank: number;
+  globalTotal: number;
+  countryRank: number | null;
+  countryTotal: number | null;
+  mmr: number;
+  games: number;
+};
+
+export type W3CRankResponse = {
+  battletag: string; // canonical casing
+  season: number;
+  country: string;
+  minGames: number;
+  asOf: string;
+  ranks: RankRow[];
+  result?: string;
+};
+
+/* =========================
+   CONFIG
+========================= */
 
 const GATEWAY = 20;
 const GAMEMODE = 1;
@@ -17,21 +71,22 @@ const SEASON = 23;
 const MAX_LEAGUE_PAGE = 76;
 const MIN_GAMES = 25;
 
-/* -------------------- GLOBAL LADDER CACHE -------------------- */
+/* =========================
+   GLOBAL LADDER CACHE
+========================= */
 
-let cachedGlobalRows: Map<number, any[]> | null = null;
+let cachedRowsByPage: Map<number, LadderEntry[]> | null = null;
 let lastFetchTime = 0;
 const GLOBAL_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-async function fetchGlobalRows(): Promise<Map<number, any[]>> {
+async function fetchGlobalRowsByPage(): Promise<Map<number, LadderEntry[]>> {
   const now = Date.now();
 
-  // Serve from cache
-  if (cachedGlobalRows && now - lastFetchTime < GLOBAL_CACHE_TTL) {
-    return cachedGlobalRows;
+  if (cachedRowsByPage && now - lastFetchTime < GLOBAL_CACHE_TTL) {
+    return cachedRowsByPage;
   }
 
-  const requests: Promise<any[]>[] = [];
+  const requests: Promise<LadderEntry[]>[] = [];
 
   for (let page = 0; page <= MAX_LEAGUE_PAGE; page++) {
     const url =
@@ -39,102 +94,100 @@ async function fetchGlobalRows(): Promise<Map<number, any[]>> {
       `?gateWay=${GATEWAY}&gameMode=${GAMEMODE}&season=${SEASON}`;
 
     requests.push(
-      fetch(url)
-        .then(r => (r.ok ? r.json() : []))
+      fetch(url, { cache: "no-store" })
+        .then(async (r) => {
+          if (!r.ok) return [];
+          const data = (await r.json()) as unknown;
+          return Array.isArray(data) ? (data as LadderEntry[]) : [];
+        })
         .catch(() => [])
     );
   }
 
   const pages = await Promise.all(requests);
-  const rowsByPage = new Map<number, any[]>();
 
-  pages.forEach((rows, page) => {
-    if (Array.isArray(rows)) {
-      rowsByPage.set(page, rows);
-    }
-  });
+  const map = new Map<number, LadderEntry[]>();
+  pages.forEach((rows, page) => map.set(page, rows));
 
-  cachedGlobalRows = rowsByPage;
+  cachedRowsByPage = map;
   lastFetchTime = now;
 
-  return rowsByPage;
+  return map;
 }
 
-/* -------------------- SERVICE -------------------- */
+/* =========================
+   SERVICE
+========================= */
 
 export async function getW3CRank(
   inputTag: string
-): Promise<{ result: string } | null> {
-  let profile = await fetchPlayerProfile(inputTag);
+): Promise<W3CRankResponse | null> {
+  if (!inputTag) return null;
 
-  // Case-normalized retry
-  if (!profile && inputTag.includes("#")) {
-    const [name, id] = inputTag.split("#");
-    profile = await fetchPlayerProfile(`${name.toLowerCase()}#${id}`);
-  }
+  // SINGLE SOURCE OF TRUTH for BattleTag casing
+  const canonicalTag = await resolveBattleTagViaSearch(inputTag);
+  if (!canonicalTag) return null;
 
-  if (!profile) return null;
+  // Profile fetch requires canonical BattleTag
+  const profile: PlayerProfile = await fetchPlayerProfile(canonicalTag);
 
-  const canonicalTag =
-    profile.battleTag || profile.playerId || inputTag;
-
+  // Keep these for country ladder matching fallback
   const canonicalLower = canonicalTag.toLowerCase();
-  const playerIdLower: string | null = profile.playerId
-    ? profile.playerId.toLowerCase()
-    : null;
+  const playerIdLower =
+    typeof profile.playerId === "string" && profile.playerId.length
+      ? profile.playerId.toLowerCase()
+      : null;
 
-  const country =
-    profile.countryCode?.toUpperCase() ||
-    profile.location?.toUpperCase() ||
-    "UNK";
+  const battletag = canonicalTag;
+  const country = (profile.countryCode || profile.location || "UNK").toUpperCase();
 
   const [rowsByPage, countryPayload] = await Promise.all([
-    fetchGlobalRows(),
+    fetchGlobalRowsByPage(),
     fetchCountryLadder(country, GATEWAY, GAMEMODE, SEASON),
   ]);
 
-  const countryRows = countryPayload
+  const countryRows = Array.isArray(countryPayload)
     ? flattenCountryLadder(countryPayload)
     : [];
 
-  /* -------------------- PRE-BUILD GLOBAL POOLS -------------------- */
-
+  // Build global pools by race.
+  // IMPORTANT: match identity primarily by canonical BattleTag EXACT casing,
+  // because your Discord working version implies ladder "player1Id" == BattleTag.
   const globalPools: Record<
     number,
-    {
-      id: string;
-      mmr: number;
-      games: number;
-      winPct: number;
-    }[]
+    { idRaw: string; idLower: string; mmr: number; games: number; winPct: number }[]
   > = {};
 
-  for (const raceId of Object.keys(RACE_MAP)) {
-    globalPools[Number(raceId)] = [];
-  }
+  for (const raceId of Object.keys(RACE_MAP).map(Number)) globalPools[raceId] = [];
 
   for (const rows of rowsByPage.values()) {
     for (const e of rows) {
-      if (
-        e.player?.games >= MIN_GAMES &&
-        e.player1Id &&
-        globalPools[e.race]
-      ) {
-        const games = e.player.games;
-        const wins = e.player.wins ?? e.player.won ?? 0;
+      const raceId = Number(e?.race);
+      const pool = globalPools[raceId];
+      if (!pool) continue;
 
-        globalPools[e.race].push({
-          id: String(e.player1Id).toLowerCase(),
-          mmr: Math.round(e.player.mmr ?? 0),
-          games,
-          winPct: games ? wins / games : 0,
-        });
-      }
+      const idRaw = typeof e?.player1Id === "string" ? e.player1Id : null;
+      if (!idRaw) continue;
+
+      const games = Number(e?.player?.games ?? 0);
+      if (games < MIN_GAMES) continue;
+
+      const wins = Number(e?.player?.wins ?? e?.player?.won ?? 0);
+      const mmr = Math.round(Number(e?.player?.mmr ?? 0));
+
+      pool.push({
+        idRaw,
+        idLower: idRaw.toLowerCase(),
+        mmr,
+        games,
+        winPct: games ? wins / games : 0,
+      });
     }
   }
 
-  for (const pool of Object.values(globalPools)) {
-    pool.sort((a, b) =>
+  // Sort pools by MMR desc, then win%, then games
+  for (const raceId of Object.keys(RACE_MAP).map(Number)) {
+    globalPools[raceId].sort((a, b) =>
       b.mmr !== a.mmr
         ? b.mmr - a.mmr
         : b.winPct !== a.winPct
@@ -143,35 +196,38 @@ export async function getW3CRank(
     );
   }
 
-  /* -------------------- OUTPUT -------------------- */
+  const asOf = new Date().toLocaleString();
+  const ranks: RankRow[] = [];
 
-  let output =
-    `📊 ${canonicalTag} — 1v1 Race Rank by MMR (Season ${SEASON})\n\n` +
-    `— Min ${MIN_GAMES} Games —\n\n`;
-
-  output += `As of: ${new Date().toLocaleString()}\n\n`;
+  let result =
+    `📊 ${battletag} — 1v1 Race Rank by MMR (Season ${SEASON})\n\n` +
+    `— Min ${MIN_GAMES} Games —\n\n` +
+    `As of: ${asOf}\n\n`;
 
   let foundAny = false;
 
   for (const [raceIdStr, raceName] of Object.entries(RACE_MAP)) {
     const raceId = Number(raceIdStr);
     const pool = globalPools[raceId];
+    if (!pool?.length) continue;
 
-    const idx = pool.findIndex(
-      p =>
-        p.id === canonicalLower ||
-        (playerIdLower && p.id === playerIdLower)
-    );
+    // GLOBAL MATCH:
+    // 1) Exact casing match vs canonical BattleTag (this matches your Discord behavior)
+    // 2) Fallback: if ladder ever uses a lowercased battletag, try lower
+    // 3) Fallback: if ladder ever uses playerId, allow matching via playerIdLower (also lower)
+    let idx = pool.findIndex((p) => p.idRaw === canonicalTag);
+    if (idx === -1) idx = pool.findIndex((p) => p.idLower === canonicalLower);
+    if (idx === -1 && playerIdLower) idx = pool.findIndex((p) => p.idLower === playerIdLower);
 
     if (idx === -1) continue;
 
-    const globalRes = {
-      rank: idx + 1,
-      total: pool.length,
-      mmr: pool[idx].mmr,
-      games: pool[idx].games,
-    };
+    const globalRank = idx + 1;
+    const globalTotal = pool.length;
 
+    const mmr = pool[idx].mmr;
+    const games = pool[idx].games;
+
+    // Country ladder: canonical battleTag lower first, then fallback playerId lower
     const countryRes = rankByMMR(
       countryRows,
       canonicalLower,
@@ -180,20 +236,38 @@ export async function getW3CRank(
       playerIdLower
     );
 
+    ranks.push({
+      race: raceName,
+      raceId,
+      globalRank,
+      globalTotal,
+      countryRank: countryRes ? countryRes.rank : null,
+      countryTotal: countryRes ? countryRes.total : null,
+      mmr,
+      games,
+    });
+
     foundAny = true;
 
-    output +=
-      `${raceName} — ` +
-      `#${globalRes.rank}/${globalRes.total} globally` +
+    result +=
+      `${raceName} — #${globalRank}/${globalTotal} globally` +
       (countryRes
         ? ` | #${countryRes.rank} in ${country} (of ${countryRes.total})`
         : "") +
-      ` — ${globalRes.mmr} MMR, ${globalRes.games} games\n`;
+      ` — ${mmr} MMR, ${games} games\n`;
   }
 
-  if (!foundAny) {
-    output += "_No ranked ladder data found._";
-  }
+  if (!foundAny) result += "_No ranked ladder data found._";
 
-  return { result: output };
+  ranks.sort((a, b) => b.mmr - a.mmr);
+
+  return {
+    battletag,
+    season: SEASON,
+    country,
+    minGames: MIN_GAMES,
+    asOf,
+    ranks,
+    result,
+  };
 }

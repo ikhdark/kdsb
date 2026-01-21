@@ -8,6 +8,14 @@ import { MenuIcon } from "./icons";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+function normalizeBattleTagInput(value: string): string {
+  // normalize user input ONLY for routing safety
+  // do NOT lowercase, do NOT decode
+  return String(value)
+    .replace(/\+/g, " ") // handle querystring-style pastes
+    .trim();
+}
+
 export function Header() {
   const { toggleSidebar, isMobile } = useSidebarContext();
   const router = useRouter();
@@ -15,12 +23,15 @@ export function Header() {
 
   function submitSearch(e: React.FormEvent) {
     e.preventDefault();
-    const value = query.trim();
-    if (!value) return;
 
-    const encoded = encodeURIComponent(value);
+    const normalized = normalizeBattleTagInput(query);
+    if (!normalized) return;
+
+    const encoded = encodeURIComponent(normalized);
+
     router.push(`/stats/player/${encoded}/summary`);
-    setQuery("");
+    // optional: keep value during dev to see what was submitted
+    // setQuery("");
   }
 
   return (

@@ -1,5 +1,6 @@
 import { fetchPlayerProfile } from "./w3cApi";
 import { fetchAllMatches } from "../lib/w3cUtils";
+import { resolveBattleTagViaSearch } from "../lib/w3cBattleTagResolver";
 
 import countries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
@@ -51,7 +52,7 @@ type CountryAgg = {
   games: number;
   wins: number;
   losses: number;
-  oppSet: Set<string>;
+  oppSet: Set<string>; // canonical-lower
   race: Map<number, CountryRaceRow>;
   mmr: { sumOpp: number; sumSelf: number; n: number };
   time: { sum: number; n: number };
@@ -71,10 +72,10 @@ function iso2(code: unknown): string {
 function resolveCountryFromProfile(profile: any): string {
   return iso2(
     profile?.playerAkaData?.country ||
-    profile?.countryCode ||
-    profile?.location ||
-    profile?.country ||
-    ""
+      profile?.countryCode ||
+      profile?.location ||
+      profile?.country ||
+      ""
   );
 }
 
@@ -88,19 +89,19 @@ async function resolveOpponentCountry(
   const cc2 = iso2(opp?.location);
   if (cc2) return cc2;
 
-  const bt = opp?.battleTag;
-  if (!bt) return null;
+  const rawBt = opp?.battleTag;
+  if (!rawBt) return null;
 
-  const key = normalizeBT(bt);
+  const key = normalizeBT(rawBt);
   if (cache.has(key)) return cache.get(key)!;
 
   try {
-    const profile = await fetchPlayerProfile(bt);
+    const profile = await fetchPlayerProfile(rawBt);
     const cc3 = iso2(
       profile?.playerAkaData?.country ||
-      profile?.countryCode ||
-      profile?.location ||
-      profile?.country
+        profile?.countryCode ||
+        profile?.location ||
+        profile?.country
     );
     const out = cc3 || null;
     cache.set(key, out);
@@ -155,20 +156,28 @@ function pickOpponent1v1(
 /* -------------------- SERVICE -------------------- */
 
 export async function getW3CCountryStats(
-  battletag: string,
+  inputBattletag: string,
   opts: { windowDays?: number } = {}
 ) {
   const windowDays = opts.windowDays ?? DEFAULT_WINDOW_DAYS;
 
-  const profile = await fetchPlayerProfile(battletag);
+  /* =====================================================
+     CANONICAL RESOLUTION (SEARCH BAR AUTHORITY)
+     ===================================================== */
+
+  const raw = decodeURIComponent(inputBattletag).trim();
+  if (!raw) return null;
+
+  const canonicalTag = await resolveBattleTagViaSearch(raw);
+  if (!canonicalTag) return null;
+
+  const profile = await fetchPlayerProfile(canonicalTag);
   if (!profile) return null;
 
-  const canonicalTag =
-    profile.battleTag ||
-    profile.playerId ||
-    battletag;
-
   const targetLower = canonicalTag.toLowerCase();
+
+  /* -------------------- HOME COUNTRY -------------------- */
+
   let homeCountry = resolveCountryFromProfile(profile);
 
   const matches = await fetchAllMatches(canonicalTag, SEASONS);
@@ -185,6 +194,8 @@ export async function getW3CCountryStats(
   }
 
   if (!homeCountry) homeCountry = UNKNOWN_COUNTRY;
+
+  /* -------------------- AGGREGATION -------------------- */
 
   const countryStats = new Map<string, CountryAgg>();
   const opponentCountryCache = new Map<string, string | null>();
@@ -226,7 +237,10 @@ export async function getW3CCountryStats(
 
     cs.games++;
     won ? cs.wins++ : cs.losses++;
-    if (opp?.battleTag) cs.oppSet.add(String(opp.battleTag));
+
+    if (opp?.battleTag) {
+      cs.oppSet.add(normalizeBT(opp.battleTag));
+    }
 
     if (Number.isFinite(raceId)) {
       const r = cs.race.get(raceId) ?? { games: 0, wins: 0, losses: 0 };
@@ -246,35 +260,33 @@ export async function getW3CCountryStats(
     totalTimeSec += dur;
   }
 
-  const rows = [];
+  if (!countryStats.size) return null;
 
-  for (const [cc, cs] of countryStats) {
-    rows.push({
-      country: cc,
-      label: countryLabel(cc),
-      games: cs.games,
-      wins: cs.wins,
-      losses: cs.losses,
-      winRate: safeDiv(cs.wins, cs.games),
-      uniqueOpponents: cs.oppSet.size,
-      avgGamesPerOpponent: safeDiv(cs.games, cs.oppSet.size),
-      avgOpponentMMR: cs.mmr.n ? cs.mmr.sumOpp / cs.mmr.n : null,
-      avgSelfMMR: cs.mmr.n ? cs.mmr.sumSelf / cs.mmr.n : null,
-      timePlayedSeconds: cs.time.sum,
-      timeShare: totalTimeSec ? cs.time.sum / totalTimeSec : 0,
-      avgGameSeconds: cs.time.n ? cs.time.sum / cs.time.n : null,
-      races: [...cs.race.entries()].map(([id, r]) => ({
-        raceId: id,
-        race: RACE_LABEL[id] || `Race ${id}`,
-        games: r.games,
-        wins: r.wins,
-        losses: r.losses,
-        winRate: safeDiv(r.wins, r.games),
-      })),
-    });
-  }
+  /* -------------------- OUTPUT -------------------- */
 
-  if (!rows.length) return null;
+  const rows = [...countryStats.entries()].map(([cc, cs]) => ({
+    country: cc,
+    label: countryLabel(cc),
+    games: cs.games,
+    wins: cs.wins,
+    losses: cs.losses,
+    winRate: safeDiv(cs.wins, cs.games),
+    uniqueOpponents: cs.oppSet.size,
+    avgGamesPerOpponent: safeDiv(cs.games, cs.oppSet.size),
+    avgOpponentMMR: cs.mmr.n ? cs.mmr.sumOpp / cs.mmr.n : null,
+    avgSelfMMR: cs.mmr.n ? cs.mmr.sumSelf / cs.mmr.n : null,
+    timePlayedSeconds: cs.time.sum,
+    timeShare: totalTimeSec ? cs.time.sum / totalTimeSec : 0,
+    avgGameSeconds: cs.time.n ? cs.time.sum / cs.time.n : null,
+    races: [...cs.race.entries()].map(([id, r]) => ({
+      raceId: id,
+      race: RACE_LABEL[id] || `Race ${id}`,
+      games: r.games,
+      wins: r.wins,
+      losses: r.losses,
+      winRate: safeDiv(r.wins, r.games),
+    })),
+  }));
 
   return {
     battletag: canonicalTag,

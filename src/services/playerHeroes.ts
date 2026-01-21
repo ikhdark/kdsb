@@ -1,7 +1,13 @@
-import { fetchAllMatches } from "@/lib/w3cUtils";
+import {
+  fetchAllMatches,
+} from "@/lib/w3cUtils";
+import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
+import { fetchPlayerProfile } from "@/services/w3cApi";
 
 const SEASONS = [23];
 const MIN_GAMES = 10;
+
+/* -------------------- HERO DISPLAY -------------------- */
 
 const HERO_DISPLAY_NAMES: Record<string, string> = {
   archmage: "Archmage",
@@ -40,26 +46,54 @@ function heroDisplay(name?: string): string {
   return HERO_DISPLAY_NAMES[name] ?? name;
 }
 
+/* -------------------- TYPES -------------------- */
+
 type HeroStat = {
   games: number;
   wins: number;
   losses: number;
 };
 
-export async function getW3CHeroStats(inputTag: string) {
-  let battleTag = String(inputTag || "").trim();
-  let matches: any[] = await fetchAllMatches(battleTag, SEASONS);
+/* -------------------- SERVICE -------------------- */
 
-  // Case-normalized fallback
-  if (!matches.length && battleTag.includes("#")) {
-    const [name, id] = battleTag.split("#");
-    battleTag = `${name.toLowerCase()}#${id}`;
-    matches = await fetchAllMatches(battleTag, SEASONS);
+export async function getW3CHeroStats(inputTag: string) {
+  const raw = String(inputTag ?? "").trim();
+  if (!raw) return null;
+
+  /* =====================================================
+     CANONICAL BATTLETAG (SEARCH-BAR EXACT BEHAVIOR)
+     ===================================================== */
+
+  const canonicalBattleTag = await resolveBattleTagViaSearch(raw);
+  if (!canonicalBattleTag) return null;
+
+  /* -------------------- PROFILE (SECONDARY ID ONLY) -------------------- */
+
+  let profile: any = null;
+  try {
+    profile = await fetchPlayerProfile(canonicalBattleTag);
+  } catch {
+    profile = null;
   }
 
+  const playerIdLower =
+    typeof profile?.playerId === "string"
+      ? profile.playerId.toLowerCase()
+      : null;
+
+  const canonicalLower = canonicalBattleTag.toLowerCase();
+
+  const displayTag =
+    canonicalBattleTag ||
+    (typeof profile?.battleTag === "string" ? profile.battleTag : "") ||
+    raw;
+
+  /* -------------------- MATCH FETCH (CANONICAL ONLY) -------------------- */
+
+  const matches = await fetchAllMatches(canonicalBattleTag, SEASONS);
   if (!matches.length) return null;
 
-  const target = battleTag.toLowerCase();
+  /* -------------------- ACCUMULATORS -------------------- */
 
   const opponentHeroStats: Record<string, HeroStat> = {};
   const opponentPrimaryHeroStats: Record<string, HeroStat> = {};
@@ -76,20 +110,24 @@ export async function getW3CHeroStats(inputTag: string) {
     3: { games: 0, wins: 0, losses: 0 },
   };
 
-  for (const match of matches) {
-    if (match.gameMode !== 1 || !Array.isArray(match.teams)) continue;
+  /* -------------------- MATCH PROCESSING -------------------- */
 
-    const players = match.teams.flatMap((t: any) => t.players || []);
+  for (const match of matches) {
+    if (match?.gameMode !== 1 || !Array.isArray(match?.teams)) continue;
+
+    const players = match.teams.flatMap((t: any) => t.players ?? []);
     if (players.length !== 2) continue;
 
     const me = players.find(
-      (p: any) => p?.battleTag?.toLowerCase() === target
-    );
-    const opp = players.find(
-      (p: any) => p?.battleTag?.toLowerCase() !== target
+      (p: any) =>
+        p?.battleTag?.toLowerCase() === canonicalLower ||
+        (playerIdLower && p?.playerId?.toLowerCase() === playerIdLower)
     );
 
-    if (!me || !opp || !me.heroes?.length || !opp.heroes?.length) continue;
+    const opp = players.find((p: any) => p !== me);
+
+    if (!me || !opp || !Array.isArray(me.heroes) || !Array.isArray(opp.heroes))
+      continue;
 
     const didWin = me.won === true;
 
@@ -106,11 +144,11 @@ export async function getW3CHeroStats(inputTag: string) {
       ? opponentHeroCountStats[oppHeroCount].wins++
       : opponentHeroCountStats[oppHeroCount].losses++;
 
-    const uniqueHeroes = new Set(
-      opp.heroes.map((h: any) => h.name).filter(Boolean)
+    const uniqueOppHeroes = new Set(
+      opp.heroes.map((h: any) => h?.name).filter(Boolean)
     );
 
-    for (const hero of uniqueHeroes) {
+    for (const hero of uniqueOppHeroes) {
       opponentHeroStats[hero] ??= { games: 0, wins: 0, losses: 0 };
       opponentHeroStats[hero].games++;
       didWin
@@ -132,6 +170,8 @@ export async function getW3CHeroStats(inputTag: string) {
     }
   }
 
+  /* -------------------- BASELINE -------------------- */
+
   let totalGames = 0;
   let totalWins = 0;
 
@@ -142,17 +182,20 @@ export async function getW3CHeroStats(inputTag: string) {
 
   const baselineWinrate = totalGames ? totalWins / totalGames : 0;
 
+  /* -------------------- OUTPUT -------------------- */
+
   const out: string[] = [];
   const line = (t: string) => out.push(t);
 
-  line(`📊 ${battleTag} — All races S23 Hero Stats`);
+  line(`📊 ${displayTag} — All races S23 Hero Stats`);
 
   line(`\nYour W/L by Your Hero Count`);
   Object.entries(yourHeroCountStats).forEach(([k, s]) => {
     if (!s.games) return;
     line(
       `${k} hero${Number(k) > 1 ? "es" : ""}: ${(
-        (100 * s.wins) / s.games
+        (100 * s.wins) /
+        s.games
       ).toFixed(1)}% (${s.wins}-${s.losses})`
     );
   });
@@ -162,7 +205,8 @@ export async function getW3CHeroStats(inputTag: string) {
     if (!s.games) return;
     line(
       `${k} hero${Number(k) > 1 ? "es" : ""}: ${(
-        (100 * s.wins) / s.games
+        (100 * s.wins) /
+        s.games
       ).toFixed(1)}% (${s.wins}-${s.losses})`
     );
   });
@@ -175,7 +219,8 @@ export async function getW3CHeroStats(inputTag: string) {
     .forEach(([hero, s]) =>
       line(
         `${heroDisplay(hero)}: ${(
-          (100 * s.wins) / s.games
+          (100 * s.wins) /
+          s.games
         ).toFixed(1)}% (${s.wins}-${s.losses})`
       )
     );
@@ -188,7 +233,8 @@ export async function getW3CHeroStats(inputTag: string) {
     .forEach(([hero, s]) =>
       line(
         `${heroDisplay(hero)}: ${(
-          (100 * s.wins) / s.games
+          (100 * s.wins) /
+          s.games
         ).toFixed(1)}% (${s.wins}-${s.losses})`
       )
     );
@@ -198,7 +244,8 @@ export async function getW3CHeroStats(inputTag: string) {
     .filter(([, s]) => s.games >= MIN_GAMES)
     .sort(
       (a, b) =>
-        (b[1].wins / b[1].games - baselineWinrate) -
+        b[1].wins / b[1].games -
+        baselineWinrate -
         (a[1].wins / a[1].games - baselineWinrate)
     )
     .slice(0, 5)
@@ -213,7 +260,8 @@ export async function getW3CHeroStats(inputTag: string) {
     .filter(([, s]) => s.games >= MIN_GAMES)
     .sort(
       (a, b) =>
-        (a[1].wins / a[1].games - baselineWinrate) -
+        a[1].wins / a[1].games -
+        baselineWinrate -
         (b[1].wins / b[1].games - baselineWinrate)
     )
     .slice(0, 5)

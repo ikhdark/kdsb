@@ -1,7 +1,11 @@
 import axios from "axios";
 
+/* -------------------- CONSTANTS -------------------- */
+
 const GATEWAY = 20;
 const PAGE_SIZE = 50;
+
+/* -------------------- RACES -------------------- */
 
 export const RACE_MAP: Record<number, string> = {
   0: "Random",
@@ -19,43 +23,75 @@ export function resolveEffectiveRace(player: any): string {
   return RACE_MAP[player?.race] || "Unknown";
 }
 
-export async function resolveBattleTagForMatches(
-  inputTag: string
+/* -------------------- BATTLETAG CANONICAL RESOLUTION -------------------- */
+
+/**
+ * SINGLE AUTHORITY (UPDATED):
+ * Mirrors W3C search-bar behavior via global-search.
+ *
+ * Rules:
+ * - Identity is the numeric suffix (#XXXX)
+ * - Casing matters AFTER resolution, never before
+ * - Prefer active ladder accounts (most seasons)
+ * - Return EXACT battleTag string from backend
+ */
+export async function resolveCanonicalBattleTag(
+  input: string
 ): Promise<string | null> {
-  const tag = String(inputTag || "").trim();
-  if (!tag.includes("#")) return null;
+  const raw = String(input ?? "").trim();
+  if (!raw.includes("#")) return null;
 
-  const [name] = tag.split("#");
-  if (!name) return null;
+  const [name, id] = raw.split("#");
+  if (!name || !id) return null;
 
-  const url = `https://website-backend.w3champions.com/api/players/search?name=${encodeURIComponent(
-    name
-  )}`;
+  const url =
+    "https://website-backend.w3champions.com/api/players/global-search" +
+    `?search=${encodeURIComponent(name)}&pageSize=20`;
 
   try {
     const res = await axios.get(url);
     const players = res.data;
 
-    if (!Array.isArray(players)) return null;
+    if (!Array.isArray(players) || !players.length) return null;
 
-    const targetLower = tag.toLowerCase();
-    const hit = players.find(
+    const targetSuffix = `#${id}`.toLowerCase();
+
+    // 1) match same numeric BattleTag id (case-insensitive)
+    const matches = players.filter(
       (p: any) =>
         typeof p?.battleTag === "string" &&
-        p.battleTag.toLowerCase() === targetLower
+        p.battleTag.toLowerCase().endsWith(targetSuffix)
     );
 
-    return hit?.battleTag ?? null;
+    if (!matches.length) return null;
+
+    // 2) prefer accounts with ladder history (most seasons)
+    matches.sort((a: any, b: any) => {
+      const aSeasons = Array.isArray(a.seasons) ? a.seasons.length : 0;
+      const bSeasons = Array.isArray(b.seasons) ? b.seasons.length : 0;
+      return bSeasons - aSeasons;
+    });
+
+    // 3) return EXACT canonical casing from backend
+    return matches[0].battleTag;
   } catch {
     return null;
   }
 }
 
+/* -------------------- MATCH FETCH -------------------- */
+
+/**
+ * IMPORTANT:
+ * - battleTag MUST already be canonical
+ * - NO casing changes
+ * - NO retries
+ */
 export async function fetchAllMatches(
-  battleTag: string,
+  canonicalBattleTag: string,
   seasons: number[] = [20, 21, 22, 23]
 ): Promise<any[]> {
-  const encodedTag = encodeURIComponent(battleTag);
+  const encodedTag = encodeURIComponent(canonicalBattleTag);
   const allMatches: any[] = [];
 
   for (const season of seasons) {
@@ -63,7 +99,7 @@ export async function fetchAllMatches(
 
     while (true) {
       const url =
-        `https://website-backend.w3champions.com/api/matches/search` +
+        "https://website-backend.w3champions.com/api/matches/search" +
         `?playerId=${encodedTag}` +
         `&gateway=${GATEWAY}` +
         `&season=${season}` +
@@ -85,23 +121,27 @@ export async function fetchAllMatches(
   return allMatches;
 }
 
+/* -------------------- PLAYER PAIR RESOLUTION -------------------- */
+
+/**
+ * STRICT MATCH:
+ * - battleTag comparison is EXACT
+ * - caller must pass canonical BattleTag
+ */
 export function getPlayerAndOpponent(
   match: any,
-  battleTag: string
+  canonicalBattleTag: string
 ): { me: any; opp: any } | null {
   if (!Array.isArray(match?.teams)) return null;
 
   const players = match.teams.flatMap((t: any) => t.players ?? []);
-  const target = String(battleTag || "").toLowerCase();
 
   const me = players.find(
-    (p: any) => p?.battleTag?.toLowerCase() === target
+    (p: any) => p?.battleTag === canonicalBattleTag
   );
   if (!me) return null;
 
-  const opp = players.find(
-    (p: any) => p?.battleTag?.toLowerCase() !== target
-  );
+  const opp = players.find((p: any) => p !== me);
   if (!opp) return null;
 
   return { me, opp };

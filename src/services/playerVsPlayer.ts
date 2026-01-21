@@ -4,6 +4,7 @@ import {
   RACE_MAP,
 } from "../lib/w3cUtils";
 
+import { resolveBattleTagViaSearch } from "../lib/w3cBattleTagResolver";
 import { applyRacePlacement } from "../lib/racePlacement";
 
 /* -------------------- CONSTANTS -------------------- */
@@ -17,7 +18,7 @@ const HIGH_GAIN_THRESHOLD = 15;
 
 /* -------------------- TYPES -------------------- */
 
-type Game = {
+export type Game = {
   result: "W" | "L";
   myName: string;
   oppName: string;
@@ -42,41 +43,118 @@ type OpponentAgg = {
 
 /* -------------------- HELPERS -------------------- */
 
-function displayMyRace(g: Game): string {
+export function displayMyRace(g: Game): string {
   if (g.myRace !== "Random") return g.myRace;
   const rolled = RACE_MAP[g.raceCode] || "Unknown";
   return `Random (${rolled})`;
 }
 
+/* -------------------- OUTPUT TYPE -------------------- */
+
+export type W3CVsPlayerContext = {
+  battletag: string;
+  seasons: number[];
+
+  rules: {
+    minGames: number;
+    minTotalGames: number;
+    minDurationSeconds: number;
+    maxExtremeAbsMmrChange: number;
+    highGainThreshold: number;
+    seasonFilteredTo: number;
+  };
+
+  totals: {
+    strictGamesAll: number;
+    opponentsEligible: number;
+  };
+
+  extremes: {
+    largestSingleGain: number | null;
+    largestSingleLoss: number | null;
+    largestLossGame: Game | null;
+
+    largestGapWin: (Game & { gap: number }) | null;
+    largestGapLoss: (Game & { gap: number }) | null;
+
+    highGainGames: Game[];
+    gainGamesToShow: Game[];
+  };
+
+  best: {
+    tag: string;
+    oppRace: string;
+    wins: number;
+    losses: number;
+    totalGames: number;
+    winrate: number;
+    netMMR: number;
+    gamesSortedByOppMMRDesc: Game[];
+    avgOppMMR: number;
+    avgMyMMR: number;
+    adjustedWinrate: number;
+  } | null;
+
+  worst: {
+    tag: string;
+    oppRace: string;
+    wins: number;
+    losses: number;
+    totalGames: number;
+    winrate: number;
+    netMMR: number;
+    gamesSortedByOppMMRDesc: Game[];
+    avgOppMMR: number;
+    avgMyMMR: number;
+    adjustedWinrate: number;
+  } | null;
+
+  opponents: {
+    tag: string;
+    wins: number;
+    losses: number;
+    totalGames: number;
+    winrate: number;
+    netMMR: number;
+    oppRace: string;
+    avgOppMMR: number;
+    avgMyMMR: number;
+    games: Game[];
+  }[];
+};
+
 /* -------------------- SERVICE -------------------- */
 
-export async function getVsPlayerStats(
+export async function getPlayerVsPlayer(
   inputTag: string
-): Promise<{ result: string } | null> {
-  let BATTLETAG = inputTag.trim();
-  let allMatches = await fetchAllMatches(BATTLETAG, SEASONS);
+): Promise<W3CVsPlayerContext | null> {
+  const raw = String(inputTag ?? "").trim();
+  if (!raw) return null;
 
-  // Case-normalized retry
-  if (!allMatches.length && BATTLETAG.includes("#")) {
-    const [name, id] = BATTLETAG.split("#");
-    BATTLETAG = `${name.toLowerCase()}#${id}`;
-    allMatches = await fetchAllMatches(BATTLETAG, SEASONS);
-  }
+  /* =====================================================
+     CANONICAL RESOLUTION (SEARCH BAR AUTHORITY)
+     ===================================================== */
 
+  const canonicalTag = await resolveBattleTagViaSearch(raw);
+  if (!canonicalTag) return null;
+
+  /* -------------------- MATCH FETCH -------------------- */
+
+  const allMatches = await fetchAllMatches(canonicalTag, SEASONS);
   if (!allMatches.length) return null;
 
-  const targetLower = BATTLETAG.toLowerCase();
+  const targetLower = canonicalTag.toLowerCase();
 
   allMatches.sort(
     (a: any, b: any) =>
-      new Date(a.startTime).getTime() -
-      new Date(b.startTime).getTime()
+      new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
   );
 
   const raceGameCount: Record<string, number> = {};
   const strictGamesAll: Game[] = [];
 
   for (const match of allMatches) {
+    // Explicitly filter to S23 only (existing behavior)
     if (match.gameMode !== 1 || match.season !== 23) continue;
 
     const pair = getPlayerAndOpponent(match, targetLower);
@@ -85,24 +163,23 @@ export async function getVsPlayerStats(
     const { me, opp } = pair;
     const race = RACE_MAP[me.race] || "Unknown";
 
-    const isActive = applyRacePlacement({
-      raceCounters: raceGameCount,
-      race,
-    });
-    if (!isActive) continue;
+    if (
+      !applyRacePlacement({
+        raceCounters: raceGameCount,
+        race,
+      })
+    ) continue;
 
     if (
       typeof match.durationInSeconds !== "number" ||
       match.durationInSeconds < MIN_DURATION_SECONDS
-    )
-      continue;
+    ) continue;
 
     if (
       typeof me.mmrGain !== "number" ||
       typeof me.oldMmr !== "number" ||
       typeof opp.oldMmr !== "number"
-    )
-      continue;
+    ) continue;
 
     strictGamesAll.push({
       result: me.won ? "W" : "L",
@@ -127,9 +204,7 @@ export async function getVsPlayerStats(
 
   /* -------------------- AGGREGATION -------------------- */
 
-  function aggregateFromGames(
-    games: Game[]
-  ): [string, OpponentAgg][] {
+  function aggregateFromGames(games: Game[]): [string, OpponentAgg][] {
     const opponents: Record<string, OpponentAgg> = {};
 
     for (const g of games) {
@@ -172,9 +247,7 @@ export async function getVsPlayerStats(
     return (o.wins + PRIOR_GAMES * PRIOR_WR) / (o.totalGames + PRIOR_GAMES);
   }
 
-  function bestOpponent(
-    list: [string, OpponentAgg][]
-  ): [string, OpponentAgg] | undefined {
+  function bestOpponent(list: [string, OpponentAgg][]) {
     return list
       .filter(([, o]) => {
         const avgOpp = o.oppMMRSum / o.totalGames;
@@ -189,20 +262,18 @@ export async function getVsPlayerStats(
       })[0];
   }
 
-  function worstOpponent(
-    list: [string, OpponentAgg][]
-  ): [string, OpponentAgg] | undefined {
-    return list.sort((a, b) => {
-      const wrA = a[1].wins / a[1].totalGames;
-      const wrB = b[1].wins / b[1].totalGames;
-      return wrA - wrB;
-    })[0];
+  function worstOpponent(list: [string, OpponentAgg][]) {
+    return list.sort(
+      (a, b) =>
+        a[1].wins / a[1].totalGames -
+        b[1].wins / b[1].totalGames
+    )[0];
   }
 
   const best = agg.length ? bestOpponent([...agg]) : undefined;
   const worst = agg.length ? worstOpponent([...agg]) : undefined;
 
-  /* -------------------- EXTREMES -------------------- */
+  /* -------------------- EXTREMES (UNCHANGED) -------------------- */
 
   let largestSingleGain: number | null = null;
   let largestSingleLoss: number | null = null;
@@ -215,31 +286,26 @@ export async function getVsPlayerStats(
 
   for (const g of strictGamesAll) {
     if (Math.abs(g.mmrChange) <= MAX_EXTREME_ABS_MMR_CHANGE) {
-      if (largestSingleGain === null || g.mmrChange > largestSingleGain) {
+      if (largestSingleGain === null || g.mmrChange > largestSingleGain)
         largestSingleGain = g.mmrChange;
-      }
 
-      if (g.mmrChange >= HIGH_GAIN_THRESHOLD) {
+      if (g.mmrChange >= HIGH_GAIN_THRESHOLD)
         highGainGames.push(g);
-      }
 
-      if (g.mmrChange < 0) {
+      if (g.mmrChange < 0)
         lossCandidates.push(g);
-      }
     }
 
     const gap = Math.abs(g.myMMR - g.oppMMR);
 
     if (g.result === "W" && g.myMMR < g.oppMMR) {
-      if (!largestGapWin || gap > largestGapWin.gap) {
+      if (!largestGapWin || gap > largestGapWin.gap)
         largestGapWin = { gap, ...g };
-      }
     }
 
     if (g.result === "L" && g.myMMR > g.oppMMR) {
-      if (!largestGapLoss || gap > largestGapLoss.gap) {
+      if (!largestGapLoss || gap > largestGapLoss.gap)
         largestGapLoss = { gap, ...g };
-      }
     }
   }
 
@@ -250,102 +316,79 @@ export async function getVsPlayerStats(
   }
 
   const gainGamesToShow =
-    highGainGames.length > 0
+    highGainGames.length
       ? highGainGames
       : largestSingleGain !== null
-      ? strictGamesAll.filter(
-          g => g.mmrChange === largestSingleGain
-        ).slice(0, 1)
+      ? strictGamesAll.filter(g => g.mmrChange === largestSingleGain).slice(0, 1)
       : [];
 
-  /* -------------------- RENDER -------------------- */
+  /* -------------------- OUTPUT -------------------- */
 
-  function render(
-    title: string,
-    result?: [string, OpponentAgg]
-  ): string {
-    if (!result) return "";
+  const packOpponent = (result?: [string, OpponentAgg]) => {
+    if (!result) return null;
 
     const [tag, r] = result;
-    const wr = ((r.wins / r.totalGames) * 100).toFixed(1);
     const oppRace = r.games[0]?.oppRace ?? "Unknown";
 
-    let out = `${title}\n`;
-    out += `Opponent: ${tag} (${oppRace})\n`;
-    out += `Record: ${r.wins}–${r.losses} (${wr}%)\n`;
-    out += `Games: ${r.totalGames}\n`;
-    out += `Net MMR: ${r.netMMR}\n`;
-    out += `Games:\n`;
+    return {
+      tag,
+      oppRace,
+      wins: r.wins,
+      losses: r.losses,
+      totalGames: r.totalGames,
+      winrate: +(r.wins / r.totalGames * 100).toFixed(1),
+      netMMR: r.netMMR,
+      gamesSortedByOppMMRDesc: [...r.games].sort(
+        (a, b) => b.oppMMR - a.oppMMR
+      ),
+      avgOppMMR: r.oppMMRSum / r.totalGames,
+      avgMyMMR: r.myMMRSum / r.totalGames,
+      adjustedWinrate: adjustedWinrate(r),
+    };
+  };
 
-    out += [...r.games]
-      .sort((a, b) => b.oppMMR - a.oppMMR)
-      .map(
-        g =>
-          `${g.result === "W" ? "W" : "L"} ${displayMyRace(g)} (${g.myMMR}) vs ` +
-          `${g.oppRace} (${g.oppMMR}) | ` +
-          `${g.mmrChange > 0 ? "+" : ""}${g.mmrChange}`
-      )
-      .join("\n");
+  return {
+    battletag: canonicalTag,
+    seasons: SEASONS,
 
-    return out + "\n\n";
-  }
+    rules: {
+      minGames: MIN_GAMES,
+      minTotalGames: MIN_TOTAL_GAMES,
+      minDurationSeconds: MIN_DURATION_SECONDS,
+      maxExtremeAbsMmrChange: MAX_EXTREME_ABS_MMR_CHANGE,
+      highGainThreshold: HIGH_GAIN_THRESHOLD,
+      seasonFilteredTo: 23,
+    },
 
-  /* -------------------- MESSAGE -------------------- */
+    totals: {
+      strictGamesAll: strictGamesAll.length,
+      opponentsEligible: agg.length,
+    },
 
-  let message =
-    `📊 ${BATTLETAG} — Opponent Breakdown (Min ${MIN_GAMES} games, Season 23)\n\n` +
-    `MMR Extremes (All valid games)\n`;
+    extremes: {
+      largestSingleGain,
+      largestSingleLoss,
+      largestLossGame,
+      largestGapWin,
+      largestGapLoss,
+      highGainGames,
+      gainGamesToShow,
+    },
 
-  if (gainGamesToShow.length) {
-    message +=
-      `Largest single-game gain (If +15 or more, all games will show)\n` +
-      gainGamesToShow
-        .map(
-          g =>
-            `${g.result === "W" ? "W" : "L"} ${g.myName} ${displayMyRace(g)} (${g.myMMR}) vs ` +
-            `${g.oppName} ${g.oppRace} (${g.oppMMR}) | ` +
-            `${g.mmrChange > 0 ? "+" : ""}${g.mmrChange}`
-        )
-        .join("\n") +
-      "\n";
-  }
+    best: packOpponent(best),
+    worst: packOpponent(worst),
 
-  if (largestLossGame) {
-    message +=
-      `Largest single-game loss: ` +
-      `${largestLossGame.myRace} (${largestLossGame.myMMR}) vs ` +
-      `${largestLossGame.oppName} ${largestLossGame.oppRace} (${largestLossGame.oppMMR}) | ` +
-      `${largestSingleLoss}\n`;
-  }
-
-  message += `\nMMR Gap Extremes\n`;
-
-  if (largestGapWin) {
-    message +=
-      `Largest gap in MMR win: ` +
-      `${largestGapWin.myRace} (${largestGapWin.myMMR}) vs ` +
-      `${largestGapWin.oppName} ${largestGapWin.oppRace} (${largestGapWin.oppMMR}) | +${largestGapWin.gap}\n`;
-  }
-
-  if (largestGapLoss) {
-    message +=
-      `Largest gap in MMR loss: ` +
-      `${largestGapLoss.myRace} (${largestGapLoss.myMMR}) vs ` +
-      `${largestGapLoss.oppName} ${largestGapLoss.oppRace} (${largestGapLoss.oppMMR}) | -${largestGapLoss.gap}\n`;
-  }
-
-  message += render(
-    "Best Winrate vs Opponent (% + MMR-weighted)",
-    best
-  );
-  message += render(
-    "Lowest Winrate vs Opponent (Min game length ≥2 min)",
-    worst
-  );
-
-  if (message.length > 1900) {
-    message = message.slice(0, 1900) + "\n…(truncated)";
-  }
-
-  return { result: message };
+    opponents: agg.map(([tag, o]) => ({
+      tag,
+      wins: o.wins,
+      losses: o.losses,
+      totalGames: o.totalGames,
+      winrate: +(o.wins / o.totalGames * 100).toFixed(1),
+      netMMR: o.netMMR,
+      oppRace: o.games[0]?.oppRace ?? "Unknown",
+      avgOppMMR: o.oppMMRSum / o.totalGames,
+      avgMyMMR: o.myMMRSum / o.totalGames,
+      games: o.games,
+    })),
+  };
 }

@@ -1,8 +1,7 @@
-import {
-  fetchAllMatches,
-  getPlayerAndOpponent,
-  resolveEffectiveRace,
-} from "../lib/w3cUtils";
+import { fetchAllMatches, resolveEffectiveRace } from "../lib/w3cUtils";
+import { resolveBattleTagViaSearch } from "../lib/w3cBattleTagResolver";
+
+/* -------------------- CONSTANTS -------------------- */
 
 const SEASONS = [20, 21, 22, 23];
 const CURRENT_SEASON = SEASONS[SEASONS.length - 1];
@@ -11,6 +10,8 @@ const LAST_3_SEASONS = SEASONS.slice(-3);
 const MIN_DURATION_SECONDS = 120;
 const MAX_EXTREME_ABS_MMR_CHANGE = 30;
 const HIGH_GAIN_THRESHOLD = 15;
+
+/* -------------------- TYPES -------------------- */
 
 type AnyMatch = any;
 
@@ -29,24 +30,54 @@ type Peak = {
   game: number;
 };
 
+/* -------------------- PAIRING (CASE-INSENSITIVE) -------------------- */
+// This is the bugfix: your "advanced sections" depended on a pairing function.
+// If pairing is case-sensitive, it silently fails for most users (but works for you).
+function getPlayerAndOpponentCI(match: any, targetKeyLower: string) {
+  const teams = match?.teams ?? [];
+  const players: any[] = teams.flatMap((t: any) => t?.players ?? []);
+
+  if (players.length < 2) return null;
+
+  const me = players.find(
+    (p: any) =>
+      typeof p?.battleTag === "string" &&
+      p.battleTag.toLowerCase() === targetKeyLower
+  );
+  if (!me) return null;
+
+  // 1v1 assumption: opponent is the "other" player
+  const opp = players.find(
+    (p: any) =>
+      p !== me &&
+      typeof p?.battleTag === "string" &&
+      p.battleTag.toLowerCase() !== targetKeyLower
+  );
+  if (!opp) return null;
+
+  return { me, opp };
+}
+
+/* -------------------- SERVICE -------------------- */
+
 export async function getPlayerSummary(inputTag: string) {
-  let battleTag = String(inputTag || "").trim();
-  let allMatches: AnyMatch[] = await fetchAllMatches(battleTag, SEASONS);
+  const raw = String(inputTag ?? "").trim();
+  if (!raw) return null;
 
-  // fallback: lowercase name only
-  if (!allMatches.length && battleTag.includes("#")) {
-    const [name, id] = battleTag.split("#");
-    battleTag = `${String(name).toLowerCase()}#${String(id)}`;
-    allMatches = await fetchAllMatches(battleTag, SEASONS);
-  }
+  /* =====================================================
+     CANONICAL RESOLUTION (SEARCH BAR AUTHORITY)
+     ===================================================== */
 
+  const canonicalBattleTag = await resolveBattleTagViaSearch(raw);
+  if (!canonicalBattleTag) return null;
+
+  const allMatches: AnyMatch[] = await fetchAllMatches(canonicalBattleTag, SEASONS);
   if (!allMatches.length) return null;
 
-  const targetLower = battleTag.toLowerCase();
+  const targetKeyLower = canonicalBattleTag.toLowerCase();
 
   allMatches.sort(
-    (a, b) =>
-      new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+    (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
   );
 
   /* ───────── Recent Stats ───────── */
@@ -65,7 +96,7 @@ export async function getPlayerSummary(inputTag: string) {
 
     for (const team of match.teams ?? []) {
       for (const player of team.players ?? []) {
-        if (player?.battleTag?.toLowerCase() !== targetLower) continue;
+        if (player?.battleTag?.toLowerCase() !== targetKeyLower) continue;
 
         const race = resolveEffectiveRace(player);
         const mmr = player.currentMmr;
@@ -73,18 +104,14 @@ export async function getPlayerSummary(inputTag: string) {
         raceGamesAllTime[race] = (raceGamesAllTime[race] || 0) + 1;
 
         if (season === CURRENT_SEASON) {
-          raceGamesCurrentSeason[race] =
-            (raceGamesCurrentSeason[race] || 0) + 1;
+          raceGamesCurrentSeason[race] = (raceGamesCurrentSeason[race] || 0) + 1;
         }
 
         lastPlayedRace[race] = date;
 
         if (typeof mmr === "number") {
           raceMMRCurrent[race] = mmr;
-          if (
-            !highestCurrentRace ||
-            mmr > (raceMMRCurrent[highestCurrentRace] ?? 0)
-          ) {
+          if (!highestCurrentRace || mmr > (raceMMRCurrent[highestCurrentRace] ?? 0)) {
             highestCurrentRace = race;
           }
         }
@@ -102,7 +129,7 @@ export async function getPlayerSummary(inputTag: string) {
     if (match.gameMode !== 1) return false;
     if (match.durationInSeconds < MIN_DURATION_SECONDS) return false;
 
-    const pair = getPlayerAndOpponent(match, targetLower);
+    const pair = getPlayerAndOpponentCI(match, targetKeyLower);
     if (!pair) return false;
 
     const { me, opp } = pair;
@@ -111,8 +138,9 @@ export async function getPlayerSummary(inputTag: string) {
       typeof me.mmrGain !== "number" ||
       typeof me.oldMmr !== "number" ||
       typeof opp.oldMmr !== "number"
-    )
+    ) {
       return false;
+    }
 
     return Math.abs(me.mmrGain) <= MAX_EXTREME_ABS_MMR_CHANGE;
   });
@@ -131,7 +159,7 @@ export async function getPlayerSummary(inputTag: string) {
   for (const match of filteredMatches) {
     if (!LAST_3_SEASONS.includes(match.season)) continue;
 
-    const pair = getPlayerAndOpponent(match, targetLower);
+    const pair = getPlayerAndOpponentCI(match, targetKeyLower);
     if (!pair) continue;
 
     const { me, opp } = pair;
@@ -140,6 +168,7 @@ export async function getPlayerSummary(inputTag: string) {
     raceCounters[race] ??= 0;
     raceCounters[race]++;
 
+    // Your original rule (kept): only start peaks after 35 games per race
     if (raceCounters[race] <= 35) continue;
 
     if (typeof me.currentMmr === "number") {
@@ -192,19 +221,14 @@ export async function getPlayerSummary(inputTag: string) {
   }
 
   const gainGamesToShow =
-    highGainGames.length > 0
-      ? highGainGames
-      : fallbackMaxGame
-      ? [fallbackMaxGame]
-      : [];
+    highGainGames.length > 0 ? highGainGames : fallbackMaxGame ? [fallbackMaxGame] : [];
 
   const mostPlayedAllTime =
-    Object.entries(raceGamesAllTime).sort((a, b) => b[1] - a[1])[0]?.[0] ??
-    "Unknown";
+    Object.entries(raceGamesAllTime).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "Unknown";
 
   const mostPlayedThisSeason =
-    Object.entries(raceGamesCurrentSeason).sort((a, b) => b[1] - a[1])[0]
-      ?.[0] ?? "Unknown";
+    Object.entries(raceGamesCurrentSeason).sort((a, b) => b[1] - a[1])[0]?.[0] ??
+    "Unknown";
 
   const timeAgo = (d: Date) => {
     const days = Math.floor((Date.now() - d.getTime()) / 86400000);
@@ -214,14 +238,11 @@ export async function getPlayerSummary(inputTag: string) {
   const top2PeaksText = Object.entries(racePeaks)
     .sort((a, b) => b[1].mmr - a[1].mmr)
     .slice(0, 2)
-    .map(
-      ([race, d]) =>
-        `${race}: ${d.mmr} MMR (Season ${d.season}, Game ${d.game})`
-    )
+    .map(([race, d]) => `${race}: ${d.mmr} MMR (Season ${d.season}, Game ${d.game})`)
     .join("\n");
 
   const result = `
-📊 W3Champions Summary — ${battleTag}
+📊 W3Champions Summary — ${canonicalBattleTag}
 Most played race (all-time): ${mostPlayedAllTime}
 Most played race (Season ${CURRENT_SEASON}): ${mostPlayedThisSeason}
 Race with current highest MMR: ${highestCurrentRace}: ${
@@ -235,9 +256,7 @@ Last played current highest MMR race: ${highestCurrentRace}, ${
       : "N/A"
   }
 Last played ladder (any race): ${
-    lastPlayedLadder
-      ? `${lastPlayedLadder.toLocaleDateString()} (${timeAgo(lastPlayedLadder)})`
-      : "N/A"
+    lastPlayedLadder ? `${lastPlayedLadder.toLocaleDateString()} (${timeAgo(lastPlayedLadder)})` : "N/A"
   }
 
 📈 Top 2 Race Peak MMRs in last 3 seasons
@@ -278,12 +297,11 @@ ${
   return {
     result,
     summary: {
-      battletag: battleTag,
+      battletag: canonicalBattleTag,
       mostPlayedAllTime,
       mostPlayedThisSeason,
       highestCurrentRace,
-      highestCurrentMMR:
-        highestCurrentRace ? raceMMRCurrent[highestCurrentRace] : null,
+      highestCurrentMMR: highestCurrentRace ? raceMMRCurrent[highestCurrentRace] : null,
       lastPlayedLadder: lastPlayedLadder?.toISOString() ?? null,
       lastPlayedRace: Object.fromEntries(
         Object.entries(lastPlayedRace).map(([k, v]) => [k, v.toISOString()])
