@@ -1,27 +1,32 @@
 import { notFound } from "next/navigation";
-import { getVsPlayerStats } from "@/services/playerVsPlayer";
+import { getPlayerVsPlayer } from "@/services/playervsPlayer";
 
 type PageProps = {
-  params: {
+  params: Promise<{
     battletag: string;
-  };
+  }>;
 };
 
 export default async function VsPlayerPage({ params }: PageProps) {
-  const battletag = params?.battletag;
+  const { battletag } = await params;
   if (!battletag) notFound();
 
   // DO NOT decode or normalize here.
   // Service fully owns canonical resolution.
-  const data = await getVsPlayerStats(battletag);
+  const data = await getPlayerVsPlayer(battletag);
   if (!data) notFound();
 
   return (
-    <div className="space-y-10 text-sm leading-relaxed">
+    <div className="space-y-10 text-sm leading-relaxed rounded-lg bg-white p-6 shadow dark:bg-gray-dark">
       {/* HEADER */}
-      <h1 className="text-lg font-semibold">
-        {data.battletag} — Opponent Breakdown (Season 23)
-      </h1>
+      <div>
+        <h1 className="text-xl font-semibold text-black dark:text-white">
+          {data.battletag} — Opponent Breakdown
+        </h1>
+        <p className="text-sm text-gray-500">
+          Season 23 · 1v1 Ladder
+        </p>
+      </div>
 
       {/* MMR EXTREMES */}
       <section>
@@ -29,9 +34,7 @@ export default async function VsPlayerPage({ params }: PageProps) {
 
         {data.extremes.gainGamesToShow.length > 0 && (
           <div className="space-y-1">
-            <div className="font-medium">
-              Largest Single-Game Gain
-            </div>
+            <div className="font-medium">Largest Single-Game Gain</div>
 
             {data.extremes.gainGamesToShow.map((g, i) => (
               <div

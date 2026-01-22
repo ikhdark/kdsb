@@ -2,9 +2,9 @@ import { notFound } from "next/navigation";
 import { getW3CHeroStats } from "@/services/playerHeroes";
 
 type PageProps = {
-  params: {
+  params: Promise<{
     battletag: string;
-  };
+  }>;
 };
 
 function Section({
@@ -16,10 +16,10 @@ function Section({
 }) {
   return (
     <section className="space-y-2">
-      <h2 className="border-b border-gray-300 pb-1 font-semibold uppercase tracking-wide text-sm text-black dark:border-gray-700 dark:text-white">
+      <h2 className="border-b border-gray-300 pb-1 text-sm font-semibold uppercase tracking-wide text-black dark:border-gray-700 dark:text-white">
         {title}
       </h2>
-      <div className="space-y-1 text-sm">{children}</div>
+      <div className="space-y-2 text-sm">{children}</div>
     </section>
   );
 }
@@ -34,20 +34,22 @@ function StatRow({
   winrate?: number;
 }) {
   return (
-    <div className="grid grid-cols-[1fr_auto] gap-x-4 items-center">
-      <span>{label}</span>
-      <span className="tabular-nums font-medium">{value}</span>
+    <div className="space-y-1">
+      <div className="grid grid-cols-[1fr_auto] gap-x-4 items-center">
+        <span>{label}</span>
+        <span className="tabular-nums font-medium">{value}</span>
+      </div>
 
       {typeof winrate === "number" && (
-        <div className="col-span-2 mt-1 h-1.5 bg-gray-200 rounded overflow-hidden dark:bg-gray-700">
+        <div className="h-1.5 bg-gray-200 rounded overflow-hidden dark:bg-gray-700">
           <div
-            className={`h-full ${
+            className={
               winrate >= 55
-                ? "bg-emerald-500"
+                ? "bg-emerald-500 h-full"
                 : winrate >= 48
-                ? "bg-yellow-500"
-                : "bg-rose-500"
-            }`}
+                ? "bg-yellow-500 h-full"
+                : "bg-rose-500 h-full"
+            }
             style={{ width: `${Math.min(100, Math.max(0, winrate))}%` }}
           />
         </div>
@@ -57,10 +59,10 @@ function StatRow({
 }
 
 export default async function HeroesPage({ params }: PageProps) {
-  const battletag = params?.battletag;
+  const { battletag } = await params;
   if (!battletag) notFound();
 
-  // DO NOT decode or normalize here
+  // service owns canonicalization
   const data = await getW3CHeroStats(battletag);
   if (!data) notFound();
 
@@ -69,68 +71,55 @@ export default async function HeroesPage({ params }: PageProps) {
     .map(l => l.trim())
     .filter(Boolean);
 
-  const HEADERS = [
-    "YOUR W/L BY YOUR HERO COUNT",
-    "YOUR W/L VS OPPONENT HERO COUNT",
-    "YOUR TOP 5 BEST WINRATES VS OPPONENT OPENING HERO",
-    "TOP 5 WORST WINRATES VS OPPONENT OPENING HERO",
-    "YOUR TOP 5 WORST WINRATES VS OPPONENT OPENING HERO",
-    "YOUR TOP 5 BEST WINRATES VS OPPONENT HEROES OVERALL",
-    "YOUR TOP 5 WORST WINRATES VS OPPONENT HEROES OVERALL",
-  ];
-
   const normalize = (s: string) =>
     s.toUpperCase().replace(/\s+/g, " ").trim();
 
-  function collectSection(possibleHeaders: string[]) {
-    const wanted = possibleHeaders.map(normalize);
-    const start = lines.findIndex(l =>
-      wanted.includes(normalize(l))
-    );
+  const HEADERS = new Set([
+    normalize("Your W/L by Your Hero Count"),
+    normalize("Your W/L vs Opponent Hero Count"),
+    normalize("Your Top 5 Best Winrates vs Opponent Opening Hero"),
+    normalize("Top 5 Worst Winrates vs Opponent Opening Hero"),
+    normalize("Your Top 5 Best Winrates vs Opponent Heroes Overall"),
+    normalize("Your Top 5 Worst Winrates vs Opponent Heroes Overall"),
+  ]);
+
+  function collectSection(headers: string[]) {
+    const wanted = headers.map(normalize);
+    const start = lines.findIndex(l => wanted.includes(normalize(l)));
     if (start === -1) return [];
 
     const out: string[] = [];
     for (let i = start + 1; i < lines.length; i++) {
-      if (HEADERS.includes(normalize(lines[i]))) break;
+      if (HEADERS.has(normalize(lines[i]))) break;
       out.push(lines[i]);
     }
     return out;
   }
 
-  const byHeroCount = collectSection([
-    "YOUR W/L BY YOUR HERO COUNT",
-  ]);
-
-  const vsOppHeroCount = collectSection([
-    "YOUR W/L VS OPPONENT HERO COUNT",
-  ]);
-
+  const byHeroCount = collectSection(["Your W/L by Your Hero Count"]);
+  const vsOppHeroCount = collectSection(["Your W/L vs Opponent Hero Count"]);
   const bestOpeners = collectSection([
-    "YOUR TOP 5 BEST WINRATES VS OPPONENT OPENING HERO",
-    "TOP 5 BEST WINRATES VS OPPONENT OPENING HERO",
+    "Your Top 5 Best Winrates vs Opponent Opening Hero",
   ]);
-
   const worstOpeners = collectSection([
-    "TOP 5 WORST WINRATES VS OPPONENT OPENING HERO",
-    "YOUR TOP 5 WORST WINRATES VS OPPONENT OPENING HERO",
+    "Top 5 Worst Winrates vs Opponent Opening Hero",
   ]);
-
   const bestOverall = collectSection([
-    "YOUR TOP 5 BEST WINRATES VS OPPONENT HEROES OVERALL",
+    "Your Top 5 Best Winrates vs Opponent Heroes Overall",
   ]);
-
   const worstOverall = collectSection([
-    "YOUR TOP 5 WORST WINRATES VS OPPONENT HEROES OVERALL",
+    "Your Top 5 Worst Winrates vs Opponent Heroes Overall",
   ]);
 
   return (
     <div className="space-y-10 rounded-lg bg-white p-6 shadow dark:bg-gray-dark">
+      {/* HEADER */}
       <div>
         <h1 className="text-xl font-semibold text-black dark:text-white">
-          Hero Statistics
+          {data.battletag}
         </h1>
         <p className="text-sm text-gray-500">
-          Season 23 · All Races
+          Season {data.seasons.join(", ")} · All Races
         </p>
       </div>
 
@@ -190,7 +179,7 @@ export default async function HeroesPage({ params }: PageProps) {
         })}
       </Section>
 
-      <Section title="Top 5 Best Winrates vs Opponent Heroes (Overall)">
+      <Section title="Best Winrates vs Opponent Heroes (Overall)">
         {bestOverall.map((l, i) => (
           <div key={i} className="flex justify-between tabular-nums">
             <span>{l.split(":")[0]}</span>
@@ -199,7 +188,7 @@ export default async function HeroesPage({ params }: PageProps) {
         ))}
       </Section>
 
-      <Section title="Top 5 Worst Winrates vs Opponent Heroes (Overall)">
+      <Section title="Worst Winrates vs Opponent Heroes (Overall)">
         {worstOverall.map((l, i) => (
           <div key={i} className="flex justify-between tabular-nums">
             <span>{l.split(":")[0]}</span>

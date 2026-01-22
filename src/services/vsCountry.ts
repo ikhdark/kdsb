@@ -1,3 +1,5 @@
+// src/services/vsCountry.ts
+console.log("vsCountry module loaded");
 import { fetchPlayerProfile } from "./w3cApi";
 import { fetchAllMatches } from "../lib/w3cUtils";
 import { resolveBattleTagViaSearch } from "../lib/w3cBattleTagResolver";
@@ -10,7 +12,6 @@ countries.registerLocale(enLocale);
 /* -------------------- CONSTANTS -------------------- */
 
 const MIN_DURATION_SECONDS = 120;
-const DEFAULT_WINDOW_DAYS = 120;
 const SEASONS = [20, 21, 22, 23];
 
 const UNKNOWN_COUNTRY = "UN";
@@ -32,12 +33,13 @@ const COUNTRY_SHORT: Record<string, string> = {
   CF: "CAR",
 };
 
+// W3C race IDs: 1 Human, 2 Orc, 4 Night Elf, 8 Undead, 0 Random
 const RACE_LABEL: Record<number, string> = {
   0: "Random",
   1: "Human",
-  2: "Undead",
+  2: "Orc",
   4: "Night Elf",
-  8: "Orc",
+  8: "Undead",
 };
 
 /* -------------------- TYPES -------------------- */
@@ -52,13 +54,50 @@ type CountryAgg = {
   games: number;
   wins: number;
   losses: number;
-  oppSet: Set<string>; // canonical-lower
+  oppSet: Set<string>; // lowercased battletags
   race: Map<number, CountryRaceRow>;
   mmr: { sumOpp: number; sumSelf: number; n: number };
   time: { sum: number; n: number };
 };
 
+export type W3CCountryStatsResponse = {
+  battletag: string; // canonical casing
+  homeCountry: string;
+  homeCountryLabel: string;
+  countries: {
+    country: string;
+    label: string;
+    games: number;
+    wins: number;
+    losses: number;
+    winRate: number;
+    uniqueOpponents: number;
+    avgGamesPerOpponent: number;
+    avgOpponentMMR: number | null;
+    avgSelfMMR: number | null;
+    timePlayedSeconds: number;
+    timeShare: number;
+    avgGameSeconds: number | null;
+    races: {
+      raceId: number;
+      race: string;
+      games: number;
+      wins: number;
+      losses: number;
+      winRate: number;
+    }[];
+  }[];
+};
+
 /* -------------------- HELPERS -------------------- */
+
+function safeDecode(s: string): string {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+}
 
 function normalizeBT(bt: unknown): string {
   return String(bt ?? "").trim().toLowerCase();
@@ -70,18 +109,68 @@ function iso2(code: unknown): string {
 }
 
 function resolveCountryFromProfile(profile: any): string {
-  return iso2(
-    profile?.playerAkaData?.country ||
-      profile?.countryCode ||
-      profile?.location ||
-      profile?.country ||
-      ""
-  );
+  return iso2(profile?.countryCode || profile?.location || "");
+}
+
+function countryLabel(code: string): string {
+  if (!code || code === UNKNOWN_COUNTRY) return "Unknown";
+  return COUNTRY_SHORT[code] || countries.getName(code, "en") || code;
+}
+
+function safeDiv(a: number, b: number): number {
+  return b > 0 ? a / b : 0;
+}
+
+function pickOpponent1v1(
+  match: any,
+  selfLower: string
+): { self: any; opp: any } | null {
+  if (!Array.isArray(match?.teams)) return null;
+
+  const players: any[] = [];
+  for (const t of match.teams) {
+    if (Array.isArray(t?.players)) {
+      for (const p of t.players) players.push(p);
+    }
+  }
+
+  if (players.length !== 2) return null;
+
+  const self = players.find((p) => normalizeBT(p?.battleTag) === selfLower);
+  if (!self) return null;
+
+  const opp = players.find((p) => p !== self);
+  if (!opp) return null;
+
+  return { self, opp };
+}
+
+function normalizeMatches(payload: any): any[] {
+  if (!payload) return [];
+
+  // Most common shapes we’ve seen:
+  // 1) Array<match>
+  if (Array.isArray(payload)) return payload;
+
+  // 2) { matches: Array<match> }
+  if (Array.isArray(payload.matches)) return payload.matches;
+
+  // 3) { data: { matches: Array<match> } }
+  if (payload.data && Array.isArray(payload.data.matches)) return payload.data.matches;
+
+  // 4) { result: { matches: Array<match> } } (rare, but cheap to support)
+  if (payload.result && Array.isArray(payload.result.matches)) return payload.result.matches;
+
+  // 5) Single match object (treat as 1-element list)
+  if (payload.teams && Array.isArray(payload.teams)) return [payload];
+
+  return [];
 }
 
 async function resolveOpponentCountry(
   opp: any,
-  cache: Map<string, string | null>
+  cache: Map<string, string | null>,
+  canonicalCache: Map<string, string | null>
 ): Promise<string | null> {
   const cc1 = iso2(opp?.countryCode);
   if (cc1) return cc1;
@@ -95,94 +184,62 @@ async function resolveOpponentCountry(
   const key = normalizeBT(rawBt);
   if (cache.has(key)) return cache.get(key)!;
 
-  try {
-    const profile = await fetchPlayerProfile(rawBt);
-    const cc3 = iso2(
-      profile?.playerAkaData?.country ||
-        profile?.countryCode ||
-        profile?.location ||
-        profile?.country
-    );
-    const out = cc3 || null;
-    cache.set(key, out);
-    return out;
-  } catch {
+  let oppCanonical = canonicalCache.get(key) ?? null;
+  if (oppCanonical === null && !canonicalCache.has(key)) {
+    oppCanonical = await resolveBattleTagViaSearch(String(rawBt));
+    canonicalCache.set(key, oppCanonical);
+  }
+
+  if (!oppCanonical) {
     cache.set(key, null);
     return null;
   }
-}
 
-function countryLabel(code: string): string {
-  if (!code || code === UNKNOWN_COUNTRY) return "Unknown";
-  return COUNTRY_SHORT[code] || countries.getName(code, "en") || code;
-}
+  const profile = await fetchPlayerProfile(oppCanonical);
+  const cc3 = iso2(profile?.countryCode || profile?.location || "");
+  const out = cc3 || null;
 
-function safeDiv(a: number, b: number): number {
-  return b > 0 ? a / b : 0;
-}
-
-function withinWindow(startTime: string, days: number): boolean {
-  if (!days) return true;
-  const ts = Date.parse(startTime);
-  return Number.isFinite(ts) && ts >= Date.now() - days * 86400000;
-}
-
-function pickOpponent1v1(
-  match: any,
-  selfLower: string
-): { self: any; opp: any } | null {
-  if (!Array.isArray(match?.teams)) return null;
-
-  const players: any[] = [];
-  for (const t of match.teams) {
-    if (Array.isArray(t.players)) {
-      for (const p of t.players) players.push(p);
-    }
-  }
-
-  if (players.length !== 2) return null;
-
-  const self = players.find(
-    p => normalizeBT(p?.battleTag) === selfLower
-  );
-  if (!self) return null;
-
-  const opp = players.find(p => p !== self);
-  if (!opp) return null;
-
-  return { self, opp };
+  cache.set(key, out);
+  return out;
 }
 
 /* -------------------- SERVICE -------------------- */
 
 export async function getW3CCountryStats(
-  inputBattletag: string,
-  opts: { windowDays?: number } = {}
-) {
-  const windowDays = opts.windowDays ?? DEFAULT_WINDOW_DAYS;
-
-  /* =====================================================
-     CANONICAL RESOLUTION (SEARCH BAR AUTHORITY)
-     ===================================================== */
-
-  const raw = decodeURIComponent(inputBattletag).trim();
+  inputBattletag: string
+): Promise<W3CCountryStatsResponse | null> {
+  const raw = safeDecode(String(inputBattletag ?? "")).trim();
   if (!raw) return null;
 
-  const canonicalTag = await resolveBattleTagViaSearch(raw);
-  if (!canonicalTag) return null;
+const canonicalTag =
+  (await resolveBattleTagViaSearch(raw)) || raw;
+  console.log("vsCountry canonicalTag =", canonicalTag);
 
   const profile = await fetchPlayerProfile(canonicalTag);
-  if (!profile) return null;
 
   const targetLower = canonicalTag.toLowerCase();
 
-  /* -------------------- HOME COUNTRY -------------------- */
-
   let homeCountry = resolveCountryFromProfile(profile);
 
-  const matches = await fetchAllMatches(canonicalTag, SEASONS);
-  if (!Array.isArray(matches) || !matches.length) return null;
+// matches: try canonical first, then lowercase fallback (some endpoints behave that way)
+const matchesA = normalizeMatches(await fetchAllMatches(canonicalTag, SEASONS));
+const matchesB =
+  canonicalTag.toLowerCase() === canonicalTag
+    ? []
+    : normalizeMatches(await fetchAllMatches(canonicalTag.toLowerCase(), SEASONS));
 
+const matches = matchesA.length ? matchesA : matchesB;
+
+console.log(
+  "vsCountry matches:",
+  "A =", matchesA.length,
+  "B =", matchesB.length,
+  "using =", matches.length
+);
+
+// TEMP: do NOT early-return
+
+  // Fallback: infer home country from match self rows
   if (!homeCountry) {
     for (const m of matches) {
       const pair = pickOpponent1v1(m, targetLower);
@@ -192,34 +249,34 @@ export async function getW3CCountryStats(
       }
     }
   }
-
   if (!homeCountry) homeCountry = UNKNOWN_COUNTRY;
-
-  /* -------------------- AGGREGATION -------------------- */
 
   const countryStats = new Map<string, CountryAgg>();
   const opponentCountryCache = new Map<string, string | null>();
+  const opponentCanonicalCache = new Map<string, string | null>();
   let totalTimeSec = 0;
 
   for (const m of matches) {
-    if (!withinWindow(m.startTime, windowDays)) continue;
-
-    const dur = Number(m.durationInSeconds);
+    const dur = Number(m?.durationInSeconds);
     if (!Number.isFinite(dur) || dur < MIN_DURATION_SECONDS) continue;
+
+
 
     const pair = pickOpponent1v1(m, targetLower);
     if (!pair) continue;
 
     const { self, opp } = pair;
 
-    const oppCC =
-      (await resolveOpponentCountry(opp, opponentCountryCache)) ||
-      UNKNOWN_COUNTRY;
+const oppCC =
+  iso2(opp?.countryCode) ||
+  iso2(opp?.location);
 
-    const won = !!self.won;
-    const raceId = Number(opp.race);
-    const selfOld = Number(self.oldMmr);
-    const oppOld = Number(opp.oldMmr);
+if (!oppCC) continue;
+
+    const won = !!self?.won;
+    const raceId = Number(opp?.race);
+    const selfOld = Number(self?.oldMmr);
+    const oppOld = Number(opp?.oldMmr);
 
     let cs = countryStats.get(oppCC);
     if (!cs) {
@@ -238,9 +295,7 @@ export async function getW3CCountryStats(
     cs.games++;
     won ? cs.wins++ : cs.losses++;
 
-    if (opp?.battleTag) {
-      cs.oppSet.add(normalizeBT(opp.battleTag));
-    }
+    if (opp?.battleTag) cs.oppSet.add(normalizeBT(opp.battleTag));
 
     if (Number.isFinite(raceId)) {
       const r = cs.race.get(raceId) ?? { games: 0, wins: 0, losses: 0 };
@@ -260,9 +315,14 @@ export async function getW3CCountryStats(
     totalTimeSec += dur;
   }
 
-  if (!countryStats.size) return null;
-
-  /* -------------------- OUTPUT -------------------- */
+if (!countryStats.size) {
+  return {
+    battletag: canonicalTag,
+    homeCountry,
+    homeCountryLabel: countryLabel(homeCountry),
+    countries: [],
+  };
+}
 
   const rows = [...countryStats.entries()].map(([cc, cs]) => ({
     country: cc,
@@ -292,7 +352,6 @@ export async function getW3CCountryStats(
     battletag: canonicalTag,
     homeCountry,
     homeCountryLabel: countryLabel(homeCountry),
-    windowDays,
     countries: rows.sort((a, b) => b.games - a.games),
   };
 }

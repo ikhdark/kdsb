@@ -9,7 +9,7 @@ import { applyRacePlacement } from "../lib/racePlacement";
 
 /* -------------------- CONSTANTS -------------------- */
 
-const SEASONS = [20, 21, 22, 23];
+const SEASONS = [23];
 const MIN_GAMES = 3;
 const MIN_TOTAL_GAMES = 30;
 const MIN_DURATION_SECONDS = 120;

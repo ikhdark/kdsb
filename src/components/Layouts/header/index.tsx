@@ -6,13 +6,13 @@ import Link from "next/link";
 import { useSidebarContext } from "@/components/Layouts/sidebar/sidebar-context";
 import { MenuIcon } from "./icons";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 function normalizeBattleTagInput(value: string): string {
   // normalize user input ONLY for routing safety
   // do NOT lowercase, do NOT decode
   return String(value)
-    .replace(/\+/g, " ") // handle querystring-style pastes
+    .replace(/\+/g, " ")
     .trim();
 }
 
@@ -20,6 +20,11 @@ export function Header() {
   const { toggleSidebar, isMobile } = useSidebarContext();
   const router = useRouter();
   const [query, setQuery] = useState("");
+  const [generatedAt, setGeneratedAt] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setGeneratedAt(new Date());
+  }, []);
 
   function submitSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -28,10 +33,7 @@ export function Header() {
     if (!normalized) return;
 
     const encoded = encodeURIComponent(normalized);
-
     router.push(`/stats/player/${encoded}/summary`);
-    // optional: keep value during dev to see what was submitted
-    // setQuery("");
   }
 
   return (
@@ -58,9 +60,19 @@ export function Header() {
 
       <div className="max-xl:hidden">
         <h1 className="mb-0.5 text-heading-5 font-bold text-dark dark:text-white">
-          KD'S W3C STATS
+          KD&apos;S W3C STATS
         </h1>
-        <p className="font-medium">A site that unlocks your W3C stats</p>
+
+        <p className="font-medium">
+          A site that unlocks your W3C stats
+        </p>
+
+        {generatedAt && (
+          <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
+            Updated {generatedAt.toLocaleTimeString()}
+          </div>
+        )}
       </div>
 
       <div className="flex flex-1 items-center justify-end gap-2 min-[375px]:gap-4">

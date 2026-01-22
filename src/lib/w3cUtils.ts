@@ -1,9 +1,32 @@
-import axios from "axios";
+// src/lib/w3cUtils.ts
+// Next.js-friendly (no axios). Keep canonical resolver single-source-of-truth.
+
+import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
+
+/* -------------------- FETCH -------------------- */
+
+const fetchFn: typeof fetch =
+  typeof globalThis !== "undefined" && typeof globalThis.fetch === "function"
+    ? globalThis.fetch.bind(globalThis)
+    : fetch;
+
+async function fetchJson<T = any>(url: string): Promise<T | null> {
+  try {
+    const res = await fetchFn(url, { cache: "no-store" });
+    if (!res.ok) return null;
+    return (await res.json()) as T;
+  } catch {
+    return null;
+  }
+}
 
 /* -------------------- CONSTANTS -------------------- */
 
 const GATEWAY = 20;
 const PAGE_SIZE = 50;
+
+// Safety: prevent any chance of an infinite loop if API misbehaves
+const MAX_PAGES_PER_SEASON = 2000;
 
 /* -------------------- RACES -------------------- */
 
@@ -23,81 +46,55 @@ export function resolveEffectiveRace(player: any): string {
   return RACE_MAP[player?.race] || "Unknown";
 }
 
-/* -------------------- BATTLETAG CANONICAL RESOLUTION -------------------- */
-
+/* -------------------- CANONICAL RESOLUTION -------------------- */
 /**
- * SINGLE AUTHORITY (UPDATED):
- * Mirrors W3C search-bar behavior via global-search.
- *
- * Rules:
- * - Identity is the numeric suffix (#XXXX)
- * - Casing matters AFTER resolution, never before
- * - Prefer active ladder accounts (most seasons)
- * - Return EXACT battleTag string from backend
+ * DO NOT create another canonical resolver.
+ * Use the locked single source of truth.
  */
 export async function resolveCanonicalBattleTag(
   input: string
 ): Promise<string | null> {
-  const raw = String(input ?? "").trim();
-  if (!raw.includes("#")) return null;
-
-  const [name, id] = raw.split("#");
-  if (!name || !id) return null;
-
-  const url =
-    "https://website-backend.w3champions.com/api/players/global-search" +
-    `?search=${encodeURIComponent(name)}&pageSize=20`;
-
-  try {
-    const res = await axios.get(url);
-    const players = res.data;
-
-    if (!Array.isArray(players) || !players.length) return null;
-
-    const targetSuffix = `#${id}`.toLowerCase();
-
-    // 1) match same numeric BattleTag id (case-insensitive)
-    const matches = players.filter(
-      (p: any) =>
-        typeof p?.battleTag === "string" &&
-        p.battleTag.toLowerCase().endsWith(targetSuffix)
-    );
-
-    if (!matches.length) return null;
-
-    // 2) prefer accounts with ladder history (most seasons)
-    matches.sort((a: any, b: any) => {
-      const aSeasons = Array.isArray(a.seasons) ? a.seasons.length : 0;
-      const bSeasons = Array.isArray(b.seasons) ? b.seasons.length : 0;
-      return bSeasons - aSeasons;
-    });
-
-    // 3) return EXACT canonical casing from backend
-    return matches[0].battleTag;
-  } catch {
-    return null;
-  }
+  return resolveBattleTagViaSearch(input);
 }
 
 /* -------------------- MATCH FETCH -------------------- */
 
+function normalizeMatches(payload: any): any[] {
+  // common shapes:
+  //  - { matches: [...] }
+  //  - { data: { matches: [...] } }
+  //  - [...] (rare)
+  //  - { match: {...} } (single)
+  if (Array.isArray(payload)) return payload;
+  if (payload && Array.isArray(payload.matches)) return payload.matches;
+  if (payload?.data && Array.isArray(payload.data.matches)) return payload.data.matches;
+  if (payload?.match) return [payload.match];
+  return [];
+}
+
 /**
  * IMPORTANT:
- * - battleTag MUST already be canonical
+ * - canonicalBattleTag MUST already be canonical
  * - NO casing changes
- * - NO retries
+ * - returns a flat array of matches
  */
 export async function fetchAllMatches(
   canonicalBattleTag: string,
   seasons: number[] = [20, 21, 22, 23]
 ): Promise<any[]> {
+  if (!canonicalBattleTag) return [];
+
   const encodedTag = encodeURIComponent(canonicalBattleTag);
   const allMatches: any[] = [];
 
   for (const season of seasons) {
     let offset = 0;
+    let pageGuard = 0;
 
     while (true) {
+      pageGuard++;
+      if (pageGuard > MAX_PAGES_PER_SEASON) break;
+
       const url =
         "https://website-backend.w3champions.com/api/matches/search" +
         `?playerId=${encodedTag}` +
@@ -106,12 +103,14 @@ export async function fetchAllMatches(
         `&offset=${offset}` +
         `&pageSize=${PAGE_SIZE}`;
 
-      const res = await axios.get(url);
-      const matches = res.data?.matches;
+      const json = await fetchJson<any>(url);
+      const matches = normalizeMatches(json);
 
-      if (!Array.isArray(matches) || matches.length === 0) break;
+      if (matches.length === 0) break;
 
       allMatches.push(...matches);
+
+      // stop if last page
       if (matches.length < PAGE_SIZE) break;
 
       offset += PAGE_SIZE;
@@ -122,26 +121,30 @@ export async function fetchAllMatches(
 }
 
 /* -------------------- PLAYER PAIR RESOLUTION -------------------- */
-
 /**
- * STRICT MATCH:
- * - battleTag comparison is EXACT
- * - caller must pass canonical BattleTag
+ * Selection-only robustness:
+ * - compare lowercased to find "me" in match payload
+ * - does NOT change canonical identity; only picks the row
  */
 export function getPlayerAndOpponent(
   match: any,
   canonicalBattleTag: string
 ): { me: any; opp: any } | null {
-  if (!Array.isArray(match?.teams)) return null;
+  if (!match || !Array.isArray(match?.teams)) return null;
 
-  const players = match.teams.flatMap((t: any) => t.players ?? []);
+  const players: any[] = match.teams.flatMap((t: any) =>
+    Array.isArray(t?.players) ? t.players : []
+  );
+
+  const targetLower = String(canonicalBattleTag ?? "").toLowerCase();
+  if (!targetLower) return null;
 
   const me = players.find(
-    (p: any) => p?.battleTag === canonicalBattleTag
+    (p: any) => String(p?.battleTag ?? "").toLowerCase() === targetLower
   );
   if (!me) return null;
 
-  const opp = players.find((p: any) => p !== me);
+  const opp = players.find((p: any) => p && p !== me);
   if (!opp) return null;
 
   return { me, opp };

@@ -1,6 +1,4 @@
-import {
-  fetchAllMatches,
-} from "@/lib/w3cUtils";
+import { fetchAllMatches } from "@/lib/w3cUtils";
 import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
 import { fetchPlayerProfile } from "@/services/w3cApi";
 
@@ -60,21 +58,13 @@ export async function getW3CHeroStats(inputTag: string) {
   const raw = String(inputTag ?? "").trim();
   if (!raw) return null;
 
-  /* =====================================================
-     CANONICAL BATTLETAG (SEARCH-BAR EXACT BEHAVIOR)
-     ===================================================== */
-
   const canonicalBattleTag = await resolveBattleTagViaSearch(raw);
   if (!canonicalBattleTag) return null;
-
-  /* -------------------- PROFILE (SECONDARY ID ONLY) -------------------- */
 
   let profile: any = null;
   try {
     profile = await fetchPlayerProfile(canonicalBattleTag);
-  } catch {
-    profile = null;
-  }
+  } catch {}
 
   const playerIdLower =
     typeof profile?.playerId === "string"
@@ -88,8 +78,6 @@ export async function getW3CHeroStats(inputTag: string) {
     (typeof profile?.battleTag === "string" ? profile.battleTag : "") ||
     raw;
 
-  /* -------------------- MATCH FETCH (CANONICAL ONLY) -------------------- */
-
   const matches = await fetchAllMatches(canonicalBattleTag, SEASONS);
   if (!matches.length) return null;
 
@@ -98,13 +86,13 @@ export async function getW3CHeroStats(inputTag: string) {
   const opponentHeroStats: Record<string, HeroStat> = {};
   const opponentPrimaryHeroStats: Record<string, HeroStat> = {};
 
-  const opponentHeroCountStats: Record<number, HeroStat> = {
+  const opponentHeroCountStats: Record<1 | 2 | 3, HeroStat> = {
     1: { games: 0, wins: 0, losses: 0 },
     2: { games: 0, wins: 0, losses: 0 },
     3: { games: 0, wins: 0, losses: 0 },
   };
 
-  const yourHeroCountStats: Record<number, HeroStat> = {
+  const yourHeroCountStats: Record<1 | 2 | 3, HeroStat> = {
     1: { games: 0, wins: 0, losses: 0 },
     2: { games: 0, wins: 0, losses: 0 },
     3: { games: 0, wins: 0, losses: 0 },
@@ -131,8 +119,9 @@ export async function getW3CHeroStats(inputTag: string) {
 
     const didWin = me.won === true;
 
-    const yourHeroCount = Math.min(me.heroes.length, 3);
-    const oppHeroCount = Math.min(opp.heroes.length, 3);
+    // 🔒 HARD CLAMP (THE ACTUAL FIX)
+    const yourHeroCount = Math.min(Math.max(me.heroes.length, 1), 3) as 1 | 2 | 3;
+    const oppHeroCount  = Math.min(Math.max(opp.heroes.length, 1), 3) as 1 | 2 | 3;
 
     yourHeroCountStats[yourHeroCount].games++;
     didWin
@@ -182,7 +171,7 @@ export async function getW3CHeroStats(inputTag: string) {
 
   const baselineWinrate = totalGames ? totalWins / totalGames : 0;
 
-  /* -------------------- OUTPUT -------------------- */
+  /* -------------------- OUTPUT (UNCHANGED) -------------------- */
 
   const out: string[] = [];
   const line = (t: string) => out.push(t);
@@ -271,5 +260,9 @@ export async function getW3CHeroStats(inputTag: string) {
       line(`${heroDisplay(hero)}: ${wr}% (${delta}%)`);
     });
 
-  return { result: out.join("\n").slice(0, 1900) };
+  return {
+    battletag: displayTag,
+    seasons: SEASONS,
+    result: out.join("\n").slice(0, 1900),
+  };
 }
