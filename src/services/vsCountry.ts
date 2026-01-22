@@ -1,5 +1,4 @@
 // src/services/vsCountry.ts
-console.log("vsCountry module loaded");
 import { fetchPlayerProfile } from "./w3cApi";
 import { fetchAllMatches } from "../lib/w3cUtils";
 import { resolveBattleTagViaSearch } from "../lib/w3cBattleTagResolver";
@@ -213,7 +212,6 @@ export async function getW3CCountryStats(
 
 const canonicalTag =
   (await resolveBattleTagViaSearch(raw)) || raw;
-  console.log("vsCountry canonicalTag =", canonicalTag);
 
   const profile = await fetchPlayerProfile(canonicalTag);
 
@@ -230,12 +228,6 @@ const matchesB =
 
 const matches = matchesA.length ? matchesA : matchesB;
 
-console.log(
-  "vsCountry matches:",
-  "A =", matchesA.length,
-  "B =", matchesB.length,
-  "using =", matches.length
-);
 
 // TEMP: do NOT early-return
 

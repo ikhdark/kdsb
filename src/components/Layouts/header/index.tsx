@@ -60,7 +60,7 @@ export function Header() {
 
       <div className="max-xl:hidden">
         <h1 className="mb-0.5 text-heading-5 font-bold text-dark dark:text-white">
-          KD&apos;S W3C STATS
+          KD&apos;S W3C STATS (Currently in BETA 1.0)
         </h1>
 
         <p className="font-medium">

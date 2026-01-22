@@ -130,6 +130,7 @@ export async function getW3CMapStats(inputTag: string) {
           oppTag: opp.battleTag,
           oppMMR: opp.oldMmr,
           mmrChange: me.mmrGain,
+          secs: dur
         };
       }
     } else {

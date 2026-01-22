@@ -1,5 +1,5 @@
 // src/services/playerRank.ts
-// Next.js-friendly ESM/TypeScript service (no Discord logic)
+// Next.js-friendly ESM/TypeScript service
 
 import {
   fetchCountryLadder,
@@ -9,9 +9,10 @@ import {
 
 import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
 import { flattenCountryLadder, rankByMMR } from "@/lib/ranking";
+import { fetchAllMatches } from "@/lib/w3cUtils";
 
 /* =========================
-   RACE MAP (local)
+   RACE MAP
 ========================= */
 
 const RACE_MAP: Record<number, string> = {
@@ -35,7 +36,6 @@ type LadderPlayerStats = {
 
 type LadderEntry = {
   race?: number | string;
-  // IMPORTANT: despite the name, in practice this may be a BattleTag string on the ladder endpoint.
   player1Id?: string;
   player?: LadderPlayerStats;
 };
@@ -52,7 +52,7 @@ type RankRow = {
 };
 
 export type W3CRankResponse = {
-  battletag: string; // canonical casing
+  battletag: string;
   season: number;
   country: string;
   minGames: number;
@@ -77,7 +77,7 @@ const MIN_GAMES = 25;
 
 let cachedRowsByPage: Map<number, LadderEntry[]> | null = null;
 let lastFetchTime = 0;
-const GLOBAL_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const GLOBAL_CACHE_TTL = 5 * 60 * 1000;
 
 async function fetchGlobalRowsByPage(): Promise<Map<number, LadderEntry[]>> {
   const now = Date.now();
@@ -97,8 +97,8 @@ async function fetchGlobalRowsByPage(): Promise<Map<number, LadderEntry[]>> {
       fetch(url, { cache: "no-store" })
         .then(async (r) => {
           if (!r.ok) return [];
-          const data = (await r.json()) as unknown;
-          return Array.isArray(data) ? (data as LadderEntry[]) : [];
+          const data = await r.json();
+          return Array.isArray(data) ? data : [];
         })
         .catch(() => [])
     );
@@ -116,6 +116,32 @@ async function fetchGlobalRowsByPage(): Promise<Map<number, LadderEntry[]>> {
 }
 
 /* =========================
+   HELPERS
+========================= */
+
+function iso2(code: unknown): string {
+  const c = String(code ?? "").toUpperCase();
+  return c.length === 2 ? c : "";
+}
+
+/* Infer home country from match telemetry (same logic as vsCountry) */
+function inferCountryFromMatches(matches: any[], selfLower: string): string {
+  for (const m of matches) {
+    if (!Array.isArray(m?.teams)) continue;
+
+    for (const t of m.teams) {
+      for (const p of t.players ?? []) {
+        if (String(p?.battleTag).toLowerCase() === selfLower) {
+          const cc = iso2(p?.countryCode);
+          if (cc) return cc;
+        }
+      }
+    }
+  }
+  return "";
+}
+
+/* =========================
    SERVICE
 ========================= */
 
@@ -124,41 +150,55 @@ export async function getW3CRank(
 ): Promise<W3CRankResponse | null> {
   if (!inputTag) return null;
 
-  // SINGLE SOURCE OF TRUTH for BattleTag casing
   const canonicalTag = await resolveBattleTagViaSearch(inputTag);
   if (!canonicalTag) return null;
 
-  // Profile fetch requires canonical BattleTag
   const profile: PlayerProfile = await fetchPlayerProfile(canonicalTag);
 
-  // Keep these for country ladder matching fallback
   const canonicalLower = canonicalTag.toLowerCase();
+
   const playerIdLower =
-    typeof profile.playerId === "string" && profile.playerId.length
-      ? profile.playerId.toLowerCase()
-      : null;
+    typeof profile.playerId === "string" ? profile.playerId.toLowerCase() : null;
 
   const battletag = canonicalTag;
-  const country = (profile.countryCode || profile.location || "UNK").toUpperCase();
+
+  /* =========================
+     COUNTRY (MATCH FIRST)
+  ========================= */
+
+  const matches = await fetchAllMatches(canonicalTag, [SEASON]);
+
+  const inferredCountry = inferCountryFromMatches(matches, canonicalLower);
+  const profileCountry = iso2(profile.countryCode);
+
+  const rawCountry = inferredCountry || profileCountry;
+  const isValidCountry = rawCountry.length === 2;
+
+  const country = isValidCountry ? rawCountry : "—";
 
   const [rowsByPage, countryPayload] = await Promise.all([
     fetchGlobalRowsByPage(),
-    fetchCountryLadder(country, GATEWAY, GAMEMODE, SEASON),
+    isValidCountry
+      ? fetchCountryLadder(rawCountry, GATEWAY, GAMEMODE, SEASON)
+      : Promise.resolve([]),
   ]);
 
   const countryRows = Array.isArray(countryPayload)
     ? flattenCountryLadder(countryPayload)
     : [];
 
-  // Build global pools by race.
-  // IMPORTANT: match identity primarily by canonical BattleTag EXACT casing,
-  // because your Discord working version implies ladder "player1Id" == BattleTag.
+  /* =========================
+     BUILD GLOBAL POOLS
+  ========================= */
+
   const globalPools: Record<
     number,
     { idRaw: string; idLower: string; mmr: number; games: number; winPct: number }[]
   > = {};
 
-  for (const raceId of Object.keys(RACE_MAP).map(Number)) globalPools[raceId] = [];
+  for (const raceId of Object.keys(RACE_MAP).map(Number)) {
+    globalPools[raceId] = [];
+  }
 
   for (const rows of rowsByPage.values()) {
     for (const e of rows) {
@@ -166,7 +206,7 @@ export async function getW3CRank(
       const pool = globalPools[raceId];
       if (!pool) continue;
 
-      const idRaw = typeof e?.player1Id === "string" ? e.player1Id : null;
+      const idRaw = e?.player1Id;
       if (!idRaw) continue;
 
       const games = Number(e?.player?.games ?? 0);
@@ -185,7 +225,6 @@ export async function getW3CRank(
     }
   }
 
-  // Sort pools by MMR desc, then win%, then games
   for (const raceId of Object.keys(RACE_MAP).map(Number)) {
     globalPools[raceId].sort((a, b) =>
       b.mmr !== a.mmr
@@ -195,6 +234,10 @@ export async function getW3CRank(
         : b.games - a.games
     );
   }
+
+  /* =========================
+     BUILD RANKS
+  ========================= */
 
   const asOf = new Date().toLocaleString();
   const ranks: RankRow[] = [];
@@ -211,10 +254,6 @@ export async function getW3CRank(
     const pool = globalPools[raceId];
     if (!pool?.length) continue;
 
-    // GLOBAL MATCH:
-    // 1) Exact casing match vs canonical BattleTag (this matches your Discord behavior)
-    // 2) Fallback: if ladder ever uses a lowercased battletag, try lower
-    // 3) Fallback: if ladder ever uses playerId, allow matching via playerIdLower (also lower)
     let idx = pool.findIndex((p) => p.idRaw === canonicalTag);
     if (idx === -1) idx = pool.findIndex((p) => p.idLower === canonicalLower);
     if (idx === -1 && playerIdLower) idx = pool.findIndex((p) => p.idLower === playerIdLower);
@@ -227,7 +266,6 @@ export async function getW3CRank(
     const mmr = pool[idx].mmr;
     const games = pool[idx].games;
 
-    // Country ladder: canonical battleTag lower first, then fallback playerId lower
     const countryRes = rankByMMR(
       countryRows,
       canonicalLower,

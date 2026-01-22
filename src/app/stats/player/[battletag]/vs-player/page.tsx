@@ -1,41 +1,35 @@
+// src/app/stats/player/[battletag]/vs-player/page.tsx
+
 import { notFound } from "next/navigation";
-import { getPlayerVsPlayer } from "@/services/playervsPlayer";
+import { getPlayerVsPlayer } from "@/services/playerVsPlayer";
+import { PlayerHeader, Section } from "@/components/PlayerUI";
 
 type PageProps = {
-  params: Promise<{
-    battletag: string;
-  }>;
+  params: Promise<{ battletag: string }>;
 };
 
 export default async function VsPlayerPage({ params }: PageProps) {
   const { battletag } = await params;
   if (!battletag) notFound();
 
-  // DO NOT decode or normalize here.
-  // Service fully owns canonical resolution.
   const data = await getPlayerVsPlayer(battletag);
   if (!data) notFound();
 
+  const signed = (n: number) => (n >= 0 ? `+${n}` : `${n}`);
+
   return (
-    <div className="space-y-10 text-sm leading-relaxed rounded-lg bg-white p-6 shadow dark:bg-gray-dark">
+    <div className="space-y-10 max-w-6xl mx-auto text-sm leading-relaxed">
       {/* HEADER */}
-      <div>
-        <h1 className="text-xl font-semibold text-black dark:text-white">
-          {data.battletag} — Opponent Breakdown
-        </h1>
-        <p className="text-sm text-gray-500">
-          Season 23 · 1v1 Ladder
-        </p>
-      </div>
+      <PlayerHeader
+        battletag={data.battletag}
+        subtitle="Opponent Breakdown · Season 23 · 1v1 Ladder"
+      />
 
-      {/* MMR EXTREMES */}
-      <section>
-        <h2 className="font-semibold mb-2">MMR Extremes</h2>
-
+      {/* MMR Extremes */}
+      <Section title="MMR Extremes">
         {data.extremes.gainGamesToShow.length > 0 && (
-          <div className="space-y-1">
+          <div className="space-y-2">
             <div className="font-medium">Largest Single-Game Gain</div>
-
             {data.extremes.gainGamesToShow.map((g, i) => (
               <div
                 key={i}
@@ -43,11 +37,10 @@ export default async function VsPlayerPage({ params }: PageProps) {
               >
                 <span className="font-medium text-emerald-600">W</span>
                 <span>
-                  {g.myRace} ({g.myMMR}) vs {g.oppName}{" "}
-                  {g.oppRace} ({g.oppMMR})
+                  {g.myRace} ({g.myMMR}) vs {g.oppRace} ({g.oppMMR})
                 </span>
                 <span className="font-medium text-emerald-600">
-                  +{g.mmrChange}
+                  {signed(g.mmrChange)}
                 </span>
               </div>
             ))}
@@ -57,137 +50,96 @@ export default async function VsPlayerPage({ params }: PageProps) {
         {data.extremes.largestLossGame && (
           <div className="mt-3 grid grid-cols-[1fr_auto] gap-x-3">
             <span>
-              Largest Single-Game Loss:{" "}
-              {data.extremes.largestLossGame.myRace} (
+              Largest Single-Game Loss: {data.extremes.largestLossGame.myRace} (
               {data.extremes.largestLossGame.myMMR}) vs{" "}
-              {data.extremes.largestLossGame.oppName}{" "}
               {data.extremes.largestLossGame.oppRace} (
               {data.extremes.largestLossGame.oppMMR})
             </span>
             <span className="font-medium text-rose-600">
-              {data.extremes.largestSingleLoss}
+              {signed(-data.extremes.largestSingleLoss)}
             </span>
           </div>
         )}
-      </section>
+      </Section>
 
-      {/* MMR GAP EXTREMES */}
-      <section>
-        <h2 className="font-semibold mb-2">MMR Gap Extremes</h2>
-
+      {/* MMR Gap Extremes */}
+      <Section title="MMR Gap Extremes">
         {data.extremes.largestGapWin && (
           <div className="grid grid-cols-[1fr_auto] gap-x-3">
             <span>
-              Largest Gap Win:{" "}
-              {data.extremes.largestGapWin.myRace} (
-              {data.extremes.largestGapWin.myMMR}) vs{" "}
-              {data.extremes.largestGapWin.oppName}{" "}
-              {data.extremes.largestGapWin.oppRace} (
+              Largest Gap Win: {data.extremes.largestGapWin.myRace} (
+              {data.extremes.largestGapWin.myMMR}) vs {data.extremes.largestGapWin.oppRace} (
               {data.extremes.largestGapWin.oppMMR})
             </span>
             <span className="font-medium text-emerald-600">
-              +{data.extremes.largestGapWin.gap}
+              {signed(data.extremes.largestGapWin.gap)}
             </span>
           </div>
         )}
-
         {data.extremes.largestGapLoss && (
           <div className="grid grid-cols-[1fr_auto] gap-x-3 mt-1">
             <span>
-              Largest Gap Loss:{" "}
-              {data.extremes.largestGapLoss.myRace} (
-              {data.extremes.largestGapLoss.myMMR}) vs{" "}
-              {data.extremes.largestGapLoss.oppName}{" "}
-              {data.extremes.largestGapLoss.oppRace} (
+              Largest Gap Loss: {data.extremes.largestGapLoss.myRace} (
+              {data.extremes.largestGapLoss.myMMR}) vs {data.extremes.largestGapLoss.oppRace} (
               {data.extremes.largestGapLoss.oppMMR})
             </span>
             <span className="font-medium text-rose-600">
-              -{data.extremes.largestGapLoss.gap}
+              {signed(-data.extremes.largestGapLoss.gap)}
             </span>
           </div>
         )}
-      </section>
+      </Section>
 
-      {/* BEST OPPONENT */}
+      {/* Best Opponent */}
       {data.best && (
-        <section>
-          <h2 className="font-semibold mb-2">
-            Best Winrate vs Opponent (MMR-Weighted)
-          </h2>
-
-          <div className="space-y-1 mb-3">
-            <div>
-              Opponent: {data.best.tag} ({data.best.oppRace})
-            </div>
-            <div>
-              Record: {data.best.wins}-{data.best.losses} (
-              {data.best.winrate}%)
-            </div>
+        <Section title="Best Winrate vs Opponent (MMR-Weighted)">
+          <div className="space-y-2 mb-2">
+            <div>Opponent: {data.best.tag} ({data.best.oppRace})</div>
+            <div>Record: {data.best.wins}-{data.best.losses} ({data.best.winrate}%)</div>
             <div>Games: {data.best.totalGames}</div>
-            <div>Net MMR: +{data.best.netMMR}</div>
+            <div>Net MMR: {signed(data.best.netMMR)}</div>
           </div>
 
           <div className="space-y-1">
             {data.best.gamesSortedByOppMMRDesc.map((g, i) => (
-              <div
-                key={i}
-                className="grid grid-cols-[auto_1fr_auto] gap-x-3"
-              >
-                <span className="font-semibold text-emerald-600">
+              <div key={i} className="grid grid-cols-[auto_1fr_auto] gap-x-3">
+                <span className={`font-semibold ${g.result === "W" ? "text-emerald-600" : "text-rose-600"}`}>
                   {g.result}
                 </span>
                 <span>
-                  {g.myRace} ({g.myMMR}) vs{" "}
-                  {g.oppRace} ({g.oppMMR})
+                  {g.myRace} ({g.myMMR}) vs {g.oppRace} ({g.oppMMR})
                 </span>
-                <span className="font-medium text-emerald-600">
-                  +{g.mmrChange}
-                </span>
+                <span className="font-medium text-emerald-600">{signed(g.mmrChange)}</span>
               </div>
             ))}
           </div>
-        </section>
+        </Section>
       )}
 
-      {/* WORST OPPONENT */}
+      {/* Worst Opponent */}
       {data.worst && (
-        <section>
-          <h2 className="font-semibold mb-2">
-            Lowest Winrate vs Opponent
-          </h2>
-
-          <div className="space-y-1 mb-3">
-            <div>
-              Opponent: {data.worst.tag} ({data.worst.oppRace})
-            </div>
-            <div>
-              Record: {data.worst.wins}-{data.worst.losses} (
-              {data.worst.winrate}%)
-            </div>
+        <Section title="Lowest Winrate vs Opponent">
+          <div className="space-y-2 mb-2">
+            <div>Opponent: {data.worst.tag} ({data.worst.oppRace})</div>
+            <div>Record: {data.worst.wins}-{data.worst.losses} ({data.worst.winrate}%)</div>
             <div>Games: {data.worst.totalGames}</div>
-            <div>Net MMR: {data.worst.netMMR}</div>
+            <div>Net MMR: {signed(data.worst.netMMR)}</div>
           </div>
 
           <div className="space-y-1">
             {data.worst.gamesSortedByOppMMRDesc.map((g, i) => (
-              <div
-                key={i}
-                className="grid grid-cols-[auto_1fr_auto] gap-x-3"
-              >
-                <span className="font-semibold text-rose-600">
+              <div key={i} className="grid grid-cols-[auto_1fr_auto] gap-x-3">
+                <span className={`font-semibold ${g.result === "W" ? "text-emerald-600" : "text-rose-600"}`}>
                   {g.result}
                 </span>
                 <span>
-                  {g.myRace} ({g.myMMR}) vs{" "}
-                  {g.oppRace} ({g.oppMMR})
+                  {g.myRace} ({g.myMMR}) vs {g.oppRace} ({g.oppMMR})
                 </span>
-                <span className="font-medium text-rose-600">
-                  {g.mmrChange}
-                </span>
+                <span className="font-medium text-rose-600">{signed(g.mmrChange)}</span>
               </div>
             ))}
           </div>
-        </section>
+        </Section>
       )}
     </div>
   );

@@ -1,11 +1,15 @@
+// src/app/stats/player/[battletag]/summary/page.tsx
+
+
 import { notFound } from "next/navigation";
 import { getPlayerSummary } from "@/services/playerSummary";
+import { PlayerHeader, Section, StatCard } from "@/components/PlayerUI";
 
 type PageProps = {
   params: Promise<{ battletag: string }>;
 };
 
-export default async function Page({ params }: PageProps) {
+export default async function SummaryPage({ params }: PageProps) {
   const { battletag } = await params;
   if (!battletag) notFound();
 
@@ -15,110 +19,86 @@ export default async function Page({ params }: PageProps) {
 
   const s = data.summary;
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-xl font-semibold">Player Summary</h1>
-        <p className="text-sm text-gray-500">{s.battletag}</p>
-      </div>
+  // Precompute values once
+  const lastPlayedAny = s.lastPlayedLadder
+    ? new Date(s.lastPlayedLadder).toLocaleDateString()
+    : "N/A";
 
-      {/* Primary stats */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <Stat
-          label="Highest MMR"
+  const lastPlayedHighest = s.highestCurrentRace && s.lastPlayedRace[s.highestCurrentRace]
+    ? `${s.highestCurrentRace} — ${new Date(s.lastPlayedRace[s.highestCurrentRace]).toLocaleDateString()}`
+    : "N/A";
+
+  return (
+    <div className="space-y-10 rounded-lg bg-white p-6 shadow dark:bg-gray-dark">
+      {/* HEADER */}
+      <PlayerHeader battletag={s.battletag} subtitle="Player Summary" />
+
+      {/* PRIMARY STATS */}
+      <section className="grid gap-4 sm:grid-cols-3">
+        <StatCard
+          label="Current Highest MMR Race"
           value={
             s.highestCurrentRace
               ? `${s.highestCurrentRace} — ${s.highestCurrentMMR}`
               : "N/A"
           }
         />
-        <Stat
-          label="Most Played (All-Time)"
-          value={s.mostPlayedAllTime}
-        />
-        <Stat
-          label="Most Played (Current Season)"
-          value={s.mostPlayedThisSeason}
-        />
-      </div>
-
-      {/* Activity */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Stat
-          label="Last Ladder Game"
-          value={
-            s.lastPlayedLadder
-              ? new Date(s.lastPlayedLadder).toLocaleDateString()
-              : "N/A"
-          }
-        />
-        <Stat
-          label="Races Played"
-          value={Object.keys(s.lastPlayedRace ?? {}).length.toString()}
-        />
-      </div>
-
-      {/* Top Peak MMRs */}
-      <section>
-        <h2 className="text-sm font-semibold uppercase tracking-wide">
-          Peak MMRs (Last 3 Seasons)
-        </h2>
-
-        <div className="mt-2 space-y-1 text-sm">
-          {s.top2Peaks.length ? (
-            s.top2Peaks.map(p => (
-              <div
-                key={p.race}
-                className="flex justify-between tabular-nums"
-              >
-                <span>{p.race}</span>
-                <span>
-                  {p.mmr} (Season {p.season}, Game {p.game})
-                </span>
-              </div>
-            ))
-          ) : (
-            <div className="text-gray-500">No peak data available</div>
-          )}
-        </div>
+        <StatCard label="Most Played (All-Time)" value={s.mostPlayedAllTime || "N/A"} />
+        <StatCard label="Most Played (Current Season)" value={s.mostPlayedThisSeason || "N/A"} />
       </section>
 
-      {/* Largest Gain Games */}
-      <section>
-        <h2 className="text-sm font-semibold uppercase tracking-wide">
-          Largest MMR Gains
-        </h2>
+      {/* ACTIVITY */}
+      <section className="grid gap-4 sm:grid-cols-2">
+        <StatCard label="Last Ladder Game (Any Race)" value={lastPlayedAny} />
+        <StatCard label="Last Ladder Game (Highest MMR Race)" value={lastPlayedHighest} />
+      </section>
 
-        <div className="mt-2 space-y-2 text-sm">
-          {s.gainGamesToShow.length ? (
-            s.gainGamesToShow.map((g, i) => (
-              <div
-                key={i}
-                className="flex justify-between tabular-nums rounded border p-2"
-              >
-                <span>
-                  {g.myRace} vs {g.oppName} ({g.oppRace})
+      {/* PEAK MMR */}
+      <Section title="Peak MMRs (Last 3 Seasons)">
+        {s.top2Peaks.length ? (
+          s.top2Peaks.map((p) => (
+            <div
+              key={p.race}
+              className="flex justify-between tabular-nums text-sm items-center"
+            >
+              <span className="font-medium">{p.race}</span>
+              <span className="text-lg font-semibold tabular-nums">
+                {p.mmr}{" "}
+                <span className="text-sm font-normal">
+                  (Season {p.season}, Game {p.game})
                 </span>
-                <span>
-                  {g.myMMR} → +{g.gain}
-                </span>
-              </div>
-            ))
-          ) : (
-            <div className="text-gray-500">
-              No significant gain games
+              </span>
             </div>
-          )}
-        </div>
-      </section>
+          ))
+        ) : (
+          <div className="text-gray-500 text-sm">No peak data available</div>
+        )}
+      </Section>
 
-      {/* Largest Gap Win */}
-      <section>
-        <h2 className="text-sm font-semibold uppercase tracking-wide">
-          Largest MMR Gap Win
-        </h2>
+      {/* LARGEST MMR GAINS */}
+      <Section title="Largest MMR Gains">
+        {s.gainGamesToShow.length ? (
+          s.gainGamesToShow.map((g, i) => (
+            <div
+              key={i}
+              className="flex justify-between tabular-nums rounded border p-2 text-sm"
+            >
+              <span>
+                {g.myRace} vs {g.oppName} ({g.oppRace})
+              </span>
+              <span>
+                {g.myMMR} →{" "}
+                <span className="text-emerald-600 font-medium">+{g.gain}</span>
+              </span>
+            </div>
+          ))
+        ) : (
+          <div className="text-gray-500 text-sm">No significant gain games</div>
+        )}
+      </Section>
 
+      {/* LARGEST GAP WIN */}
+      <Section title="Largest MMR Gap Win">
         {s.largestGapWin ? (
           <div className="mt-2 rounded border p-3 text-sm tabular-nums">
             <div>
@@ -126,26 +106,16 @@ export default async function Page({ params }: PageProps) {
               {s.largestGapWin.oppRace})
             </div>
             <div className="mt-1">
-              {s.largestGapWin.myMMR} → +{s.largestGapWin.gap}
+              {s.largestGapWin.myMMR} →{" "}
+              <span className="text-emerald-600 font-medium">
+                +{s.largestGapWin.gap}
+              </span>
             </div>
           </div>
         ) : (
-          <div className="mt-2 text-sm text-gray-500">
-            No gap wins recorded
-          </div>
+          <div className="text-gray-500 text-sm mt-2">No gap wins recorded</div>
         )}
-      </section>
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded border p-3 text-sm">
-      <div className="text-xs uppercase text-gray-500">
-        {label}
-      </div>
-      <div className="mt-1 font-semibold">{value}</div>
+      </Section>
     </div>
   );
 }

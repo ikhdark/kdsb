@@ -1,8 +1,8 @@
 // src/app/stats/player/[battletag]/vs-country/page.tsx
 
-import "./countries.css";
-import { getW3CCountryStats } from "@/services/vsCountry";
 import { notFound } from "next/navigation";
+import { getW3CCountryStats } from "@/services/vsCountry";
+import { PlayerHeader, Section, StatCard } from "@/components/PlayerUI";
 
 type Props = {
   params: Promise<{ battletag: string }>;
@@ -10,36 +10,23 @@ type Props = {
 };
 
 export default async function CountriesPage({ params, searchParams }: Props) {
-  // params is a Promise in your project -> await it
   const { battletag: routeBt } = await params;
-
-  // IMPORTANT:
-  // - Do NOT decode here (route OR query).
-  // - Service (vsCountry.ts) already safe-decodes + canonicalizes.
   const battletag = routeBt || searchParams?.bt;
-
   if (!battletag) notFound();
 
   const data = await getW3CCountryStats(battletag);
   if (!data || !data.countries?.length) {
-    return <pre>No country data available</pre>;
+    return <div className="text-sm text-gray-500">No country data available</div>;
   }
 
-  const { battletag: canonicalBt, countries, homeCountry, homeCountryLabel } =
-    data;
+  const { battletag: canonicalBt, countries, homeCountry, homeCountryLabel } = data;
 
   const sum = (arr: any[], key: string) =>
     arr.reduce((a, b) => a + (b[key] || 0), 0);
 
   const countriesByGames = countries.slice().sort((a, b) => b.games - a.games);
-
-  const countriesByOppMmr = countries
-    .slice()
-    .sort((a, b) => (b.avgOpponentMMR ?? 0) - (a.avgOpponentMMR ?? 0));
-
-  const countriesByTime = countries
-    .slice()
-    .sort((a, b) => b.timePlayedSeconds - a.timePlayedSeconds);
+  const countriesByOppMmr = countries.slice().sort((a, b) => (b.avgOpponentMMR ?? 0) - (a.avgOpponentMMR ?? 0));
+  const countriesByTime = countries.slice().sort((a, b) => b.timePlayedSeconds - a.timePlayedSeconds);
 
   const home = countries.filter((c) => c.country === homeCountry);
   const foreign = countries.filter((c) => c.country !== homeCountry);
@@ -49,191 +36,192 @@ export default async function CountriesPage({ params, searchParams }: Props) {
   const foreignWins = sum(foreign, "wins");
   const foreignLosses = sum(foreign, "losses");
 
+  // helper to assign color to WR %
+  const getWrColor = (wr: number) => {
+    if (wr >= 50) return "text-emerald-500 font-medium"; // green
+    if (wr >= 40) return "text-yellow-500 font-medium";  // yellow
+    return "text-rose-500 font-medium";                  // red
+  };
+
   return (
-    <div className="countries-page">
-      <h1>Country Stats — {canonicalBt}</h1>
+    <div className="space-y-10 rounded-lg bg-white p-6 shadow dark:bg-gray-dark text-sm">
 
-      <section>
-        <h2>Home vs Foreign</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Group</th>
-              <th className="num">W</th>
-              <th className="num">L</th>
-              <th className="num">WR %</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>{homeCountryLabel}</td>
-              <td className="num">{homeWins}</td>
-              <td className="num">{homeLosses}</td>
-              <td className="num">
-                {homeWins + homeLosses
-                  ? ((homeWins / (homeWins + homeLosses)) * 100).toFixed(1)
-                  : "—"}
-              </td>
-            </tr>
-            <tr>
-              <td>Foreign</td>
-              <td className="num">{foreignWins}</td>
-              <td className="num">{foreignLosses}</td>
-              <td className="num">
-                {foreignWins + foreignLosses
-                  ? ((foreignWins / (foreignWins + foreignLosses)) * 100).toFixed(
-                      1
-                    )
-                  : "—"}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
+      {/* HEADER */}
+      <PlayerHeader
+        battletag={canonicalBt}
+        subtitle="Country Stats"
+      />
 
-      <section>
-        <h2>Record vs Countries</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Country</th>
-              <th className="num">Games</th>
-              <th className="num">Unique opponents</th>
-              <th className="num">W</th>
-              <th className="num">L</th>
-              <th className="num">WR %</th>
-            </tr>
-          </thead>
-          <tbody>
-            {countriesByGames.map((c) => (
-              <tr key={c.country}>
-                <td>{c.label}</td>
-                <td className="num">{c.games}</td>
-                <td className="num">{c.uniqueOpponents}</td>
-                <td className="num">{c.wins}</td>
-                <td className="num">{c.losses}</td>
-                <td className="num">{(c.winRate * 100).toFixed(1)}</td>
+      {/* HOME VS FOREIGN */}
+      <Section title="Home vs Foreign">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <StatCard
+            label={homeCountryLabel}
+            value={`${homeWins}-${homeLosses}`}
+            sub={homeWins + homeLosses
+              ? <span className={getWrColor(homeWins / (homeWins + homeLosses) * 100)}>
+                  {((homeWins / (homeWins + homeLosses)) * 100).toFixed(1)}% WR
+                </span>
+              : "—"}
+          />
+          <StatCard
+            label="Foreign"
+            value={`${foreignWins}-${foreignLosses}`}
+            sub={foreignWins + foreignLosses
+              ? <span className={getWrColor(foreignWins / (foreignWins + foreignLosses) * 100)}>
+                  {((foreignWins / (foreignWins + foreignLosses)) * 100).toFixed(1)}% WR
+                </span>
+              : "—"}
+          />
+        </div>
+      </Section>
+
+      {/* RECORD VS COUNTRIES */}
+      <Section title="Record vs Countries">
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b text-left text-gray-500 uppercase text-xs">
+                <th className="px-4 py-2">Country</th>
+                <th className="px-4 py-2 tabular-nums">Games</th>
+                <th className="px-4 py-2 tabular-nums">Unique Opponents</th>
+                <th className="px-4 py-2 tabular-nums">W</th>
+                <th className="px-4 py-2 tabular-nums">L</th>
+                <th className="px-4 py-2 tabular-nums">WR %</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-
-      <section>
-        <h2>Country × Race</h2>
-        {countriesByGames.map((c) => (
-          <div key={c.country} className="country-block">
-            <h3>
-              {c.label} ({c.games} games)
-            </h3>
-
-            {c.races?.length ? (
-              <table>
-                <thead>
-                  <tr>
-                    <th>Race</th>
-                    <th className="num">Games</th>
-                    <th className="num">W</th>
-                    <th className="num">L</th>
-                    <th className="num">WR %</th>
+            </thead>
+            <tbody>
+              {countriesByGames.map((c) => {
+                const wrPercent = c.winRate * 100;
+                return (
+                  <tr key={c.country} className="border-b">
+                    <td className="px-4 py-2">{c.label}</td>
+                    <td className="px-4 py-2 tabular-nums">{c.games}</td>
+                    <td className="px-4 py-2 tabular-nums">{c.uniqueOpponents}</td>
+                    <td className="px-4 py-2 tabular-nums">{c.wins}</td>
+                    <td className="px-4 py-2 tabular-nums">{c.losses}</td>
+                    <td className={`px-4 py-2 tabular-nums ${getWrColor(wrPercent)}`}>
+                      {wrPercent.toFixed(1)}%
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {[...c.races]
-                    .sort((a, b) => b.games - a.games)
-                    .map((r) => (
-                      <tr key={r.raceId}>
-                        <td>{r.race}</td>
-                        <td className="num">{r.games}</td>
-                        <td className="num">{r.wins}</td>
-                        <td className="num">{r.losses}</td>
-                        <td className="num">{(r.winRate * 100).toFixed(1)}</td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            ) : (
-              <p>No race rows ≥ threshold</p>
-            )}
-          </div>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Section>
+
+      {/* COUNTRY × RACE */}
+<Section title="Country × Race">
+  <div className="overflow-x-auto">
+    <table className="w-full border-collapse text-sm">
+      <thead>
+        <tr className="border-b text-left text-gray-500 uppercase text-xs">
+          <th className="px-4 py-2">Country</th>
+          <th className="px-4 py-2">Games</th>
+          <th className="px-4 py-2">Race</th>
+          <th className="px-4 py-2 tabular-nums">W</th>
+          <th className="px-4 py-2 tabular-nums">L</th>
+          <th className="px-4 py-2 tabular-nums">WR %</th>
+        </tr>
+      </thead>
+      <tbody>
+        {countriesByGames.map((c) => (
+          [...c.races].sort((a, b) => b.games - a.games).map((r, idx) => {
+            const wrPercent = r.winRate * 100;
+            return (
+              <tr key={`${c.country}-${r.raceId}`} className="border-b">
+                <td className="px-4 py-2">{idx === 0 ? `${c.label} (${c.games} games)` : ""}</td>
+                <td className="px-4 py-2">{r.games}</td>
+                <td className="px-4 py-2">{r.race}</td>
+                <td className="px-4 py-2 tabular-nums">{r.wins}</td>
+                <td className="px-4 py-2 tabular-nums">{r.losses}</td>
+                <td className={`px-4 py-2 tabular-nums ${getWrColor(wrPercent)}`}>
+                  {wrPercent.toFixed(1)}%
+                </td>
+              </tr>
+            )
+          })
         ))}
-      </section>
-
-      <section>
-        <h2>Rematch Density</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Country</th>
-              <th className="num">Games</th>
-              <th className="num">Opponents</th>
-              <th className="num">Games / Opp</th>
-            </tr>
-          </thead>
-          <tbody>
-            {countriesByGames.map((c) => (
-              <tr key={c.country}>
-                <td>{c.label}</td>
-                <td className="num">{c.games}</td>
-                <td className="num">{c.uniqueOpponents}</td>
-                <td className="num">{c.avgGamesPerOpponent.toFixed(2)}</td>
+      </tbody>
+    </table>
+  </div>
+</Section>
+      {/* REMATCH DENSITY */}
+      <Section title="Rematch Density">
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b text-left text-gray-500 uppercase text-xs">
+                <th className="px-4 py-2">Country</th>
+                <th className="px-4 py-2 tabular-nums">Games</th>
+                <th className="px-4 py-2 tabular-nums">Opponents</th>
+                <th className="px-4 py-2 tabular-nums">Games / Opp</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
+            </thead>
+            <tbody>
+              {countriesByGames.map((c) => (
+                <tr key={c.country} className="border-b">
+                  <td className="px-4 py-2">{c.label}</td>
+                  <td className="px-4 py-2 tabular-nums">{c.games}</td>
+                  <td className="px-4 py-2 tabular-nums">{c.uniqueOpponents}</td>
+                  <td className="px-4 py-2 tabular-nums">{c.avgGamesPerOpponent.toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Section>
 
-      <section>
-        <h2>Avg MMR Faced</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Country</th>
-              <th className="num">Opp MMR</th>
-              <th className="num">Your MMR</th>
-            </tr>
-          </thead>
-          <tbody>
-            {countriesByOppMmr.map((c) => (
-              <tr key={c.country}>
-                <td>{c.label}</td>
-                <td className="num">
-                  {c.avgOpponentMMR == null ? "—" : c.avgOpponentMMR.toFixed(0)}
-                </td>
-                <td className="num">
-                  {c.avgSelfMMR == null ? "—" : c.avgSelfMMR.toFixed(0)}
-                </td>
+      {/* AVG MMR FACED */}
+      <Section title="Avg MMR Faced">
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b text-left text-gray-500 uppercase text-xs">
+                <th className="px-4 py-2">Country</th>
+                <th className="px-4 py-2 tabular-nums">Opp MMR</th>
+                <th className="px-4 py-2 tabular-nums">Your MMR</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
+            </thead>
+            <tbody>
+              {countriesByOppMmr.map((c) => (
+                <tr key={c.country} className="border-b">
+                  <td className="px-4 py-2">{c.label}</td>
+                  <td className="px-4 py-2 tabular-nums">{c.avgOpponentMMR?.toFixed(0) ?? "—"}</td>
+                  <td className="px-4 py-2 tabular-nums">{c.avgSelfMMR?.toFixed(0) ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Section>
 
-      <section>
-        <h2>Time Played vs Country</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Country</th>
-              <th className="num">Hours</th>
-              <th className="num">% Total</th>
-              <th className="num">Avg Game (min)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {countriesByTime.map((c) => (
-              <tr key={c.country}>
-                <td>{c.label}</td>
-                <td className="num">{(c.timePlayedSeconds / 3600).toFixed(1)}</td>
-                <td className="num">{(c.timeShare * 100).toFixed(1)}</td>
-                <td className="num">
-                  {c.avgGameSeconds ? (c.avgGameSeconds / 60).toFixed(1) : "—"}
-                </td>
+      {/* TIME PLAYED */}
+      <Section title="Time Played vs Country">
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b text-left text-gray-500 uppercase text-xs">
+                <th className="px-4 py-2">Country</th>
+                <th className="px-4 py-2 tabular-nums">Hours</th>
+                <th className="px-4 py-2 tabular-nums">% Total</th>
+                <th className="px-4 py-2 tabular-nums">Avg Game (min)</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
+            </thead>
+            <tbody>
+              {countriesByTime.map((c) => (
+                <tr key={c.country} className="border-b">
+                  <td className="px-4 py-2">{c.label}</td>
+                  <td className="px-4 py-2 tabular-nums">{(c.timePlayedSeconds / 3600).toFixed(1)}</td>
+                  <td className="px-4 py-2 tabular-nums">{(c.timeShare * 100).toFixed(1)}</td>
+                  <td className="px-4 py-2 tabular-nums">{c.avgGameSeconds ? (c.avgGameSeconds / 60).toFixed(1) : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Section>
     </div>
   );
 }

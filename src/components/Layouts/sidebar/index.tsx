@@ -1,13 +1,13 @@
 "use client";
 
+import Link from "next/link";
+import { usePathname, useParams } from "next/navigation";
 import { NAV_DATA } from "./data";
 import MenuItem from "./menu-item";
-import { useParams, usePathname } from "next/navigation";
 
 export default function Sidebar() {
   const params = useParams<{ battletag?: string }>();
   const pathname = usePathname();
-
   const battletag = params?.battletag;
 
   return (
@@ -21,23 +21,37 @@ export default function Sidebar() {
 
             <div className="space-y-1">
               {group.items.map((item) => {
-                // If the item is player-scoped, require battletag
-                const href = battletag
-                  ? `/stats/player/${battletag}${item.path}`
-                  : "/stats/player";
+                // Disabled items render unclickable
+                if (item.disabled) {
+                  return (
+                    <div
+                      key={item.title}
+                      className="flex items-center gap-3 rounded-lg px-4 py-2 text-sm font-medium text-gray-400 cursor-not-allowed"
+                    >
+                      {item.icon && <item.icon />}
+                      {item.title}
+                    </div>
+                  );
+                }
 
-                const isActive =
-                  battletag &&
-                  pathname === `/stats/player/${battletag}${item.path}`;
+                // Player Search always routes to /stats/player
+                const href =
+                  item.title === "Player Search"
+                    ? "/stats/player"
+                    : battletag
+                    ? `/stats/player/${battletag}${item.path}`
+                    : `/stats/player${item.path}`;
+
+                const isActive = pathname === href;
 
                 return (
                   <MenuItem
                     key={item.title}
-                    as="link"
+                    as={item.as ?? "link"}
                     href={href}
-                    isActive={!!isActive}
+                    isActive={isActive}
                   >
-                    <item.icon />
+                    {item.icon && <item.icon />}
                     {item.title}
                   </MenuItem>
                 );

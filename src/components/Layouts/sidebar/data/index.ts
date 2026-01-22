@@ -7,7 +7,8 @@ export const NAV_DATA = [
       {
         title: "Player Search",
         icon: Icons.HomeIcon,
-        path: "", // handled as /stats/player
+        path: "/",      // root landing page
+        as: "link",     // render as <Link>
       },
     ],
   },
@@ -18,33 +19,44 @@ export const NAV_DATA = [
         title: "Summary",
         icon: Icons.HomeIcon,
         path: "/summary",
+        as: "link",
       },
       {
         title: "Rank Stats",
         icon: Icons.HomeIcon,
         path: "/rank",
+        as: "link",
       },
       {
         title: "Hero Stats",
         icon: Icons.HomeIcon,
         path: "/heroes",
+        as: "link",
       },
       {
         title: "Map Stats",
         icon: Icons.HomeIcon,
         path: "/maps",
-      }, 
+        as: "link",
+      },
       {
         title: "Vs Country",
         icon: Icons.HomeIcon,
         path: "/vs-country",
+        as: "link",
       },
-       {
+      {
         title: "Vs Player",
         icon: Icons.HomeIcon,
         path: "/vs-player",
+        as: "link",
       },
-      
+      {
+        title: "More Coming Soon!",
+        icon: Icons.HomeIcon,
+        path: null,      // no route
+        disabled: true,  // still shows in sidebar, unclickable
+      },
     ],
   },
 ];

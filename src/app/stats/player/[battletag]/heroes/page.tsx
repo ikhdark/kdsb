@@ -1,78 +1,28 @@
+// src/app/stats/player/[battletag]/heroes/page.tsx
+
 import { notFound } from "next/navigation";
 import { getW3CHeroStats } from "@/services/playerHeroes";
+import { PlayerHeader, Section, StatRow } from "@/components/PlayerUI";
 
 type PageProps = {
-  params: Promise<{
-    battletag: string;
-  }>;
+  params: Promise<{ battletag: string }>;
 };
-
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="space-y-2">
-      <h2 className="border-b border-gray-300 pb-1 text-sm font-semibold uppercase tracking-wide text-black dark:border-gray-700 dark:text-white">
-        {title}
-      </h2>
-      <div className="space-y-2 text-sm">{children}</div>
-    </section>
-  );
-}
-
-function StatRow({
-  label,
-  value,
-  winrate,
-}: {
-  label: string;
-  value: string;
-  winrate?: number;
-}) {
-  return (
-    <div className="space-y-1">
-      <div className="grid grid-cols-[1fr_auto] gap-x-4 items-center">
-        <span>{label}</span>
-        <span className="tabular-nums font-medium">{value}</span>
-      </div>
-
-      {typeof winrate === "number" && (
-        <div className="h-1.5 bg-gray-200 rounded overflow-hidden dark:bg-gray-700">
-          <div
-            className={
-              winrate >= 55
-                ? "bg-emerald-500 h-full"
-                : winrate >= 48
-                ? "bg-yellow-500 h-full"
-                : "bg-rose-500 h-full"
-            }
-            style={{ width: `${Math.min(100, Math.max(0, winrate))}%` }}
-          />
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default async function HeroesPage({ params }: PageProps) {
   const { battletag } = await params;
   if (!battletag) notFound();
 
-  // service owns canonicalization
+  // fetch canonical hero stats
   const data = await getW3CHeroStats(battletag);
   if (!data) notFound();
 
+  // parse text lines from service
   const lines = data.result
     .split("\n")
-    .map(l => l.trim())
+    .map((l) => l.trim())
     .filter(Boolean);
 
-  const normalize = (s: string) =>
-    s.toUpperCase().replace(/\s+/g, " ").trim();
+  const normalize = (s: string) => s.toUpperCase().replace(/\s+/g, " ").trim();
 
   const HEADERS = new Set([
     normalize("Your W/L by Your Hero Count"),
@@ -83,11 +33,11 @@ export default async function HeroesPage({ params }: PageProps) {
     normalize("Your Top 5 Worst Winrates vs Opponent Heroes Overall"),
   ]);
 
+  // helper to collect lines for a given section
   function collectSection(headers: string[]) {
     const wanted = headers.map(normalize);
-    const start = lines.findIndex(l => wanted.includes(normalize(l)));
+    const start = lines.findIndex((l) => wanted.includes(normalize(l)));
     if (start === -1) return [];
-
     const out: string[] = [];
     for (let i = start + 1; i < lines.length; i++) {
       if (HEADERS.has(normalize(lines[i]))) break;
@@ -113,16 +63,13 @@ export default async function HeroesPage({ params }: PageProps) {
 
   return (
     <div className="space-y-10 rounded-lg bg-white p-6 shadow dark:bg-gray-dark">
-      {/* HEADER */}
-      <div>
-        <h1 className="text-xl font-semibold text-black dark:text-white">
-          {data.battletag}
-        </h1>
-        <p className="text-sm text-gray-500">
-          Season {data.seasons.join(", ")} · All Races
-        </p>
-      </div>
+      {/* ========== HEADER ========== */}
+      <PlayerHeader
+        battletag={data.battletag}
+        subtitle={`Season ${data.seasons.join(", ")} · All Races`}
+      />
 
+      {/* ========== SECTIONS ========== */}
       <Section title="Your W/L by Hero Count">
         {byHeroCount.map((l, i) => {
           const m = l.match(/(.+?):\s([\d.]+)%\s\((\d+)-(\d+)\)/);
@@ -180,21 +127,27 @@ export default async function HeroesPage({ params }: PageProps) {
       </Section>
 
       <Section title="Best Winrates vs Opponent Heroes (Overall)">
-        {bestOverall.map((l, i) => (
-          <div key={i} className="flex justify-between tabular-nums">
-            <span>{l.split(":")[0]}</span>
-            <span className="font-medium">{l.split(":")[1]?.trim()}</span>
-          </div>
-        ))}
+        {bestOverall.map((l, i) => {
+          const [label, value] = l.split(":");
+          return (
+            <div key={i} className="flex justify-between tabular-nums">
+              <span>{label}</span>
+              <span className="font-medium">{value?.trim()}</span>
+            </div>
+          );
+        })}
       </Section>
 
       <Section title="Worst Winrates vs Opponent Heroes (Overall)">
-        {worstOverall.map((l, i) => (
-          <div key={i} className="flex justify-between tabular-nums">
-            <span>{l.split(":")[0]}</span>
-            <span className="font-medium">{l.split(":")[1]?.trim()}</span>
-          </div>
-        ))}
+        {worstOverall.map((l, i) => {
+          const [label, value] = l.split(":");
+          return (
+            <div key={i} className="flex justify-between tabular-nums">
+              <span>{label}</span>
+              <span className="font-medium">{value?.trim()}</span>
+            </div>
+          );
+        })}
       </Section>
     </div>
   );
