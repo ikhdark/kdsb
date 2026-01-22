@@ -9,8 +9,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 function normalizeBattleTagInput(value: string): string {
-  // normalize user input ONLY for routing safety
-  // do NOT lowercase, do NOT decode
   return String(value)
     .replace(/\+/g, " ")
     .trim();
@@ -21,14 +19,18 @@ export function Header() {
   const router = useRouter();
 
   const [query, setQuery] = useState("");
-  const [generatedAt, setGeneratedAt] = useState<Date>(new Date());
 
-  // ✅ LIVE clock (updates every second)
+  // ✅ START EMPTY (critical)
+  const [generatedAt, setGeneratedAt] = useState<string>("");
+
+  // ✅ client-only clock
   useEffect(() => {
-    const id = setInterval(() => {
-      setGeneratedAt(new Date());
-    }, 1000);
+    const update = () =>
+      setGeneratedAt(new Date().toLocaleTimeString());
 
+    update(); // first render after mount
+
+    const id = setInterval(update, 1000);
     return () => clearInterval(id);
   }, []);
 
@@ -73,17 +75,16 @@ export function Header() {
           A site that unlocks your W3C stats
         </p>
 
-        <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
-          Updated {generatedAt.toLocaleTimeString()}
-        </div>
+        {generatedAt && (
+          <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
+            Updated {generatedAt}
+          </div>
+        )}
       </div>
 
       <div className="flex flex-1 items-center justify-end gap-2 min-[375px]:gap-4">
-        <form
-          onSubmit={submitSearch}
-          className="relative w-full max-w-[300px]"
-        >
+        <form onSubmit={submitSearch} className="relative w-full max-w-[300px]">
           <input
             type="search"
             name="battletag"
