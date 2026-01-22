@@ -19,11 +19,17 @@ function normalizeBattleTagInput(value: string): string {
 export function Header() {
   const { toggleSidebar, isMobile } = useSidebarContext();
   const router = useRouter();
-  const [query, setQuery] = useState("");
-  const [generatedAt, setGeneratedAt] = useState<Date | null>(null);
 
+  const [query, setQuery] = useState("");
+  const [generatedAt, setGeneratedAt] = useState<Date>(new Date());
+
+  // ✅ LIVE clock (updates every second)
   useEffect(() => {
-    setGeneratedAt(new Date());
+    const id = setInterval(() => {
+      setGeneratedAt(new Date());
+    }, 1000);
+
+    return () => clearInterval(id);
   }, []);
 
   function submitSearch(e: React.FormEvent) {
@@ -67,12 +73,10 @@ export function Header() {
           A site that unlocks your W3C stats
         </p>
 
-        {generatedAt && (
-          <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
-            Updated {generatedAt.toLocaleTimeString()}
-          </div>
-        )}
+        <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
+          Updated {generatedAt.toLocaleTimeString()}
+        </div>
       </div>
 
       <div className="flex flex-1 items-center justify-end gap-2 min-[375px]:gap-4">
