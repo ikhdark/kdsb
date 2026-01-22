@@ -2,6 +2,7 @@ import "@/css/satoshi.css";
 import "@/css/style.css";
 
 import { GoogleAnalytics } from "@next/third-parties/google";
+import Script from "next/script";
 import Sidebar from "@/components/Layouts/sidebar";
 
 import "flatpickr/dist/flatpickr.min.css";
@@ -12,8 +13,6 @@ import type { Metadata } from "next";
 import NextTopLoader from "nextjs-toploader";
 import type { PropsWithChildren } from "react";
 import { Providers } from "./providers";
-
-import AnalyticsInit from "@/components/AnalyticsInit";
 
 export const metadata: Metadata = {
   title: {
@@ -28,10 +27,6 @@ export default function RootLayout({ children }: PropsWithChildren) {
     <html lang="en" suppressHydrationWarning>
       <body>
         <Providers>
-
-          {/* Plausible tracker init (client-only) */}
-          <AnalyticsInit />
-
           <NextTopLoader color="#5750F1" showSpinner={false} />
 
           <div className="flex min-h-screen">
@@ -47,8 +42,16 @@ export default function RootLayout({ children }: PropsWithChildren) {
           </div>
         </Providers>
 
-        {/* Google Analytics (optional) */}
+        {/* Google Analytics */}
         <GoogleAnalytics gaId="G-5QB5E0KBCL" />
+
+        {/* Plausible (simple + works everywhere) */}
+        <Script
+          defer
+          data-domain="w3cstats.com"
+          src="https://plausible.io/js/script.js"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );
