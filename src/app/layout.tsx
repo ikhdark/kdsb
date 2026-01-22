@@ -45,11 +45,9 @@ export default function RootLayout({ children }: PropsWithChildren) {
         {/* Google Analytics */}
         <GoogleAnalytics gaId="G-5QBE50KBCL" />
 
-        {/* Plausible */}
+        {/* Plausible (proxy script – auto initialized) */}
         <Script
-          defer
-          data-domain="w3cstats.com"
-          src="https://plausible.io/js/script.js"
+          src="https://plausible.io/js/pa-6GZEiZckboIP92Gtduyau.js"
           strategy="afterInteractive"
         />
       </body>
