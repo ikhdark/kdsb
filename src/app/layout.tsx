@@ -43,7 +43,7 @@ export default function RootLayout({ children }: PropsWithChildren) {
         </Providers>
 
         {/* Google Analytics */}
-        <GoogleAnalytics gaId="G-5QBE50KBCL" />
+        <GoogleAnalytics gaId="G-5QB5E0KBCL" />
 
         {/* Plausible (proxy script – auto initialized) */}
         <Script
