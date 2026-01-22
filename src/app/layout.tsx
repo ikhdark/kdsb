@@ -2,6 +2,7 @@ import "@/css/satoshi.css";
 import "@/css/style.css";
 
 import { GoogleAnalytics } from "@next/third-parties/google";
+import Script from "next/script";
 import Sidebar from "@/components/Layouts/sidebar";
 
 import "flatpickr/dist/flatpickr.min.css";
@@ -43,6 +44,14 @@ export default function RootLayout({ children }: PropsWithChildren) {
 
         {/* Google Analytics */}
         <GoogleAnalytics gaId="G-5QBE50KBCL" />
+
+        {/* Plausible */}
+        <Script
+          defer
+          data-domain="w3cstats.com"
+          src="https://plausible.io/js/script.js"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );
