@@ -44,10 +44,13 @@ export default function Sidebar() {
 
                 const isActive = pathname === href;
 
+                // Safe cast ensures TypeScript knows as is valid
+                const asType: "link" | "button" = (item.as as "link" | "button") ?? "link";
+
                 return (
                   <MenuItem
                     key={item.title}
-                    as={item.as ?? "link"}
+                    as={asType}
                     href={href}
                     isActive={isActive}
                   >

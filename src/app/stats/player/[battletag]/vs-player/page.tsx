@@ -48,18 +48,20 @@ export default async function VsPlayerPage({ params }: PageProps) {
         )}
 
         {data.extremes.largestLossGame && (
-          <div className="mt-3 grid grid-cols-[1fr_auto] gap-x-3">
-            <span>
-              Largest Single-Game Loss: {data.extremes.largestLossGame.myRace} (
-              {data.extremes.largestLossGame.myMMR}) vs{" "}
-              {data.extremes.largestLossGame.oppRace} (
-              {data.extremes.largestLossGame.oppMMR})
-            </span>
-            <span className="font-medium text-rose-600">
-              {signed(-data.extremes.largestSingleLoss)}
-            </span>
-          </div>
-        )}
+  <div className="mt-3 grid grid-cols-[1fr_auto] gap-x-3">
+    <span>
+      Largest Single-Game Loss: {data.extremes.largestLossGame.myRace} (
+      {data.extremes.largestLossGame.myMMR}) vs{" "}
+      {data.extremes.largestLossGame.oppRace} (
+      {data.extremes.largestLossGame.oppMMR})
+    </span>
+    <span className="font-medium text-rose-600">
+      {data.extremes.largestSingleLoss != null
+        ? signed(-data.extremes.largestSingleLoss)
+        : "—"}
+    </span>
+  </div>
+)}
       </Section>
 
       {/* MMR Gap Extremes */}

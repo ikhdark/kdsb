@@ -1,4 +1,4 @@
-import React from "react";
+import React, { ReactNode } from "react";
 
 /* =========================
    Header
@@ -28,7 +28,7 @@ export function Section({
   children,
 }: {
   title: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <section className="space-y-2">
@@ -79,6 +79,7 @@ export function StatRow({
 
 /* =========================
    Stat card (for Rank / Hero summary tiles)
+   Updated to allow JSX in 'sub'
 ========================= */
 export function StatCard({
   label,
@@ -87,7 +88,7 @@ export function StatCard({
 }: {
   label: string;
   value: string;
-  sub?: string;
+  sub?: ReactNode; // <-- changed from 'string' to ReactNode
 }) {
   return (
     <div className="rounded-xl border bg-white p-5 shadow-sm dark:bg-gray-dark">

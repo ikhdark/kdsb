@@ -179,11 +179,9 @@ export function rankByMMR(
   if (!Array.isArray(rows) || rows.length === 0) return null;
   if (!canonicalLower) return null;
 
-  // Require caller-provided lowercased identity (no transformation).
   if (canonicalLower !== canonicalLower.toLowerCase()) return null;
 
   const canon = canonicalLower;
-
   const pidLower = fallbackPlayerIdLower ?? null;
   if (pidLower && pidLower !== pidLower.toLowerCase()) return null;
 
@@ -199,9 +197,10 @@ export function rankByMMR(
       const hasPid =
         typeof row.playerIdLower === "string" && row.playerIdLower.length > 0;
 
-      if (hasBtag && row.battleTagLower !== row.battleTagLower.toLowerCase())
+      // Use ! to assure TS these are defined
+      if (hasBtag && row.battleTagLower! !== row.battleTagLower!.toLowerCase())
         return false;
-      if (hasPid && row.playerIdLower !== row.playerIdLower.toLowerCase())
+      if (hasPid && row.playerIdLower! !== row.playerIdLower!.toLowerCase())
         return false;
 
       return hasBtag || hasPid;

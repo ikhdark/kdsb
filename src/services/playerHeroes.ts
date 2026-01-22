@@ -133,10 +133,11 @@ export async function getW3CHeroStats(inputTag: string) {
       ? opponentHeroCountStats[oppHeroCount].wins++
       : opponentHeroCountStats[oppHeroCount].losses++;
 
-    const uniqueOppHeroes = new Set(
-      opp.heroes.map((h: any) => h?.name).filter(Boolean)
-    );
-
+const uniqueOppHeroes: Set<string> = new Set(
+  opp.heroes
+    .map((h: any) => h?.name)
+    .filter(Boolean)
+);
     for (const hero of uniqueOppHeroes) {
       opponentHeroStats[hero] ??= { games: 0, wins: 0, losses: 0 };
       opponentHeroStats[hero].games++;
