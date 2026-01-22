@@ -15,10 +15,10 @@ import { Providers } from "./providers";
 
 export const metadata: Metadata = {
   title: {
-    template: "%s | NextAdmin - Next.js Dashboard Kit",
-    default: "NextAdmin - Next.js Dashboard Kit",
+    template: "%s | KD's W3C Stats",
+    default: "KD's W3C Stats",
   },
-  description: "1",
+  description: "Warcraft III W3Champions stats dashboard",
 };
 
 export default function RootLayout({ children }: PropsWithChildren) {
@@ -41,7 +41,7 @@ export default function RootLayout({ children }: PropsWithChildren) {
           </div>
         </Providers>
 
-        {/* Google Analytics (global, once) */}
+        {/* Google Analytics */}
         <GoogleAnalytics gaId="G-5QBE50KBCL" />
       </body>
     </html>
