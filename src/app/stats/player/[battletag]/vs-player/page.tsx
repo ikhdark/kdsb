@@ -68,7 +68,7 @@ export default async function VsPlayerPage({ params }: PageProps) {
 
             <span className="font-medium text-rose-600">
               {data.extremes.largestSingleLoss != null
-                ? signed(-data.extremes.largestSingleLoss)
+                ? signed(data.extremes.largestSingleLoss)
                 : "—"}
             </span>
           </div>
@@ -141,7 +141,14 @@ export default async function VsPlayerPage({ params }: PageProps) {
                   ({g.oppRace} {g.oppMMR})
                 </span>
 
-                <span>{signed(g.mmrChange)}</span>
+                {/* FIXED COLOR */}
+                <span
+                  className={`font-medium ${
+                    g.mmrChange >= 0 ? "text-emerald-600" : "text-rose-600"
+                  }`}
+                >
+                  {signed(g.mmrChange)}
+                </span>
               </div>
             ))}
           </div>
@@ -163,7 +170,14 @@ export default async function VsPlayerPage({ params }: PageProps) {
                   ({g.oppRace} {g.oppMMR})
                 </span>
 
-                <span>{signed(g.mmrChange)}</span>
+                {/* FIXED COLOR */}
+                <span
+                  className={`font-medium ${
+                    g.mmrChange >= 0 ? "text-emerald-600" : "text-rose-600"
+                  }`}
+                >
+                  {signed(g.mmrChange)}
+                </span>
               </div>
             ))}
           </div>
