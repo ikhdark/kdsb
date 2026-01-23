@@ -16,11 +16,20 @@ import { Providers } from "./providers";
 
 export const metadata: Metadata = {
   title: {
-    template: "%s | KD's W3C Stats",
-    default: "KD's W3C Stats",
+    template: "%s | W3C Stats",
+    default: "W3C Stats",
   },
   description: "Warcraft III W3Champions stats dashboard",
+  openGraph: {
+    title: "W3C Stats",
+    siteName: "W3C Stats",
+  },
+  twitter: {
+    title: "W3C Stats",
+    card: "summary",
+  },
 };
+
 
 export default function RootLayout({ children }: PropsWithChildren) {
   return (
