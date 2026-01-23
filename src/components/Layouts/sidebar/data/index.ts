@@ -7,8 +7,8 @@ export const NAV_DATA = [
       {
         title: "Player Search",
         icon: Icons.HomeIcon,
-        path: "/",      // root landing page
-        as: "link",     // render as <Link>
+        path: "/", // root landing page
+        as: "link",
       },
     ],
   },
@@ -27,6 +27,15 @@ export const NAV_DATA = [
         path: "/rank",
         as: "link",
       },
+
+      // ✅ ADD THIS (Performance page)
+      {
+        title: "Performance",
+        icon: Icons.HomeIcon,
+        path: "/performance",
+        as: "link",
+      },
+
       {
         title: "Hero Stats",
         icon: Icons.HomeIcon,
@@ -54,8 +63,8 @@ export const NAV_DATA = [
       {
         title: "More Coming Soon!",
         icon: Icons.HomeIcon,
-        path: null,      // no route
-        disabled: true,  // still shows in sidebar, unclickable
+        path: null,
+        disabled: true,
       },
     ],
   },

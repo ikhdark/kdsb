@@ -39,7 +39,7 @@ export default async function SummaryPage({ params }: PageProps) {
   return (
     <div className="space-y-10 rounded-lg bg-white p-6 shadow dark:bg-gray-dark">
       {/* HEADER */}
-      <PlayerHeader battletag={s.battletag} subtitle="Player Summary" />
+      <PlayerHeader battletag={s.battletag} subtitle="Player Summary · Season 20-23" />
 
       {/* PRIMARY STATS */}
       <section className="grid gap-4 sm:grid-cols-3">

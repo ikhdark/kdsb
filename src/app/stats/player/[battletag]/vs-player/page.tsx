@@ -27,7 +27,7 @@ export default async function VsPlayerPage({ params }: PageProps) {
       {/* HEADER */}
       <PlayerHeader
         battletag={data.battletag}
-        subtitle="Opponent Breakdown · Season 23 · 1v1 Ladder"
+        subtitle="Opponent Stats · Season 23"
       />
 
       {/* ================= MMR Extremes ================= */}

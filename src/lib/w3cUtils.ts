@@ -80,7 +80,7 @@ function normalizeMatches(payload: any): any[] {
  */
 export async function fetchAllMatches(
   canonicalBattleTag: string,
-  seasons: number[] = [20, 21, 22, 23]
+  seasons: number[] = [23]
 ): Promise<any[]> {
   if (!canonicalBattleTag) return [];
 

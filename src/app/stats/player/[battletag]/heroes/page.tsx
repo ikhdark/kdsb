@@ -68,7 +68,7 @@ export default async function HeroesPage({ params }: PageProps) {
       {/* HEADER */}
       <PlayerHeader
         battletag={data.battletag}
-        subtitle={`Season ${data.seasons.join(", ")} · All Races`}
+        subtitle={`Hero Stats · Season 23`}
       />
 
       {/* ================= HERO COUNT ================= */}

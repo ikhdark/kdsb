@@ -58,7 +58,7 @@ export default async function CountriesPage({ params, searchParams }: Props) {
       {/* HEADER */}
       <PlayerHeader
         battletag={canonicalBt}
-        subtitle="Country Stats"
+        subtitle="Country Stats · Season 23"
       />
 
       {/* ================= HOME VS FOREIGN ================= */}
