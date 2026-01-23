@@ -33,7 +33,7 @@ export default async function VsPlayerPage({ params }: PageProps) {
 
             {data.extremes.gainGamesToShow.map((g, i) => (
               <div key={i} className="grid grid-cols-[auto_1fr_auto] gap-x-3">
-                <span className="font-medium text-emerald-600">W</span>
+                <span className="font-semibold text-emerald-600">W</span>
 
                 <span>
                   <span className="font-semibold">{g.myName}</span>{" "}
@@ -52,7 +52,7 @@ export default async function VsPlayerPage({ params }: PageProps) {
 
         {data.extremes.largestLossGame && (
           <div className="mt-3 grid grid-cols-[auto_1fr_auto] gap-x-3">
-            <span className="font-medium text-rose-600">L</span>
+            <span className="font-semibold text-rose-600">L</span>
 
             <span>
               <span className="font-semibold">
@@ -78,7 +78,7 @@ export default async function VsPlayerPage({ params }: PageProps) {
       <Section title="MMR Gap Extremes">
         {data.extremes.largestGapWin && (
           <div className="grid grid-cols-[auto_1fr_auto] gap-x-3">
-            <span className="font-medium text-emerald-600">W</span>
+            <span className="font-semibold text-emerald-600">W</span>
 
             <span>
               <span className="font-semibold">
@@ -101,7 +101,7 @@ export default async function VsPlayerPage({ params }: PageProps) {
 
         {data.extremes.largestGapLoss && (
           <div className="grid grid-cols-[auto_1fr_auto] gap-x-3 mt-1">
-            <span className="font-medium text-rose-600">L</span>
+            <span className="font-semibold text-rose-600">L</span>
 
             <span>
               <span className="font-semibold">
@@ -135,7 +135,13 @@ export default async function VsPlayerPage({ params }: PageProps) {
           <div className="space-y-1">
             {data.best.gamesSortedByOppMMRDesc.map((g, i) => (
               <div key={i} className="grid grid-cols-[auto_1fr_auto] gap-x-3">
-                <span className="font-semibold">{g.result}</span>
+                <span
+                  className={`font-semibold ${
+                    g.result === "W" ? "text-emerald-600" : "text-rose-600"
+                  }`}
+                >
+                  {g.result}
+                </span>
 
                 <span>
                   <span className="font-semibold">{g.myName}</span>{" "}
@@ -163,7 +169,13 @@ export default async function VsPlayerPage({ params }: PageProps) {
           <div className="space-y-1">
             {data.worst.gamesSortedByOppMMRDesc.map((g, i) => (
               <div key={i} className="grid grid-cols-[auto_1fr_auto] gap-x-3">
-                <span className="font-semibold">{g.result}</span>
+                <span
+                  className={`font-semibold ${
+                    g.result === "W" ? "text-emerald-600" : "text-rose-600"
+                  }`}
+                >
+                  {g.result}
+                </span>
 
                 <span>
                   <span className="font-semibold">{g.myName}</span>{" "}

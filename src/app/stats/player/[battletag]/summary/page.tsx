@@ -1,8 +1,8 @@
 // src/app/stats/player/[battletag]/summary/page.tsx
 
-
 import { notFound } from "next/navigation";
 import { getPlayerSummary } from "@/services/playerSummary";
+import { displayMyRace } from "@/services/playerVsPlayer";
 import { PlayerHeader, Section, StatCard } from "@/components/PlayerUI";
 
 type PageProps = {
@@ -19,14 +19,16 @@ export default async function SummaryPage({ params }: PageProps) {
 
   const s = data.summary;
 
-  // Precompute values once
   const lastPlayedAny = s.lastPlayedLadder
     ? new Date(s.lastPlayedLadder).toLocaleDateString()
     : "N/A";
 
-  const lastPlayedHighest = s.highestCurrentRace && s.lastPlayedRace[s.highestCurrentRace]
-    ? `${s.highestCurrentRace} — ${new Date(s.lastPlayedRace[s.highestCurrentRace]).toLocaleDateString()}`
-    : "N/A";
+  const lastPlayedHighest =
+    s.highestCurrentRace && s.lastPlayedRace[s.highestCurrentRace]
+      ? `${s.highestCurrentRace} — ${new Date(
+          s.lastPlayedRace[s.highestCurrentRace]
+        ).toLocaleDateString()}`
+      : "N/A";
 
   return (
     <div className="space-y-10 rounded-lg bg-white p-6 shadow dark:bg-gray-dark">
@@ -84,11 +86,14 @@ export default async function SummaryPage({ params }: PageProps) {
               className="flex justify-between tabular-nums rounded border p-2 text-sm"
             >
               <span>
-                {g.myRace} vs {g.oppName} ({g.oppRace})
+                <span className="font-semibold">{g.myName}</span>{" "}
+                ({displayMyRace(g)} {g.myMMR}) vs{" "}
+                <span className="font-semibold">{g.oppName}</span>{" "}
+                ({g.oppRace} {g.oppMMR})
               </span>
-              <span>
-                {g.myMMR} →{" "}
-                <span className="text-emerald-600 font-medium">+{g.gain}</span>
+
+              <span className="text-emerald-600 font-medium">
+                +{g.gain}
               </span>
             </div>
           ))
@@ -102,14 +107,14 @@ export default async function SummaryPage({ params }: PageProps) {
         {s.largestGapWin ? (
           <div className="mt-2 rounded border p-3 text-sm tabular-nums">
             <div>
-              {s.largestGapWin.myRace} vs {s.largestGapWin.oppName} (
-              {s.largestGapWin.oppRace})
+              <span className="font-semibold">{s.largestGapWin.myName}</span>{" "}
+              ({displayMyRace(s.largestGapWin)} {s.largestGapWin.myMMR}) vs{" "}
+              <span className="font-semibold">{s.largestGapWin.oppName}</span>{" "}
+              ({s.largestGapWin.oppRace} {s.largestGapWin.oppMMR})
             </div>
-            <div className="mt-1">
-              {s.largestGapWin.myMMR} →{" "}
-              <span className="text-emerald-600 font-medium">
-                +{s.largestGapWin.gap}
-              </span>
+
+            <div className="mt-1 text-emerald-600 font-medium">
+              +{s.largestGapWin.gap}
             </div>
           </div>
         ) : (
