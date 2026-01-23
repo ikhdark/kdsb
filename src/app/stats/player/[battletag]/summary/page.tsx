@@ -19,6 +19,10 @@ export default async function SummaryPage({ params }: PageProps) {
 
   const s = data.summary;
 
+  /* ================= helpers ================= */
+
+  const myRace = (g: any) => g.myRace ?? displayMyRace(g) ?? "Unknown";
+
   const lastPlayedAny = s.lastPlayedLadder
     ? new Date(s.lastPlayedLadder).toLocaleDateString()
     : "N/A";
@@ -29,6 +33,8 @@ export default async function SummaryPage({ params }: PageProps) {
           s.lastPlayedRace[s.highestCurrentRace]
         ).toLocaleDateString()}`
       : "N/A";
+
+  /* ================= render ================= */
 
   return (
     <div className="space-y-10 rounded-lg bg-white p-6 shadow dark:bg-gray-dark">
@@ -59,14 +65,11 @@ export default async function SummaryPage({ params }: PageProps) {
       <Section title="Peak MMRs (Last 3 Seasons)">
         {s.top2Peaks.length ? (
           s.top2Peaks.map((p) => (
-            <div
-              key={p.race}
-              className="flex justify-between tabular-nums text-sm items-center"
-            >
+            <div key={p.race} className="flex justify-between text-sm tabular-nums">
               <span className="font-medium">{p.race}</span>
-              <span className="text-lg font-semibold tabular-nums">
+              <span className="font-semibold">
                 {p.mmr}{" "}
-                <span className="text-sm font-normal">
+                <span className="text-xs font-normal">
                   (Season {p.season}, Game {p.game})
                 </span>
               </span>
@@ -83,11 +86,11 @@ export default async function SummaryPage({ params }: PageProps) {
           s.gainGamesToShow.map((g, i) => (
             <div
               key={i}
-              className="flex justify-between tabular-nums rounded border p-2 text-sm"
+              className="grid grid-cols-[1fr_auto] gap-x-3 rounded border p-2 text-sm tabular-nums"
             >
               <span>
-                <span className="font-semibold">{g.myName}</span>{" "}
-                ({displayMyRace(g)} {g.myMMR}) vs{" "}
+                <span className="font-semibold">{s.battletag}</span>{" "}
+                ({myRace(g)} {g.myMMR}) vs{" "}
                 <span className="font-semibold">{g.oppName}</span>{" "}
                 ({g.oppRace} {g.oppMMR})
               </span>
@@ -105,20 +108,20 @@ export default async function SummaryPage({ params }: PageProps) {
       {/* LARGEST GAP WIN */}
       <Section title="Largest MMR Gap Win">
         {s.largestGapWin ? (
-          <div className="mt-2 rounded border p-3 text-sm tabular-nums">
-            <div>
-              <span className="font-semibold">{s.largestGapWin.myName}</span>{" "}
-              ({displayMyRace(s.largestGapWin)} {s.largestGapWin.myMMR}) vs{" "}
+          <div className="grid grid-cols-[1fr_auto] gap-x-3 rounded border p-3 text-sm tabular-nums">
+            <span>
+              <span className="font-semibold">{s.battletag}</span>{" "}
+              ({myRace(s.largestGapWin)} {s.largestGapWin.myMMR}) vs{" "}
               <span className="font-semibold">{s.largestGapWin.oppName}</span>{" "}
               ({s.largestGapWin.oppRace} {s.largestGapWin.oppMMR})
-            </div>
+            </span>
 
-            <div className="mt-1 text-emerald-600 font-medium">
+            <span className="text-emerald-600 font-medium">
               +{s.largestGapWin.gap}
-            </div>
+            </span>
           </div>
         ) : (
-          <div className="text-gray-500 text-sm mt-2">No gap wins recorded</div>
+          <div className="text-gray-500 text-sm">No gap wins recorded</div>
         )}
       </Section>
     </div>
