@@ -11,8 +11,13 @@ export default function PlayerLandingPage() {
   const onSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
+
       const value = inputRef.current?.value.trim();
       if (!value) return;
+
+      // ✅ Track real tool usage (GA4 custom event)
+      window.gtag?.("event", "battleTag_search");
+
       router.push(`/stats/player/${encodeURIComponent(value)}`);
     },
     [router]
@@ -25,6 +30,7 @@ export default function PlayerLandingPage() {
         <h1 className="text-4xl sm:text-5xl font-semibold text-black dark:text-white leading-snug">
           W3Champions
         </h1>
+
         <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400">
           Search a BattleTag (Please be patient stats loading might take up to 10 seconds, this will improve in BETA 1.1)
         </p>
@@ -40,6 +46,7 @@ export default function PlayerLandingPage() {
                        focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500
                        dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500 box-border"
           />
+
           <button
             type="submit"
             className="w-full sm:w-auto rounded-lg bg-emerald-500 px-4 py-2 text-sm sm:text-base font-semibold text-white
