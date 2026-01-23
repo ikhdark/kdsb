@@ -12,17 +12,16 @@ export default async function HeroesPage({ params }: PageProps) {
   const { battletag } = await params;
   if (!battletag) notFound();
 
-  // fetch canonical hero stats
   const data = await getW3CHeroStats(battletag);
   if (!data) notFound();
 
-  // parse text lines from service
   const lines = data.result
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean);
 
-  const normalize = (s: string) => s.toUpperCase().replace(/\s+/g, " ").trim();
+  const normalize = (s: string) =>
+    s.toUpperCase().replace(/\s+/g, " ").trim();
 
   const HEADERS = new Set([
     normalize("Your W/L by Your Hero Count"),
@@ -33,16 +32,18 @@ export default async function HeroesPage({ params }: PageProps) {
     normalize("Your Top 5 Worst Winrates vs Opponent Heroes Overall"),
   ]);
 
-  // helper to collect lines for a given section
   function collectSection(headers: string[]) {
     const wanted = headers.map(normalize);
     const start = lines.findIndex((l) => wanted.includes(normalize(l)));
     if (start === -1) return [];
+
     const out: string[] = [];
+
     for (let i = start + 1; i < lines.length; i++) {
       if (HEADERS.has(normalize(lines[i]))) break;
       out.push(lines[i]);
     }
+
     return out;
   }
 
@@ -62,17 +63,19 @@ export default async function HeroesPage({ params }: PageProps) {
   ]);
 
   return (
-    <div className="space-y-10 rounded-lg bg-white p-6 shadow dark:bg-gray-dark">
-      {/* ========== HEADER ========== */}
+    <div className="space-y-10 max-w-6xl mx-auto text-sm leading-relaxed">
+
+      {/* HEADER */}
       <PlayerHeader
         battletag={data.battletag}
         subtitle={`Season ${data.seasons.join(", ")} · All Races`}
       />
 
-      {/* ========== SECTIONS ========== */}
+      {/* ================= HERO COUNT ================= */}
       <Section title="Your W/L by Hero Count">
         {byHeroCount.map((l, i) => {
           const m = l.match(/(.+?):\s([\d.]+)%\s\((\d+)-(\d+)\)/);
+
           return (
             <StatRow
               key={i}
@@ -84,9 +87,11 @@ export default async function HeroesPage({ params }: PageProps) {
         })}
       </Section>
 
+      {/* ================= VS OPP HERO COUNT ================= */}
       <Section title="W/L vs Opponent Hero Count">
         {vsOppHeroCount.map((l, i) => {
           const m = l.match(/(.+?):\s([\d.]+)%\s\((\d+)-(\d+)\)/);
+
           return (
             <StatRow
               key={i}
@@ -98,9 +103,11 @@ export default async function HeroesPage({ params }: PageProps) {
         })}
       </Section>
 
+      {/* ================= BEST OPENERS ================= */}
       <Section title="Best Matchups vs Opponent Opening Hero">
         {bestOpeners.map((l, i) => {
           const m = l.match(/(.+?):\s([\d.]+)%\s\((\d+)-(\d+)\)/);
+
           return (
             <StatRow
               key={i}
@@ -112,9 +119,11 @@ export default async function HeroesPage({ params }: PageProps) {
         })}
       </Section>
 
+      {/* ================= WORST OPENERS ================= */}
       <Section title="Worst Matchups vs Opponent Opening Hero">
         {worstOpeners.map((l, i) => {
           const m = l.match(/(.+?):\s([\d.]+)%\s\((\d+)-(\d+)\)/);
+
           return (
             <StatRow
               key={i}
@@ -126,9 +135,11 @@ export default async function HeroesPage({ params }: PageProps) {
         })}
       </Section>
 
+      {/* ================= BEST OVERALL ================= */}
       <Section title="Best Winrates vs Opponent Heroes (Overall)">
         {bestOverall.map((l, i) => {
           const [label, value] = l.split(":");
+
           return (
             <div key={i} className="flex justify-between tabular-nums">
               <span>{label}</span>
@@ -138,9 +149,11 @@ export default async function HeroesPage({ params }: PageProps) {
         })}
       </Section>
 
+      {/* ================= WORST OVERALL ================= */}
       <Section title="Worst Winrates vs Opponent Heroes (Overall)">
         {worstOverall.map((l, i) => {
           const [label, value] = l.split(":");
+
           return (
             <div key={i} className="flex justify-between tabular-nums">
               <span>{label}</span>
@@ -149,6 +162,7 @@ export default async function HeroesPage({ params }: PageProps) {
           );
         })}
       </Section>
+
     </div>
   );
 }

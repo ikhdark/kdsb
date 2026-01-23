@@ -2,7 +2,7 @@
 
 import { notFound } from "next/navigation";
 import { getW3CRank, type W3CRankResponse } from "@/services/playerRank";
-import { PlayerHeader, StatCard } from "@/components/PlayerUI";
+import { PlayerHeader, StatCard, Section } from "@/components/PlayerUI";
 
 type PageProps = {
   params: Promise<{ battletag: string }>;
@@ -28,25 +28,31 @@ export default async function RankPage({ params }: PageProps) {
   const titleTag = data?.battletag ?? decodeURIComponent(input);
   const season = data?.season ?? "—";
   const country = data?.country ?? "—";
+
   const ranks = Array.isArray(data?.ranks) ? data.ranks : [];
+
   const topRace =
     ranks.length > 0
       ? [...ranks].sort((a, b) => b.mmr - a.mmr)[0]
       : null;
+
   const showEmpty = !serviceError && (!data || ranks.length === 0);
 
-  // Helper function to get color based on percentile
+  /* ================= helpers ================= */
+
   const getColorByPercentile = (rank: number, total: number) => {
-    if (rank <= total * 0.03) return "text-yellow-500 font-bold";      // top 3%
-    if (rank <= total * 0.10) return "text-amber-500 font-semibold";   // top 10%
-    if (rank <= total * 0.25) return "text-emerald-500 font-semibold"; // top 25%
-    if (rank <= total * 0.50) return "text-cyan-500 font-medium";      // top 50%
-    if (rank <= total * 0.75) return "text-blue-500 font-medium";      // top 75%
-    return "text-gray-500 dark:text-gray-400 font-medium";             // below 75%
+    if (rank <= total * 0.03) return "text-yellow-500 font-bold";
+    if (rank <= total * 0.10) return "text-amber-500 font-semibold";
+    if (rank <= total * 0.25) return "text-emerald-500 font-semibold";
+    if (rank <= total * 0.50) return "text-cyan-500 font-medium";
+    if (rank <= total * 0.75) return "text-blue-500 font-medium";
+    return "text-gray-500 dark:text-gray-400 font-medium";
   };
 
+  /* ================= render ================= */
+
   return (
-    <div className="mx-auto max-w-6xl space-y-10">
+    <div className="space-y-10 max-w-6xl mx-auto text-sm leading-relaxed">
 
       {/* HEADER */}
       <PlayerHeader
@@ -69,7 +75,7 @@ export default async function RankPage({ params }: PageProps) {
         </div>
       )}
 
-      {/* HERO/STATS CARDS */}
+      {/* PRIMARY STATS */}
       <section className="grid gap-4 sm:grid-cols-3">
         <StatCard
           label="Highest Current MMR Race"
@@ -82,18 +88,14 @@ export default async function RankPage({ params }: PageProps) {
 
       {/* RANK TABLE */}
       {ranks.length > 0 && (
-        <section className="space-y-4">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-            Race Rankings
-          </h2>
-
-          <div className="overflow-hidden rounded-xl border bg-white shadow-md dark:bg-gray-dark">
+        <Section title="Race Rankings">
+          <div className="overflow-hidden rounded-xl border bg-white shadow-sm dark:bg-gray-dark">
             <table className="w-full text-sm">
-              <thead className="bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                <tr className="text-left text-base font-semibold">
-                  <th className="px-5 py-3">Race</th>
-                  <th className="px-5 py-3">Global</th>
-                  <th className="px-5 py-3">Country</th>
+              <thead className="bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs uppercase tracking-wider">
+                <tr>
+                  <th className="px-5 py-3 text-left">Race</th>
+                  <th className="px-5 py-3 text-left">Global</th>
+                  <th className="px-5 py-3 text-left">Country</th>
                   <th className="px-5 py-3 text-right">MMR</th>
                   <th className="px-5 py-3 text-right">Games</th>
                 </tr>
@@ -101,10 +103,15 @@ export default async function RankPage({ params }: PageProps) {
 
               <tbody>
                 {ranks.map((r, i) => {
-                  const globalColor = getColorByPercentile(r.globalRank, r.globalTotal);
-                  const countryColor = r.countryRank && r.countryTotal
-                    ? getColorByPercentile(r.countryRank, r.countryTotal)
-                    : "font-semibold";
+                  const globalColor = getColorByPercentile(
+                    r.globalRank,
+                    r.globalTotal
+                  );
+
+                  const countryColor =
+                    r.countryRank && r.countryTotal
+                      ? getColorByPercentile(r.countryRank, r.countryTotal)
+                      : "text-gray-400";
 
                   return (
                     <tr
@@ -112,26 +119,26 @@ export default async function RankPage({ params }: PageProps) {
                       className={`border-t ${
                         i % 2 === 0
                           ? "bg-white dark:bg-gray-dark"
-                          : "bg-gray-50/50 dark:bg-gray-800/50"
+                          : "bg-gray-50/50 dark:bg-gray-800/40"
                       }`}
                     >
-                      <td className="px-5 py-3 font-medium text-lg">{r.race}</td>
+                      <td className="px-5 py-3 font-medium">{r.race}</td>
 
-                      <td className={`px-5 py-3 tabular-nums text-lg ${globalColor}`}>
+                      <td className={`px-5 py-3 tabular-nums ${globalColor}`}>
                         #{r.globalRank}/{r.globalTotal}
                       </td>
 
-                      <td className={`px-5 py-3 tabular-nums text-lg ${countryColor}`}>
+                      <td className={`px-5 py-3 tabular-nums ${countryColor}`}>
                         {r.countryRank && r.countryTotal
                           ? `#${r.countryRank}/${r.countryTotal}`
                           : "—"}
                       </td>
 
-                      <td className="px-5 py-3 text-right font-semibold text-lg tabular-nums">
+                      <td className="px-5 py-3 text-right font-semibold tabular-nums">
                         {r.mmr}
                       </td>
 
-                      <td className="px-5 py-3 text-right text-gray-600 font-medium tabular-nums">
+                      <td className="px-5 py-3 text-right text-gray-500 tabular-nums">
                         {r.games}
                       </td>
                     </tr>
@@ -140,12 +147,11 @@ export default async function RankPage({ params }: PageProps) {
               </tbody>
             </table>
 
-            {/* FOOTNOTE */}
-            <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 px-5 pb-2">
-              <strong>Color Legend:</strong> Yellow = Top 3%, Amber = Top 10%, Green = Top 25%, Cyan/Blue = Mid ranks, Gray = Lower ranks
+            <div className="px-5 py-3 text-xs text-gray-500 dark:text-gray-400 border-t">
+              Yellow = Top 3% · Amber = Top 10% · Green = Top 25% · Cyan/Blue = Mid · Gray = Lower
             </div>
           </div>
-        </section>
+        </Section>
       )}
     </div>
   );

@@ -15,7 +15,12 @@ export default async function VsPlayerPage({ params }: PageProps) {
   const data = await getPlayerVsPlayer(battletag);
   if (!data) notFound();
 
+  /* ================= helpers ================= */
+
   const signed = (n: number) => (n >= 0 ? `+${n}` : `${n}`);
+  const myRace = (g: any) => g.myRace ?? displayMyRace(g) ?? "Unknown";
+
+  /* ================= render ================= */
 
   return (
     <div className="space-y-10 max-w-6xl mx-auto text-sm leading-relaxed">
@@ -37,7 +42,7 @@ export default async function VsPlayerPage({ params }: PageProps) {
 
                 <span>
                   <span className="font-semibold">{g.myName}</span>{" "}
-                  ({displayMyRace(g)} {g.myMMR}) vs{" "}
+                  ({myRace(g)} {g.myMMR}) vs{" "}
                   <span className="font-semibold">{g.oppName}</span>{" "}
                   ({g.oppRace} {g.oppMMR})
                 </span>
@@ -58,7 +63,7 @@ export default async function VsPlayerPage({ params }: PageProps) {
               <span className="font-semibold">
                 {data.extremes.largestLossGame.myName}
               </span>{" "}
-              ({displayMyRace(data.extremes.largestLossGame)}{" "}
+              ({myRace(data.extremes.largestLossGame)}{" "}
               {data.extremes.largestLossGame.myMMR}) vs{" "}
               <span className="font-semibold">
                 {data.extremes.largestLossGame.oppName}
@@ -84,7 +89,7 @@ export default async function VsPlayerPage({ params }: PageProps) {
               <span className="font-semibold">
                 {data.extremes.largestGapWin.myName}
               </span>{" "}
-              ({displayMyRace(data.extremes.largestGapWin)}{" "}
+              ({myRace(data.extremes.largestGapWin)}{" "}
               {data.extremes.largestGapWin.myMMR}) vs{" "}
               <span className="font-semibold">
                 {data.extremes.largestGapWin.oppName}
@@ -107,7 +112,7 @@ export default async function VsPlayerPage({ params }: PageProps) {
               <span className="font-semibold">
                 {data.extremes.largestGapLoss.myName}
               </span>{" "}
-              ({displayMyRace(data.extremes.largestGapLoss)}{" "}
+              ({myRace(data.extremes.largestGapLoss)}{" "}
               {data.extremes.largestGapLoss.myMMR}) vs{" "}
               <span className="font-semibold">
                 {data.extremes.largestGapLoss.oppName}
@@ -145,7 +150,7 @@ export default async function VsPlayerPage({ params }: PageProps) {
 
                 <span>
                   <span className="font-semibold">{g.myName}</span>{" "}
-                  ({displayMyRace(g)} {g.myMMR}) vs{" "}
+                  ({myRace(g)} {g.myMMR}) vs{" "}
                   <span className="font-semibold">{g.oppName}</span>{" "}
                   ({g.oppRace} {g.oppMMR})
                 </span>
@@ -179,7 +184,7 @@ export default async function VsPlayerPage({ params }: PageProps) {
 
                 <span>
                   <span className="font-semibold">{g.myName}</span>{" "}
-                  ({displayMyRace(g)} {g.myMMR}) vs{" "}
+                  ({myRace(g)} {g.myMMR}) vs{" "}
                   <span className="font-semibold">{g.oppName}</span>{" "}
                   ({g.oppRace} {g.oppMMR})
                 </span>
