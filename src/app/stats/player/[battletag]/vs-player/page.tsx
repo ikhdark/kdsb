@@ -51,9 +51,10 @@ export default async function VsPlayerPage({ params }: PageProps) {
         )}
 
         {data.extremes.largestLossGame && (
-          <div className="mt-3 grid grid-cols-[1fr_auto] gap-x-3">
+          <div className="mt-3 grid grid-cols-[auto_1fr_auto] gap-x-3">
+            <span className="font-medium text-rose-600">L</span>
+
             <span>
-              Largest Single-Game Loss:{" "}
               <span className="font-semibold">
                 {data.extremes.largestLossGame.myName}
               </span>{" "}
@@ -67,9 +68,7 @@ export default async function VsPlayerPage({ params }: PageProps) {
             </span>
 
             <span className="font-medium text-rose-600">
-              {data.extremes.largestSingleLoss != null
-                ? signed(data.extremes.largestSingleLoss)
-                : "—"}
+              {signed(-Math.abs(data.extremes.largestSingleLoss ?? 0))}
             </span>
           </div>
         )}
@@ -78,7 +77,9 @@ export default async function VsPlayerPage({ params }: PageProps) {
       {/* ================= Gap Extremes ================= */}
       <Section title="MMR Gap Extremes">
         {data.extremes.largestGapWin && (
-          <div className="grid grid-cols-[1fr_auto] gap-x-3">
+          <div className="grid grid-cols-[auto_1fr_auto] gap-x-3">
+            <span className="font-medium text-emerald-600">W</span>
+
             <span>
               <span className="font-semibold">
                 {data.extremes.largestGapWin.myName}
@@ -99,7 +100,9 @@ export default async function VsPlayerPage({ params }: PageProps) {
         )}
 
         {data.extremes.largestGapLoss && (
-          <div className="grid grid-cols-[1fr_auto] gap-x-3 mt-1">
+          <div className="grid grid-cols-[auto_1fr_auto] gap-x-3 mt-1">
+            <span className="font-medium text-rose-600">L</span>
+
             <span>
               <span className="font-semibold">
                 {data.extremes.largestGapLoss.myName}
@@ -114,7 +117,7 @@ export default async function VsPlayerPage({ params }: PageProps) {
             </span>
 
             <span className="font-medium text-rose-600">
-              {signed(-data.extremes.largestGapLoss.gap)}
+              {signed(-Math.abs(data.extremes.largestGapLoss.gap))}
             </span>
           </div>
         )}
@@ -141,7 +144,6 @@ export default async function VsPlayerPage({ params }: PageProps) {
                   ({g.oppRace} {g.oppMMR})
                 </span>
 
-                {/* FIXED COLOR */}
                 <span
                   className={`font-medium ${
                     g.mmrChange >= 0 ? "text-emerald-600" : "text-rose-600"
@@ -170,7 +172,6 @@ export default async function VsPlayerPage({ params }: PageProps) {
                   ({g.oppRace} {g.oppMMR})
                 </span>
 
-                {/* FIXED COLOR */}
                 <span
                   className={`font-medium ${
                     g.mmrChange >= 0 ? "text-emerald-600" : "text-rose-600"
