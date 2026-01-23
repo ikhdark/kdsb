@@ -57,7 +57,7 @@ export default async function RankPage({ params }: PageProps) {
       {/* HEADER */}
       <PlayerHeader
         battletag={titleTag}
-        subtitle={`Season ${season} · 1v1 Ladder`}
+        subtitle={`Season ${season} · 1v1 Ladder (Min 25 Games Played per Race)`}
       />
 
       {/* ERROR */}
