@@ -135,8 +135,10 @@ export default async function VsPlayerPage({ params }: PageProps) {
                 <span className="font-semibold">{g.result}</span>
 
                 <span>
-                  {g.myName} ({displayMyRace(g)} {g.myMMR}) vs{" "}
-                  {g.oppName} ({g.oppRace} {g.oppMMR})
+                  <span className="font-semibold">{g.myName}</span>{" "}
+                  ({displayMyRace(g)} {g.myMMR}) vs{" "}
+                  <span className="font-semibold">{g.oppName}</span>{" "}
+                  ({g.oppRace} {g.oppMMR})
                 </span>
 
                 <span>{signed(g.mmrChange)}</span>
@@ -155,8 +157,10 @@ export default async function VsPlayerPage({ params }: PageProps) {
                 <span className="font-semibold">{g.result}</span>
 
                 <span>
-                  {g.myName} ({displayMyRace(g)} {g.myMMR}) vs{" "}
-                  {g.oppName} ({g.oppRace} {g.oppMMR})
+                  <span className="font-semibold">{g.myName}</span>{" "}
+                  ({displayMyRace(g)} {g.myMMR}) vs{" "}
+                  <span className="font-semibold">{g.oppName}</span>{" "}
+                  ({g.oppRace} {g.oppMMR})
                 </span>
 
                 <span>{signed(g.mmrChange)}</span>
