@@ -19,7 +19,12 @@ export default async function CountriesPage({ params, searchParams }: Props) {
     return <div className="text-sm text-gray-500">No country data available</div>;
   }
 
-  const { battletag: canonicalBt, countries, homeCountry, homeCountryLabel } = data;
+  const {
+    battletag: canonicalBt,
+    countries,
+    homeCountry,
+    homeCountryLabel,
+  } = data;
 
   /* ================= helpers ================= */
 
@@ -27,12 +32,9 @@ export default async function CountriesPage({ params, searchParams }: Props) {
     arr.reduce((a, b) => a + (b[key] || 0), 0);
 
   const countriesByGames = countries.slice().sort((a, b) => b.games - a.games);
-  const countriesByOppMmr = countries.slice().sort(
-    (a, b) => (b.avgOpponentMMR ?? 0) - (a.avgOpponentMMR ?? 0)
-  );
-  const countriesByTime = countries.slice().sort(
-    (a, b) => b.timePlayedSeconds - a.timePlayedSeconds
-  );
+  const countriesByOppMmr = countries
+    .slice()
+    .sort((a, b) => (b.avgOpponentMMR ?? 0) - (a.avgOpponentMMR ?? 0));
 
   const home = countries.filter((c) => c.country === homeCountry);
   const foreign = countries.filter((c) => c.country !== homeCountry);
@@ -48,15 +50,16 @@ export default async function CountriesPage({ params, searchParams }: Props) {
     return "text-rose-500 font-medium";
   };
 
-  const wlColor = (wins: number, losses: number) =>
-    wins >= losses ? "text-emerald-500" : "text-rose-500";
-
   /* ================= render ================= */
 
   return (
-    <div className="space-y-10 rounded-lg bg-white p-6 shadow dark:bg-gray-dark text-sm">
+    <div className="space-y-10 max-w-6xl mx-auto text-sm leading-relaxed">
+
       {/* HEADER */}
-      <PlayerHeader battletag={canonicalBt} subtitle="Country Stats" />
+      <PlayerHeader
+        battletag={canonicalBt}
+        subtitle="Country Stats"
+      />
 
       {/* ================= HOME VS FOREIGN ================= */}
       <Section title="Home vs Foreign">
@@ -66,7 +69,11 @@ export default async function CountriesPage({ params, searchParams }: Props) {
             value={`${homeWins}-${homeLosses}`}
             sub={
               homeWins + homeLosses ? (
-                <span className={wrColor((homeWins / (homeWins + homeLosses)) * 100)}>
+                <span
+                  className={wrColor(
+                    (homeWins / (homeWins + homeLosses)) * 100
+                  )}
+                >
                   {((homeWins / (homeWins + homeLosses)) * 100).toFixed(1)}% WR
                 </span>
               ) : (
@@ -74,6 +81,7 @@ export default async function CountriesPage({ params, searchParams }: Props) {
               )
             }
           />
+
           <StatCard
             label="Foreign"
             value={`${foreignWins}-${foreignLosses}`}
@@ -118,14 +126,8 @@ export default async function CountriesPage({ params, searchParams }: Props) {
                     <td className="px-4 py-2">{c.label}</td>
                     <td className="px-4 py-2 tabular-nums">{c.games}</td>
                     <td className="px-4 py-2 tabular-nums">{c.uniqueOpponents}</td>
-
-                    <td className={`px-4 py-2 tabular-nums text-emerald-600`}>
-                      {c.wins}
-                    </td>
-                    <td className={`px-4 py-2 tabular-nums text-rose-600`}>
-                      {c.losses}
-                    </td>
-
+                    <td className="px-4 py-2 tabular-nums text-emerald-600">{c.wins}</td>
+                    <td className="px-4 py-2 tabular-nums text-rose-600">{c.losses}</td>
                     <td className={`px-4 py-2 tabular-nums ${wrColor(wrPercent)}`}>
                       {wrPercent.toFixed(1)}%
                     </td>
@@ -161,22 +163,11 @@ export default async function CountriesPage({ params, searchParams }: Props) {
 
                     return (
                       <tr key={`${c.country}-${r.raceId}`} className="border-b">
-                        <td className="px-4 py-2">
-                          {idx === 0 ? c.label : ""}
-                        </td>
-
+                        <td className="px-4 py-2">{idx === 0 ? c.label : ""}</td>
                         <td className="px-4 py-2">{r.race}</td>
-
                         <td className="px-4 py-2 tabular-nums">{r.games}</td>
-
-                        <td className="px-4 py-2 tabular-nums text-emerald-600">
-                          {r.wins}
-                        </td>
-
-                        <td className="px-4 py-2 tabular-nums text-rose-600">
-                          {r.losses}
-                        </td>
-
+                        <td className="px-4 py-2 tabular-nums text-emerald-600">{r.wins}</td>
+                        <td className="px-4 py-2 tabular-nums text-rose-600">{r.losses}</td>
                         <td className={`px-4 py-2 tabular-nums ${wrColor(wrPercent)}`}>
                           {wrPercent.toFixed(1)}%
                         </td>
@@ -204,18 +195,15 @@ export default async function CountriesPage({ params, searchParams }: Props) {
               {countriesByOppMmr.map((c) => (
                 <tr key={c.country} className="border-b">
                   <td className="px-4 py-2">{c.label}</td>
-                  <td className="px-4 py-2 tabular-nums">
-                    {c.avgOpponentMMR?.toFixed(0) ?? "—"}
-                  </td>
-                  <td className="px-4 py-2 tabular-nums">
-                    {c.avgSelfMMR?.toFixed(0) ?? "—"}
-                  </td>
+                  <td className="px-4 py-2 tabular-nums">{c.avgOpponentMMR?.toFixed(0) ?? "—"}</td>
+                  <td className="px-4 py-2 tabular-nums">{c.avgSelfMMR?.toFixed(0) ?? "—"}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </Section>
+
     </div>
   );
 }
