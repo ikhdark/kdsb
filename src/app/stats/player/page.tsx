@@ -14,10 +14,8 @@ export default function PlayerLandingPage() {
       const value = inputRef.current?.value.trim();
       if (!value) return;
 
-      // ✅ GA4-safe custom event (works with Next.js GoogleAnalytics wrapper)
-      window.dataLayer?.push({
-        event: "battleTag_search",
-      });
+      // ✅ Correct for GA4 (NOT dataLayer)
+      (window as any).gtag?.("event", "battleTag_search");
 
       router.push(`/stats/player/${encodeURIComponent(value)}`);
     },
