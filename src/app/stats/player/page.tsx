@@ -7,7 +7,6 @@ export default function PlayerLandingPage() {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Submit handler
   const onSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
@@ -15,8 +14,10 @@ export default function PlayerLandingPage() {
       const value = inputRef.current?.value.trim();
       if (!value) return;
 
-      // ✅ Track real tool usage (GA4 custom event)
-      window.gtag?.("event", "battleTag_search");
+      // ✅ GA4-safe custom event (works with Next.js GoogleAnalytics wrapper)
+      window.dataLayer?.push({
+        event: "battleTag_search",
+      });
 
       router.push(`/stats/player/${encodeURIComponent(value)}`);
     },
@@ -26,7 +27,6 @@ export default function PlayerLandingPage() {
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-gray-50 dark:bg-gray-900 overflow-hidden">
       <div className="w-full max-w-md text-center space-y-4 sm:space-y-6 px-4">
-        {/* Header */}
         <h1 className="text-4xl sm:text-5xl font-semibold text-black dark:text-white leading-snug">
           W3Champions
         </h1>
@@ -35,7 +35,6 @@ export default function PlayerLandingPage() {
           Search a BattleTag (Please be patient stats loading might take up to 10 seconds, this will improve in BETA 1.1)
         </p>
 
-        {/* Search form */}
         <form onSubmit={onSubmit} className="flex flex-col sm:flex-row gap-2 w-full">
           <input
             ref={inputRef}
