@@ -37,17 +37,21 @@ export default function RootLayout({ children }: PropsWithChildren) {
         <Providers>
           <NextTopLoader color="#5750F1" showSpinner={false} />
 
-          {/* 🔥 KEY FIX HERE */}
-          <div className="min-h-screen md:flex">
+          {/* 🔴 IMPORTANT: NOT flex anymore */}
+          <div className="min-h-screen">
+
+            {/* sidebar overlays on mobile, static on desktop */}
             <Sidebar />
 
-            <div className="flex-1 bg-gray-2 dark:bg-[#020d1a]">
+            {/* main content always full width */}
+            <div className="w-full bg-gray-2 dark:bg-[#020d1a]">
               <Header />
 
               <main className="mx-auto w-full max-w-screen-2xl p-4 md:p-6 2xl:p-10">
                 {children}
               </main>
             </div>
+
           </div>
         </Providers>
 
