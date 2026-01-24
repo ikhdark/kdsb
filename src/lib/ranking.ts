@@ -61,7 +61,7 @@ export function flattenCountryLadder(payload: unknown): FlattenedLadderRow[] {
       `${row.race}|${row.mmr}|${row.games}|${row.wins}|` +
       `${row.battleTagLower ?? ""}|${row.playerIdLower ?? ""}`;
 
-    if (seen.has(key)) return;
+    (seen.has(key))
     seen.add(key);
     out.push(row);
   };
@@ -174,40 +174,50 @@ export function rankByMMR(
   if (!Array.isArray(rows) || rows.length === 0) return null;
   if (!canonicalLower) return null;
 
+  if (canonicalLower !== canonicalLower.toLowerCase()) return null;
+
   const canon = canonicalLower;
   const pidLower = fallbackPlayerIdLower ?? null;
+  if (pidLower && pidLower !== pidLower.toLowerCase()) return null;
 
   const pool = rows
     .filter((row) => {
+      if (!row) return false;
       if (row.race !== raceId) return false;
       if (row.games < minGames) return false;
+      if (typeof row.mmr !== "number") return false;
 
-      return (
-        row.battleTagLower === canon ||
-        (pidLower && row.playerIdLower === pidLower)
-      );
+      const hasBtag =
+        typeof row.battleTagLower === "string" && row.battleTagLower.length > 0;
+      const hasPid =
+        typeof row.playerIdLower === "string" && row.playerIdLower.length > 0;
+
+      // Use ! to assure TS these are defined
+      if (hasBtag && row.battleTagLower! !== row.battleTagLower!.toLowerCase())
+        return false;
+      if (hasPid && row.playerIdLower! !== row.playerIdLower!.toLowerCase())
+        return false;
+
+      return hasBtag || hasPid;
     })
     .sort((a, b) => {
       if (b.mmr !== a.mmr) return b.mmr - a.mmr;
 
-      const aPct = a.games ? a.wins / a.games : 0;
-      const bPct = b.games ? b.wins / b.games : 0;
-
-      if (bPct !== aPct) return bPct - aPct;
+      const aWinPct = a.games ? a.wins / a.games : 0;
+      const bWinPct = b.games ? b.wins / b.games : 0;
+      if (bWinPct !== aWinPct) return bWinPct - aWinPct;
 
       return b.games - a.games;
     });
 
-  const idx = pool.findIndex(
-    (r) =>
-      r.battleTagLower === canon ||
-      (pidLower && r.playerIdLower === pidLower)
-  );
+  const idx = pool.findIndex((r) => {
+    if (typeof r.battleTagLower === "string" && r.battleTagLower === canon)
+      return true;
+    if (pidLower && typeof r.playerIdLower === "string" && r.playerIdLower === pidLower)
+      return true;
+    return false;
+  });
 
   if (idx === -1) return null;
-
-  return {
-    rank: idx + 1,
-    total: pool.length,
-  };
+  return { rank: idx + 1, total: pool.length };
 }

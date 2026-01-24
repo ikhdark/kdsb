@@ -11,7 +11,7 @@ const fetchFn: typeof fetch =
 ========================= */
 
 export type PlayerProfile = {
-  battletag: string; // canonical casing (best effort)
+  battletag: string;           // canonical casing (best effort)
   playerId: string | null;
   countryCode: string | null;
   location: string | null;
@@ -38,9 +38,7 @@ function pickString(x: any): string | null {
  * - battletag MUST already be canonical (from resolveBattleTagViaSearch)
  * - NO casing/identity logic here
  */
-export async function fetchPlayerProfile(
-  battletag: string
-): Promise<PlayerProfile> {
+export async function fetchPlayerProfile(battletag: string): Promise<PlayerProfile> {
   const safeDefault: PlayerProfile = {
     battletag,
     playerId: null,
@@ -57,18 +55,16 @@ export async function fetchPlayerProfile(
   try {
     const res = await fetchFn(
       `https://website-backend.w3champions.com/api/players/${btEnc}`,
-      {
-        cache: "no-store",
-      }
+      { cache: "no-store" }
     );
 
     if (res.ok) {
       const json: any = await res.json();
 
-      // FIXED: check BOTH battleTag + battletag (not duplicate)
+      // Some payloads use battleTag, others battleTag; also id is often battletag
       const canonical =
         pickString(json?.battleTag) ||
-        pickString(json?.battletag) ||
+        pickString(json?.battleTag) ||
         pickString(json?.id) ||
         battletag;
 
@@ -131,8 +127,7 @@ export async function fetchCountryLadder(
   const url =
     `https://website-backend.w3champions.com/api/ladder/country/${encodeURIComponent(
       country
-    )}` +
-    `?gateWay=${gateway}&gameMode=${gameMode}&season=${season}`;
+    )}?gateWay=${gateway}&gameMode=${gameMode}&season=${season}`;
 
   try {
     const res = await fetchFn(url, { cache: "no-store" });
