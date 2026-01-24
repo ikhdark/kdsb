@@ -1,21 +1,30 @@
 import React, { ReactNode } from "react";
+import { cn } from "@/lib/utils";
 
 /* =========================
    Header
 ========================= */
+
+type PlayerHeaderProps = {
+  battletag: string;
+  subtitle: string;
+  className?: string;
+};
+
 export function PlayerHeader({
   battletag,
   subtitle,
-}: {
-  battletag: string;
-  subtitle: string;
-}) {
+  className,
+}: PlayerHeaderProps) {
   return (
-    <header className="space-y-1">
+    <header className={cn("space-y-1", className)}>
       <h1 className="text-2xl font-semibold tracking-tight text-black dark:text-white">
         {battletag}
       </h1>
-      <p className="text-sm text-gray-500">{subtitle}</p>
+
+      <p className="text-sm text-gray-500 dark:text-gray-400">
+        {subtitle}
+      </p>
     </header>
   );
 }
@@ -23,18 +32,20 @@ export function PlayerHeader({
 /* =========================
    Section wrapper
 ========================= */
-export function Section({
-  title,
-  children,
-}: {
+
+type SectionProps = {
   title: string;
   children: ReactNode;
-}) {
+  className?: string;
+};
+
+export function Section({ title, children, className }: SectionProps) {
   return (
-    <section className="space-y-2">
+    <section className={cn("space-y-3", className)}>
       <h2 className="border-b border-gray-300 pb-1 text-sm font-semibold uppercase tracking-wide text-black dark:border-gray-700 dark:text-white">
         {title}
       </h2>
+
       <div className="space-y-2 text-sm">{children}</div>
     </section>
   );
@@ -43,33 +54,49 @@ export function Section({
 /* =========================
    Stat row
 ========================= */
+
+type StatRowProps = {
+  label: string;
+  value: string;
+  winrate?: number;
+  className?: string;
+};
+
 export function StatRow({
   label,
   value,
   winrate,
-}: {
-  label: string;
-  value: string;
-  winrate?: number;
-}) {
+  className,
+}: StatRowProps) {
+  const pct =
+    typeof winrate === "number"
+      ? Math.min(100, Math.max(0, winrate))
+      : null;
+
   return (
-    <div className="space-y-1">
-      <div className="grid grid-cols-[1fr_auto] gap-x-4 items-center">
-        <span>{label}</span>
-        <span className="tabular-nums font-medium">{value}</span>
+    <div className={cn("space-y-1", className)}>
+      <div className="grid grid-cols-[1fr_auto] items-center gap-x-4">
+        <span className="truncate text-gray-700 dark:text-gray-300">
+          {label}
+        </span>
+
+        <span className="tabular-nums font-medium">
+          {value}
+        </span>
       </div>
 
-      {typeof winrate === "number" && (
-        <div className="h-1.5 bg-gray-200 rounded overflow-hidden dark:bg-gray-700">
+      {pct !== null && (
+        <div className="h-1.5 overflow-hidden rounded bg-gray-200 dark:bg-gray-700">
           <div
-            className={
-              winrate >= 55
-                ? "bg-emerald-500 h-full"
-                : winrate >= 48
-                ? "bg-yellow-500 h-full"
-                : "bg-rose-500 h-full"
-            }
-            style={{ width: `${Math.min(100, Math.max(0, winrate))}%` }}
+            className={cn(
+              "h-full transition-all",
+              pct >= 55
+                ? "bg-emerald-500"
+                : pct >= 48
+                ? "bg-yellow-500"
+                : "bg-rose-500"
+            )}
+            style={{ width: `${pct}%` }}
           />
         </div>
       )}
@@ -78,23 +105,42 @@ export function StatRow({
 }
 
 /* =========================
-   Stat card (for Rank / Hero summary tiles)
-   Updated to allow JSX in 'sub'
+   Stat card (summary tiles)
 ========================= */
+
+type StatCardProps = {
+  label: string;
+  value: string;
+  sub?: ReactNode;
+  className?: string;
+};
+
 export function StatCard({
   label,
   value,
   sub,
-}: {
-  label: string;
-  value: string;
-  sub?: ReactNode; // <-- changed from 'string' to ReactNode
-}) {
+  className,
+}: StatCardProps) {
   return (
-    <div className="rounded-xl border bg-white p-5 shadow-sm dark:bg-gray-dark">
-      <div className="text-xs uppercase tracking-wide text-gray-500">{label}</div>
-      <div className="mt-2 text-2xl font-semibold tabular-nums">{value}</div>
-      {sub && <div className="text-xs text-gray-500">{sub}</div>}
+    <div
+      className={cn(
+        "rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900",
+        className
+      )}
+    >
+      <div className="text-xs uppercase tracking-wide text-gray-500">
+        {label}
+      </div>
+
+      <div className="mt-2 text-2xl font-semibold tabular-nums">
+        {value}
+      </div>
+
+      {sub && (
+        <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          {sub}
+        </div>
+      )}
     </div>
   );
 }

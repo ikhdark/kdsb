@@ -26,7 +26,6 @@ export default async function RankPage({ params }: PageProps) {
   if (!data && !serviceError) notFound();
 
   const titleTag = data?.battletag ?? decodeURIComponent(input);
-  const season = data?.season ?? "—";
   const country = data?.country ?? "—";
 
   const ranks = Array.isArray(data?.ranks) ? data.ranks : [];
@@ -37,17 +36,6 @@ export default async function RankPage({ params }: PageProps) {
       : null;
 
   const showEmpty = !serviceError && (!data || ranks.length === 0);
-
-  /* ================= helpers ================= */
-
-  const getColorByPercentile = (rank: number, total: number) => {
-    if (rank <= total * 0.03) return "text-yellow-500 font-bold";
-    if (rank <= total * 0.10) return "text-amber-500 font-semibold";
-    if (rank <= total * 0.25) return "text-emerald-500 font-semibold";
-    if (rank <= total * 0.50) return "text-cyan-500 font-medium";
-    if (rank <= total * 0.75) return "text-blue-500 font-medium";
-    return "text-gray-500 dark:text-gray-400 font-medium";
-  };
 
   /* ================= render ================= */
 
@@ -89,31 +77,23 @@ export default async function RankPage({ params }: PageProps) {
       {/* RANK TABLE */}
       {ranks.length > 0 && (
         <Section title="Race Rankings">
-          <div className="overflow-hidden rounded-xl border bg-white shadow-sm dark:bg-gray-dark">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs uppercase tracking-wider">
-                <tr>
-                  <th className="px-5 py-3 text-left">Race</th>
-                  <th className="px-5 py-3 text-left">Global</th>
-                  <th className="px-5 py-3 text-left">Country</th>
-                  <th className="px-5 py-3 text-right">MMR</th>
-                  <th className="px-5 py-3 text-right">Games</th>
-                </tr>
-              </thead>
+          <div className="rounded-xl border bg-white shadow-sm dark:bg-gray-dark">
 
-              <tbody>
-                {ranks.map((r, i) => {
-                  const globalColor = getColorByPercentile(
-                    r.globalRank,
-                    r.globalTotal
-                  );
+            <div className="w-full overflow-x-auto">
+              <table className="min-w-[680px] w-full text-sm">
 
-                  const countryColor =
-                    r.countryRank && r.countryTotal
-                      ? getColorByPercentile(r.countryRank, r.countryTotal)
-                      : "text-gray-400";
+                <thead className="bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs uppercase tracking-wider">
+                  <tr>
+                    <th className="px-5 py-3 text-left">Race</th>
+                    <th className="px-5 py-3 text-left">Global</th>
+                    <th className="px-5 py-3 text-left">Country</th>
+                    <th className="px-5 py-3 text-right">MMR</th>
+                    <th className="px-5 py-3 text-right">Games</th>
+                  </tr>
+                </thead>
 
-                  return (
+                <tbody>
+                  {ranks.map((r, i) => (
                     <tr
                       key={r.raceId}
                       className={`border-t ${
@@ -124,11 +104,11 @@ export default async function RankPage({ params }: PageProps) {
                     >
                       <td className="px-5 py-3 font-medium">{r.race}</td>
 
-                      <td className={`px-5 py-3 tabular-nums ${globalColor}`}>
+                      <td className="px-5 py-3 tabular-nums">
                         #{r.globalRank}/{r.globalTotal}
                       </td>
 
-                      <td className={`px-5 py-3 tabular-nums ${countryColor}`}>
+                      <td className="px-5 py-3 tabular-nums">
                         {r.countryRank && r.countryTotal
                           ? `#${r.countryRank}/${r.countryTotal}`
                           : "—"}
@@ -142,14 +122,11 @@ export default async function RankPage({ params }: PageProps) {
                         {r.games}
                       </td>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-
-            <div className="px-5 py-3 text-xs text-gray-500 dark:text-gray-400 border-t">
-              Yellow = Top 3% · Amber = Top 10% · Green = Top 25% · Cyan/Blue = Mid · Gray = Lower
+                  ))}
+                </tbody>
+              </table>
             </div>
+
           </div>
         </Section>
       )}

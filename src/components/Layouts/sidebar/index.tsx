@@ -30,7 +30,7 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* ================= OVERLAY (mobile only) ================= */}
+      {/* ================= OVERLAY ================= */}
       {isMobile && isOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/40"
@@ -50,8 +50,7 @@ export default function Sidebar() {
           dark:border-stroke-dark dark:bg-gray-dark
         `}
       >
-        <div className="p-4 overflow-y-auto w-full">
-
+        <div className="w-full overflow-y-auto p-4">
           {NAV_DATA.map((group) => (
             <div key={group.label} className="mb-6">
               <p className="mb-2 px-4 text-xs font-semibold uppercase text-gray-500">
@@ -89,10 +88,10 @@ export default function Sidebar() {
                   }
 
                   const href = isSearch
-                    ? "/stats/player"
-                    : `/stats/player/${battletag}${item.path}`;
+                    ? "/"
+                    : `/stats/player/${battletag}/${item.path}`;
 
-                  const isActive = pathname === href;
+                  const isActive = pathname.startsWith(href);
 
                   return (
                     <MenuItem

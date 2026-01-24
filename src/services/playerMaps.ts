@@ -74,7 +74,7 @@ export async function getW3CMapStats(inputTag: string) {
   for (const m of matches) {
     if (m?.gameMode !== 1) continue;
 
-    const pair = getPlayerAndOpponent(m, canonical);
+    const pair = getPlayerAndOpponent(m, canonical.toLowerCase());
     if (!pair) continue;
 
     const { me, opp } = pair;

@@ -20,9 +20,8 @@ export default function MenuItem({
 }: MenuItemProps) {
   const classes = cn(
     "flex items-center gap-3 rounded-lg px-4 py-2 text-sm font-medium transition-colors",
-    isActive
-      ? "bg-primary text-white"
-      : "text-dark hover:bg-gray-100 dark:text-white dark:hover:bg-gray-800"
+    "text-dark dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800",
+    isActive && "bg-primary text-white hover:bg-primary"
   );
 
   /* ================= LINK ================= */
@@ -30,7 +29,8 @@ export default function MenuItem({
     return (
       <Link
         href={href}
-        onClick={onClick}   // ← CRITICAL FIX
+        onClick={onClick}
+        aria-current={isActive ? "page" : undefined}
         className={classes}
       >
         {children}

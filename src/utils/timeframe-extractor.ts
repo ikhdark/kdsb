@@ -1,9 +1,9 @@
 export function createTimeFrameExtractor(
   selectedTimeFrame: string | undefined,
 ) {
+  const values = selectedTimeFrame?.split(",") ?? [];
+
   return (sectionKey: string) => {
-    return selectedTimeFrame
-      ?.split(",")
-      .find((value) => value.includes(sectionKey));
+    return values.find((value) => value === sectionKey);
   };
 }

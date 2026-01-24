@@ -4,10 +4,10 @@ import { SearchIcon } from "@/assets/icons";
 import { MenuIcon } from "./icons";
 import { useSidebarContext } from "@/components/Layouts/sidebar/sidebar-context";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState, type FormEvent } from "react";
 
-function normalizeBattleTagInput(value: string): string {
-  return String(value).replace(/\+/g, " ").trim();
+function normalizeBattleTagInput(value: string) {
+  return value.trim();
 }
 
 export function Header() {
@@ -15,38 +15,41 @@ export function Header() {
   const router = useRouter();
 
   const [query, setQuery] = useState("");
-  const [generatedAt, setGeneratedAt] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const update = () =>
-      setGeneratedAt(new Date().toLocaleTimeString());
-
-    update();
-    const id = setInterval(update, 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  function submitSearch(e: React.FormEvent) {
+  async function submitSearch(e: FormEvent) {
     e.preventDefault();
 
     const normalized = normalizeBattleTagInput(query);
-    if (!normalized) return;
+    if (!normalized || loading) return;
 
-    router.push(`/stats/player/${encodeURIComponent(normalized)}/summary`);
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch(
+        `/api/resolve-battletag?q=${encodeURIComponent(normalized)}`
+      );
+
+      const data = await res.json();
+
+      if (!data?.ok) {
+        setError("Player not found");
+        return;
+      }
+
+      router.replace(
+        `/stats/player/${encodeURIComponent(data.battleTag)}/summary`
+      );
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
-    <header
-      className="
-        sticky top-0 z-20
-        flex items-center justify-between
-        border-b border-stroke bg-white shadow-1
-        px-3 py-3
-        md:px-5 md:py-5
-        dark:border-stroke-dark dark:bg-gray-dark
-      "
-    >
-      {/* ===== SINGLE MOBILE HAMBURGER ===== */}
+    <header className="sticky top-0 z-20 flex items-center justify-between border-b border-stroke bg-white shadow-1 px-3 py-3 md:px-5 md:py-5 dark:border-stroke-dark dark:bg-gray-dark">
+
       <button
         onClick={toggleSidebar}
         className="rounded-lg border p-2 lg:hidden dark:border-stroke-dark"
@@ -54,23 +57,12 @@ export function Header() {
         <MenuIcon />
       </button>
 
-      {/* ===== DESKTOP TITLE ===== */}
       <div className="hidden xl:block">
         <h1 className="text-heading-5 font-bold text-dark dark:text-white">
           KD&apos;S W3C STATS
         </h1>
-
-        <p className="font-medium">Unlock your W3C stats</p>
-
-        {generatedAt && (
-          <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="h-2 w-2 rounded-full bg-emerald-500" />
-            Updated {generatedAt}
-          </div>
-        )}
       </div>
 
-      {/* ===== SEARCH ===== */}
       <div className="flex flex-1 items-center justify-end">
         <form
           onSubmit={submitSearch}
@@ -81,28 +73,20 @@ export function Header() {
             autoComplete="off"
             placeholder="Search BattleTag"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="
-              w-full rounded-full border bg-gray-2 outline-none
-
-              h-10 text-sm pl-9 pr-3
-              md:h-12 md:text-base md:pl-12 md:pr-5
-
-              dark:border-dark-3 dark:bg-dark-2
-              focus-visible:border-primary
-            "
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setError(null);
+            }}
+            className="w-full rounded-full border bg-gray-2 outline-none h-10 text-sm pl-9 pr-3 md:h-12 md:text-base md:pl-12 md:pr-5 dark:border-dark-3 dark:bg-dark-2 focus-visible:border-primary"
           />
 
-          <SearchIcon
-            className="
-              pointer-events-none absolute top-1/2 -translate-y-1/2
-              left-3 size-4 md:left-5 md:size-5
-            "
-          />
+          <SearchIcon className="pointer-events-none absolute top-1/2 -translate-y-1/2 left-3 size-4 md:left-5 md:size-5" />
 
-          <button type="submit" className="sr-only">
-            Search
-          </button>
+          {error && (
+            <p className="absolute left-0 top-full mt-1 text-xs text-red-500">
+              {error}
+            </p>
+          )}
         </form>
       </div>
     </header>

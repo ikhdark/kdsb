@@ -1,4 +1,3 @@
-import WhatsNew from "@/components/WhatsNew";
 import PlayerLandingPage from "@/components/PlayerLandingPage";
 
 export default function Home() {
@@ -6,9 +5,6 @@ export default function Home() {
     <div className="space-y-10">
       {/* Search (primary action) */}
       <PlayerLandingPage />
-
-      {/* What's new (secondary info) */}
-      <WhatsNew />
     </div>
   );
 }

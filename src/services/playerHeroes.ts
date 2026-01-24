@@ -5,6 +5,32 @@ import { fetchPlayerProfile } from "@/services/w3cApi";
 const SEASONS = [23];
 const MIN_GAMES = 10;
 
+/* -------------------- MATCH CACHE (PERFORMANCE ONLY) -------------------- */
+
+const MATCH_CACHE_TTL = 5 * 60 * 1000;
+
+const matchCache = new Map<
+  string,
+  { time: number; matches: any[] }
+>();
+
+async function fetchMatchesCached(tag: string) {
+  const key = tag.toLowerCase();
+  const now = Date.now();
+
+  const cached = matchCache.get(key);
+  if (cached && now - cached.time < MATCH_CACHE_TTL) {
+    return cached.matches;
+  }
+
+  const matches = await fetchAllMatches(tag, SEASONS);
+
+  matchCache.set(key, { time: now, matches });
+
+  return matches;
+}
+
+
 /* -------------------- HERO DISPLAY -------------------- */
 
 const HERO_DISPLAY_NAMES: Record<string, string> = {
@@ -78,7 +104,7 @@ export async function getW3CHeroStats(inputTag: string) {
     (typeof profile?.battleTag === "string" ? profile.battleTag : "") ||
     raw;
 
-  const matches = await fetchAllMatches(canonicalBattleTag, SEASONS);
+  const matches = await fetchMatchesCached(canonicalBattleTag);
   if (!matches.length) return null;
 
   /* -------------------- ACCUMULATORS -------------------- */

@@ -5,9 +5,6 @@ import { GoogleAnalytics } from "@next/third-parties/google";
 import Script from "next/script";
 import Sidebar from "@/components/Layouts/sidebar";
 
-import "flatpickr/dist/flatpickr.min.css";
-import "jsvectormap/dist/jsvectormap.css";
-
 import { Header } from "@/components/Layouts/header";
 import type { Metadata } from "next";
 import NextTopLoader from "nextjs-toploader";

@@ -11,6 +11,31 @@ const MIN_DURATION_SECONDS = 120;
 const MAX_EXTREME_ABS_MMR_CHANGE = 30;
 const HIGH_GAIN_THRESHOLD = 15;
 
+/* -------------------- MATCH CACHE (PERFORMANCE ONLY) -------------------- */
+
+const MATCH_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+const matchCache = new Map<
+  string,
+  { time: number; matches: any[] }
+>();
+
+async function fetchMatchesCached(tag: string) {
+  const key = tag.toLowerCase();
+  const now = Date.now();
+
+  const cached = matchCache.get(key);
+  if (cached && now - cached.time < MATCH_CACHE_TTL) {
+    return cached.matches;
+  }
+
+  const matches = await fetchAllMatches(tag, SEASONS);
+
+  matchCache.set(key, { time: now, matches });
+
+  return matches;
+}
+
 /* -------------------- TYPES -------------------- */
 
 type AnyMatch = any;
@@ -71,7 +96,7 @@ export async function getPlayerSummary(inputTag: string) {
   const canonicalBattleTag = await resolveBattleTagViaSearch(raw);
   if (!canonicalBattleTag) return null;
 
-  const allMatches: AnyMatch[] = await fetchAllMatches(canonicalBattleTag, SEASONS);
+  const allMatches: AnyMatch[] = await fetchMatchesCached(canonicalBattleTag);
   if (!allMatches.length) return null;
 
   const targetKeyLower = canonicalBattleTag.toLowerCase();

@@ -37,10 +37,12 @@ export function SidebarProvider({
   const [isOpen, setIsOpen] = useState(true);
 
   /* =========================
-     Auto close when mobile
+     Sync open state with device
+     mobile  -> closed
+     desktop -> open
   ========================== */
   useEffect(() => {
-    if (isMobile) setIsOpen(false);
+    setIsOpen(!isMobile);
   }, [isMobile]);
 
   function toggleSidebar() {

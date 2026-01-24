@@ -9,8 +9,8 @@ const SEASONS = [23];
 const MIN_DURATION_SECONDS = 120;
 
 const BUCKET_SIZE = 50;
-const MAX_BUCKET_EDGE = 300;   // ← stop stepping here
-const EVEN_THRESHOLD = 25;     // ±25 treated as even
+const MAX_BUCKET_EDGE = 300;
+const EVEN_THRESHOLD = 25;
 
 /* =========================
    TYPES
@@ -25,7 +25,7 @@ type WL = {
 
 export type PerformanceBucket = {
   min: number;
-  max: number | null; // null = 300+ bucket
+  max: number | null;
   games: number;
   wins: number;
   losses: number;
@@ -37,8 +37,8 @@ export type PlayerPerformanceStats = {
 
   overall: WL;
 
-  higherMMR: WL; // you favored
-  lowerMMR: WL;  // you underdog
+  higherMMR: WL;
+  lowerMMR: WL;
   evenMMR: WL;
 
   buckets: PerformanceBucket[];
@@ -56,14 +56,6 @@ function finalizeWL(wl: WL) {
   if (wl.games) wl.winrate = wl.wins / wl.games;
 }
 
-/*
-  Buckets:
-  -300 to -250
-  ...
-  250 to 300
-  300+
-  -300+
-*/
 function bucketFloor(diff: number) {
   if (diff >= MAX_BUCKET_EDGE) return MAX_BUCKET_EDGE;
   if (diff <= -MAX_BUCKET_EDGE) return -MAX_BUCKET_EDGE;
@@ -81,7 +73,8 @@ export async function getPlayerPerformance(
   const battletag = await resolveBattleTagViaSearch(inputBattleTag);
   if (!battletag) return null;
 
-  const matches = await fetchAllMatches(battletag);
+  /* OPTIMIZED: season-filtered fetch */
+  const matches = await fetchAllMatches(battletag, SEASONS);
   if (!matches?.length) return null;
 
   const myTagLower = battletag.toLowerCase();
@@ -97,17 +90,19 @@ export async function getPlayerPerformance(
     if (match.durationInSeconds < MIN_DURATION_SECONDS) continue;
     if (!match.teams || match.teams.length !== 2) continue;
 
-    /* ---------- FAST 1v1 RESOLVE ---------- */
-
     const [teamA, teamB] = match.teams;
 
     const pA = teamA.players?.[0];
     const pB = teamB.players?.[0];
     if (!pA || !pB) continue;
 
+    /* OPTIMIZED: avoid double toLowerCase */
+    const tagA = pA.battleTag?.toLowerCase();
+    const tagB = pB.battleTag?.toLowerCase();
+
     const me =
-      pA.battleTag?.toLowerCase() === myTagLower ? pA :
-      pB.battleTag?.toLowerCase() === myTagLower ? pB :
+      tagA === myTagLower ? pA :
+      tagB === myTagLower ? pB :
       null;
 
     if (!me) continue;

@@ -1,10 +1,14 @@
+import type * as React from "react";
 import { cn } from "@/lib/utils";
-import * as React from "react";
+
+/* =========================
+   Table wrapper
+========================= */
 
 export function Table({
   className,
   ...props
-}: React.HTMLAttributes<HTMLTableElement>) {
+}: React.TableHTMLAttributes<HTMLTableElement>) {
   return (
     <div className="relative w-full overflow-auto">
       <table
@@ -15,11 +19,18 @@ export function Table({
   );
 }
 
+/* ========================= */
+
 export function TableHeader({
   className,
   ...props
 }: React.HTMLAttributes<HTMLTableSectionElement>) {
-  return <thead className={cn("[&_tr]:border-b", className)} {...props} />;
+  return (
+    <thead
+      className={cn("[&_tr]:border-b", className)}
+      {...props}
+    />
+  );
 }
 
 export function TableBody({
@@ -27,7 +38,10 @@ export function TableBody({
   ...props
 }: React.HTMLAttributes<HTMLTableSectionElement>) {
   return (
-    <tbody className={cn("[&_tr:last-child]:border-0", className)} {...props} />
+    <tbody
+      className={cn("[&_tr:last-child]:border-0", className)}
+      {...props}
+    />
   );
 }
 
@@ -39,12 +53,14 @@ export function TableFooter({
     <tfoot
       className={cn(
         "border-t bg-neutral-100/50 font-medium dark:bg-neutral-800/50 [&>tr]:last:border-b-0",
-        className,
+        className
       )}
       {...props}
     />
   );
 }
+
+/* ========================= */
 
 export function TableRow({
   className,
@@ -54,7 +70,7 @@ export function TableRow({
     <tr
       className={cn(
         "border-b transition-colors hover:bg-neutral-100/50 data-[state=selected]:bg-neutral-100 dark:border-dark-3 dark:hover:bg-dark-2 dark:data-[state=selected]:bg-neutral-800",
-        className,
+        className
       )}
       {...props}
     />
@@ -69,7 +85,7 @@ export function TableHead({
     <th
       className={cn(
         "h-12 px-4 text-left align-middle font-medium text-neutral-500 dark:text-neutral-400 [&:has([role=checkbox])]:pr-0",
-        className,
+        className
       )}
       {...props}
     />
@@ -84,7 +100,7 @@ export function TableCell({
     <td
       className={cn(
         "p-4 align-middle [&:has([role=checkbox])]:pr-0",
-        className,
+        className
       )}
       {...props}
     />

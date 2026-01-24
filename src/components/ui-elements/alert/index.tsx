@@ -1,10 +1,14 @@
 import { cn } from "@/lib/utils";
-import { cva } from "class-variance-authority";
-import React from "react";
-import { AlertErrorIcon, AlertSuccessIcon, AlertWarningIcon } from "./icons";
+import { cva, type VariantProps } from "class-variance-authority";
+import type { HTMLAttributes, ReactNode } from "react";
+import {
+  AlertErrorIcon,
+  AlertSuccessIcon,
+  AlertWarningIcon,
+} from "./icons";
 
 const alertVariants = cva(
-  "flex gap-5 w-full rounded-[10px] border-l-6 px-7 py-8 dark:bg-opacity-30 md:p-9",
+  "flex w-full gap-5 rounded-[10px] border-l-6 px-7 py-8 dark:bg-opacity-30 md:p-9",
   {
     variants: {
       variant: {
@@ -16,7 +20,7 @@ const alertVariants = cva(
     defaultVariants: {
       variant: "error",
     },
-  },
+  }
 );
 
 const icons = {
@@ -25,24 +29,26 @@ const icons = {
   warning: AlertWarningIcon,
 };
 
-type AlertProps = React.HTMLAttributes<HTMLDivElement> & {
-  variant: "error" | "success" | "warning";
-  title: string;
-  description: string;
-};
+type AlertProps =
+  HTMLAttributes<HTMLDivElement> &
+  VariantProps<typeof alertVariants> & {
+    title: ReactNode;
+    description: ReactNode;
+  };
 
-const Alert = ({
+export function Alert({
   className,
-  variant,
+  variant = "error",
   title,
   description,
   ...props
-}: AlertProps) => {
-  const IconComponent = icons[variant];
+}: AlertProps) {
+  const IconComponent = icons[variant!];
 
   return (
     <div
       role="alert"
+      aria-live="polite"
       className={cn(alertVariants({ variant }), className)}
       {...props}
     >
@@ -62,7 +68,7 @@ const Alert = ({
         <div
           className={cn({
             "text-[#637381]": variant === "success",
-            "text-[#D0915C]": variant == "warning",
+            "text-[#D0915C]": variant === "warning",
             "text-[#CD5D5D]": variant === "error",
           })}
         >
@@ -71,6 +77,4 @@ const Alert = ({
       </div>
     </div>
   );
-};
-
-export { Alert, type AlertProps };
+}

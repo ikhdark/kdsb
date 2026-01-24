@@ -32,9 +32,15 @@ export default async function CountriesPage({ params, searchParams }: Props) {
     arr.reduce((a, b) => a + (b[key] || 0), 0);
 
   const countriesByGames = countries.slice().sort((a, b) => b.games - a.games);
+
   const countriesByOppMmr = countries
     .slice()
     .sort((a, b) => (b.avgOpponentMMR ?? 0) - (a.avgOpponentMMR ?? 0));
+
+  // NEW — sort by total time played
+  const countriesByTime = countries
+    .slice()
+    .sort((a, b) => b.timePlayedSeconds - a.timePlayedSeconds);
 
   const home = countries.filter((c) => c.country === homeCountry);
   const foreign = countries.filter((c) => c.country !== homeCountry);
@@ -175,6 +181,47 @@ export default async function CountriesPage({ params, searchParams }: Props) {
                     );
                   })
               )}
+            </tbody>
+          </table>
+        </div>
+      </Section>
+
+      {/* ================= AVG GAME LENGTH (SORTED BY TIME) ================= */}
+      <Section title="Avg Game Length">
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b text-left text-gray-500 uppercase text-xs">
+                <th className="px-4 py-2">Country</th>
+                <th className="px-4 py-2 tabular-nums">Avg (min)</th>
+                <th className="px-4 py-2 tabular-nums">Total (h)</th>
+                
+              </tr>
+            </thead>
+
+            <tbody>
+              {countriesByTime.map((c) => {
+                const avgMin = c.avgGameSeconds
+                  ? c.avgGameSeconds / 60
+                  : null;
+
+                const hours = c.timePlayedSeconds / 3600;
+
+                return (
+                  <tr key={c.country} className="border-b">
+                    <td className="px-4 py-2">{c.label}</td>
+
+                    <td className="px-4 py-2 tabular-nums">
+                      {avgMin ? avgMin.toFixed(1) : "—"}
+                    </td>
+
+                    <td className="px-4 py-2 tabular-nums">
+                      {hours.toFixed(1)}
+                  
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

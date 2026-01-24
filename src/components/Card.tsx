@@ -1,8 +1,19 @@
 import type { ReactNode } from "react";
+import { cn } from "@/lib/utils";
 
-export function Card({ children }: { children: ReactNode }) {
+type CardProps = {
+  children: ReactNode;
+  className?: string;
+};
+
+export function Card({ children, className }: CardProps) {
   return (
-    <div className="rounded-lg border bg-background p-6 shadow-sm">
+    <div
+      className={cn(
+        "rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900",
+        className
+      )}
+    >
       {children}
     </div>
   );

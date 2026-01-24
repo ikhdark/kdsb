@@ -10,9 +10,17 @@ const fetchFn: typeof fetch =
     ? globalThis.fetch.bind(globalThis)
     : fetch;
 
+/*
+  PERFORMANCE FIX:
+  - use Next request cache instead of no-store
+  - prevents refetching the same pages repeatedly
+*/
 async function fetchJson<T = any>(url: string): Promise<T | null> {
   try {
-    const res = await fetchFn(url, { cache: "no-store" });
+    const res = await fetchFn(url, {
+      next: { revalidate: 300 }, // 5 minutes cache
+    });
+
     if (!res.ok) return null;
     return (await res.json()) as T;
   } catch {
@@ -60,11 +68,6 @@ export async function resolveCanonicalBattleTag(
 /* -------------------- MATCH FETCH -------------------- */
 
 function normalizeMatches(payload: any): any[] {
-  // common shapes:
-  //  - { matches: [...] }
-  //  - { data: { matches: [...] } }
-  //  - [...] (rare)
-  //  - { match: {...} } (single)
   if (Array.isArray(payload)) return payload;
   if (payload && Array.isArray(payload.matches)) return payload.matches;
   if (payload?.data && Array.isArray(payload.data.matches)) return payload.data.matches;
@@ -110,7 +113,6 @@ export async function fetchAllMatches(
 
       allMatches.push(...matches);
 
-      // stop if last page
       if (matches.length < PAGE_SIZE) break;
 
       offset += PAGE_SIZE;
@@ -121,11 +123,7 @@ export async function fetchAllMatches(
 }
 
 /* -------------------- PLAYER PAIR RESOLUTION -------------------- */
-/**
- * Selection-only robustness:
- * - compare lowercased to find "me" in match payload
- * - does NOT change canonical identity; only picks the row
- */
+
 export function getPlayerAndOpponent(
   match: any,
   canonicalBattleTag: string

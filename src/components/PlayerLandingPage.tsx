@@ -2,6 +2,7 @@
 
 import { useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import WhatsNew from "@/components/WhatsNew";
 
 export default function PlayerLandingPage() {
   const router = useRouter();
@@ -22,8 +23,9 @@ export default function PlayerLandingPage() {
   );
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
-      <div className="w-full max-w-md text-center space-y-6">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 px-4 pt-20">
+      <div className="mx-auto w-full max-w-md space-y-6 text-center">
+
         <h1 className="text-4xl font-semibold text-black dark:text-white">
           W3Champions
         </h1>
@@ -56,6 +58,10 @@ export default function PlayerLandingPage() {
             Search
           </button>
         </form>
+
+        {/* ✅ Now directly under search */}
+        <WhatsNew />
+
       </div>
     </div>
   );
