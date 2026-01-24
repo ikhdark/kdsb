@@ -33,32 +33,34 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: PropsWithChildren) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* ✅ REQUIRED FOR MOBILE / SAFARI */}
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1, viewport-fit=cover"
+        />
+      </head>
+
       <body>
         <Providers>
           <NextTopLoader color="#5750F1" showSpinner={false} />
 
-          {/* 🔴 IMPORTANT: NOT flex anymore */}
-          <div className="min-h-screen">
-
-            {/* sidebar overlays on mobile, static on desktop */}
+          <div className="flex min-h-screen">
             <Sidebar />
 
-            {/* main content always full width */}
             <div className="w-full bg-gray-2 dark:bg-[#020d1a]">
               <Header />
 
-              <main className="mx-auto w-full max-w-screen-2xl p-4 md:p-6 2xl:p-10">
+              {/* ✅ safe-area bottom padding for iOS */}
+              <main className="mx-auto w-full max-w-screen-2xl p-4 md:p-6 2xl:p-10 pb-safe">
                 {children}
               </main>
             </div>
-
           </div>
         </Providers>
 
-        {/* Google Analytics */}
         <GoogleAnalytics gaId="G-5QB5E0KBCL" />
 
-        {/* Plausible */}
         <Script
           defer
           data-domain="w3cstats.com"

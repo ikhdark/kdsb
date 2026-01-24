@@ -478,3 +478,34 @@ input[type="search"]::-webkit-search-cancel-button {
 .custom-gradient-1 {
   background-image: linear-gradient(145deg, #eef 0%, #fff8fc 100%);
 }
+/* ================================
+   MOBILE / SAFARI FIXES
+================================ */
+
+/* Prevent iOS Safari text auto-zoom */
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Stop Safari scroll bounce / layout jump */
+body {
+  overscroll-behavior-y: none;
+}
+
+/* Safe-area padding for iPhone notch / bottom bar */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Make tap targets feel native on mobile */
+button,
+a {
+  touch-action: manipulation;
+}
+
+/* Prevent inputs from zooming on focus (iOS) */
+input,
+select,
+textarea {
+  font-size: 16px;
+}
