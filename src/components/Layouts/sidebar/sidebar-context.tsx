@@ -9,8 +9,12 @@ type SidebarContextType = {
   state: SidebarState;
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
+
   isMobile: boolean;
+
   toggleSidebar: () => void;
+  openSidebar: () => void;
+  closeSidebar: () => void;
 };
 
 const SidebarContext = createContext<SidebarContextType | null>(null);
@@ -29,17 +33,26 @@ export function SidebarProvider({
   children: React.ReactNode;
 }) {
   const isMobile = useIsMobile();
+
   const [isOpen, setIsOpen] = useState(true);
 
-  // Close sidebar ONLY when switching to mobile
+  /* =========================
+     Auto close when mobile
+  ========================== */
   useEffect(() => {
-    if (isMobile) {
-      setIsOpen(false);
-    }
+    if (isMobile) setIsOpen(false);
   }, [isMobile]);
 
   function toggleSidebar() {
     setIsOpen((prev) => !prev);
+  }
+
+  function openSidebar() {
+    setIsOpen(true);
+  }
+
+  function closeSidebar() {
+    setIsOpen(false);
   }
 
   return (
@@ -48,8 +61,12 @@ export function SidebarProvider({
         state: isOpen ? "expanded" : "collapsed",
         isOpen,
         setIsOpen,
+
         isMobile,
+
         toggleSidebar,
+        openSidebar,
+        closeSidebar,
       }}
     >
       {children}
