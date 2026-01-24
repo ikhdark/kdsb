@@ -51,7 +51,7 @@ export default async function SummaryPage({ params }: PageProps) {
               : "N/A"
           }
         />
-        <StatCard label="Most Played (Total from Seasons 20-23)" value={s.mostPlayedAllTime || "N/A"} />
+        <StatCard label="Most Played (Seasons 20-23)" value={s.mostPlayedAllTime || "N/A"} />
         <StatCard label="Most Played (Current Season)" value={s.mostPlayedThisSeason || "N/A"} />
       </section>
 
