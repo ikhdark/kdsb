@@ -11,7 +11,7 @@ countries.registerLocale(enLocale);
 /* -------------------- CONSTANTS -------------------- */
 
 const MIN_DURATION_SECONDS = 120;
-const SEASONS = [20, 21, 22, 23];
+const SEASONS = [23];
 
 const UNKNOWN_COUNTRY = "UN";
 

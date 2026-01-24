@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname, useParams } from "next/navigation";
 import { NAV_DATA } from "./data";
 import MenuItem from "./menu-item";
@@ -8,6 +7,7 @@ import MenuItem from "./menu-item";
 export default function Sidebar() {
   const params = useParams<{ battletag?: string }>();
   const pathname = usePathname();
+
   const battletag = params?.battletag;
 
   return (
@@ -21,12 +21,16 @@ export default function Sidebar() {
 
             <div className="space-y-1">
               {group.items.map((item) => {
-                // Disabled items render unclickable
+                const isSearch = item.title === "Player Search";
+
+                /* -----------------------------------------
+                   HARD DISABLE (explicit disabled flag)
+                ------------------------------------------ */
                 if (item.disabled) {
                   return (
                     <div
                       key={item.title}
-                      className="flex items-center gap-3 rounded-lg px-4 py-2 text-sm font-medium text-gray-400 cursor-not-allowed"
+                      className="flex items-center gap-3 rounded-lg px-4 py-2 text-sm font-medium text-gray-400 opacity-40 cursor-not-allowed select-none"
                     >
                       {item.icon && <item.icon />}
                       {item.title}
@@ -34,18 +38,34 @@ export default function Sidebar() {
                   );
                 }
 
-                // Player Search always routes to /stats/player
-                const href =
-                  item.title === "Player Search"
-                    ? "/stats/player"
-                    : battletag
-                    ? `/stats/player/${battletag}${item.path}`
-                    : `/stats/player${item.path}`;
+                /* -----------------------------------------
+                   CONTEXT DISABLE (no battletag yet)
+                ------------------------------------------ */
+                const disabledByContext = !battletag && !isSearch;
+
+                if (disabledByContext) {
+                  return (
+                    <div
+                      key={item.title}
+                      className="flex items-center gap-3 rounded-lg px-4 py-2 text-sm font-medium text-gray-400 opacity-40 cursor-not-allowed select-none"
+                    >
+                      {item.icon && <item.icon />}
+                      {item.title}
+                    </div>
+                  );
+                }
+
+                /* -----------------------------------------
+                   NORMAL LINK
+                ------------------------------------------ */
+                const href = isSearch
+                  ? "/stats/player"
+                  : `/stats/player/${battletag}${item.path}`;
 
                 const isActive = pathname === href;
 
-                // Safe cast ensures TypeScript knows as is valid
-                const asType: "link" | "button" = (item.as as "link" | "button") ?? "link";
+                const asType: "link" | "button" =
+                  (item.as as "link" | "button") ?? "link";
 
                 return (
                   <MenuItem
