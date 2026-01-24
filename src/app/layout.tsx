@@ -30,7 +30,6 @@ export const metadata: Metadata = {
   },
 };
 
-
 export default function RootLayout({ children }: PropsWithChildren) {
   return (
     <html lang="en" suppressHydrationWarning>
@@ -38,10 +37,11 @@ export default function RootLayout({ children }: PropsWithChildren) {
         <Providers>
           <NextTopLoader color="#5750F1" showSpinner={false} />
 
-          <div className="flex min-h-screen">
+          {/* 🔥 KEY FIX HERE */}
+          <div className="min-h-screen md:flex">
             <Sidebar />
 
-            <div className="w-full bg-gray-2 dark:bg-[#020d1a]">
+            <div className="flex-1 bg-gray-2 dark:bg-[#020d1a]">
               <Header />
 
               <main className="mx-auto w-full max-w-screen-2xl p-4 md:p-6 2xl:p-10">
@@ -54,7 +54,7 @@ export default function RootLayout({ children }: PropsWithChildren) {
         {/* Google Analytics */}
         <GoogleAnalytics gaId="G-5QB5E0KBCL" />
 
-        {/* Plausible (simple + works everywhere) */}
+        {/* Plausible */}
         <Script
           defer
           data-domain="w3cstats.com"
