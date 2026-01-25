@@ -1,3 +1,4 @@
+export const revalidate = 300;
 import { notFound } from "next/navigation";
 import { getPlayerPerformance } from "@/services/playerPerformance";
 import { PlayerHeader, Section, StatCard } from "@/components/PlayerUI";

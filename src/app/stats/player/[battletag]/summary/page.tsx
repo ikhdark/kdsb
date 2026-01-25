@@ -1,5 +1,5 @@
 // src/app/stats/player/[battletag]/summary/page.tsx
-
+export const revalidate = 300;
 import { notFound } from "next/navigation";
 import { getPlayerSummary } from "@/services/playerSummary";
 import { displayMyRace } from "@/services/playerVsPlayer";

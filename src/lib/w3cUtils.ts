@@ -3,7 +3,9 @@
 
 import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
 
-/* -------------------- FETCH -------------------- */
+/* =====================================================
+   FETCH
+===================================================== */
 
 const fetchFn: typeof fetch =
   typeof globalThis !== "undefined" && typeof globalThis.fetch === "function"
@@ -20,15 +22,17 @@ async function fetchJson<T = any>(url: string): Promise<T | null> {
   }
 }
 
-/* -------------------- CONSTANTS -------------------- */
+/* =====================================================
+   CONSTANTS
+===================================================== */
 
 const GATEWAY = 20;
 const PAGE_SIZE = 50;
-
-// Safety: prevent any chance of an infinite loop if API misbehaves
 const MAX_PAGES_PER_SEASON = 2000;
 
-/* -------------------- RACES -------------------- */
+/* =====================================================
+   RACES
+===================================================== */
 
 export const RACE_MAP: Record<number, string> = {
   0: "Random",
@@ -46,107 +50,157 @@ export function resolveEffectiveRace(player: any): string {
   return RACE_MAP[player?.race] || "Unknown";
 }
 
-/* -------------------- CANONICAL RESOLUTION -------------------- */
+/* =====================================================
+   CANONICAL RESOLUTION
+===================================================== */
 
-/**
- * DO NOT create another canonical resolver.
- * Use the locked single source of truth.
- */
 export async function resolveCanonicalBattleTag(
   input: string
 ): Promise<string | null> {
   return resolveBattleTagViaSearch(input);
 }
 
-/* -------------------- MATCH FETCH -------------------- */
+/* =====================================================
+   MATCH FETCH (CACHED + BATCHED PARALLEL)
+===================================================== */
+
+/* ---------- cache ---------- */
+
+const MATCH_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
+const matchCache = new Map<
+  string,
+  { ts: number; data: any[] }
+>();
+
+/* ---------- helpers ---------- */
 
 function normalizeMatches(payload: any): any[] {
-  // Common shapes:
-  // - { matches: [...] }
-  // - { data: { matches: [...] } }
-  // - [...] (rare)
-  // - { match: {...} } (single)
   if (Array.isArray(payload)) return payload;
-  if (payload && Array.isArray(payload.matches)) return payload.matches;
-  if (payload?.data && Array.isArray(payload.data.matches)) return payload.data.matches;
+  if (payload?.matches) return payload.matches;
+  if (payload?.data?.matches) return payload.data.matches;
   if (payload?.match) return [payload.match];
   return [];
 }
 
-/**
- * IMPORTANT:
- * - canonicalBattleTag MUST already be canonical
- * - NO casing changes
- * - returns a flat array of matches
- */
+/* ---------- season fetch (bounded concurrency) ---------- */
+
+async function fetchSeasonMatches(
+  encodedTag: string,
+  season: number
+): Promise<any[]> {
+
+  const all: any[] = [];
+
+  let offset = 0;
+  let done = false;
+
+  // SAFE CONCURRENCY LIMIT
+  const BATCH_SIZE = 10;
+
+  while (!done) {
+    const offsets: number[] = [];
+
+    for (let i = 0; i < BATCH_SIZE; i++) {
+      offsets.push(offset + i * PAGE_SIZE);
+    }
+
+    const results = await Promise.all(
+      offsets.map(async (off) => {
+        const url =
+          "https://website-backend.w3champions.com/api/matches/search" +
+          `?playerId=${encodedTag}` +
+          `&gateway=${GATEWAY}` +
+          `&season=${season}` +
+          `&offset=${off}` +
+          `&pageSize=${PAGE_SIZE}`;
+
+        const json = await fetchJson<any>(url);
+        return normalizeMatches(json);
+      })
+    );
+
+    for (const matches of results) {
+      if (!matches.length) {
+        done = true;
+        break;
+      }
+
+      all.push(...matches);
+
+      if (matches.length < PAGE_SIZE) {
+        done = true;
+        break;
+      }
+    }
+
+    offset += BATCH_SIZE * PAGE_SIZE;
+
+    if (offset >= PAGE_SIZE * MAX_PAGES_PER_SEASON) break;
+  }
+
+  return all;
+}
+
+/* ---------- public ---------- */
+
 export async function fetchAllMatches(
   canonicalBattleTag: string,
   seasons: number[] = [23]
 ): Promise<any[]> {
+
   if (!canonicalBattleTag) return [];
 
-  const encodedTag = encodeURIComponent(canonicalBattleTag);
-  const allMatches: any[] = [];
+  const key = `${canonicalBattleTag.toLowerCase()}-${seasons.join(",")}`;
+  const now = Date.now();
 
-  for (const season of seasons) {
-    let offset = 0;
-    let pageGuard = 0;
-
-    while (true) {
-      pageGuard++;
-      if (pageGuard > MAX_PAGES_PER_SEASON) break;
-
-      const url =
-        "https://website-backend.w3champions.com/api/matches/search" +
-        `?playerId=${encodedTag}` +
-        `&gateway=${GATEWAY}` +
-        `&season=${season}` +
-        `&offset=${offset}` +
-        `&pageSize=${PAGE_SIZE}`;
-
-      const json = await fetchJson<any>(url);
-      const matches = normalizeMatches(json);
-
-      if (matches.length === 0) break;
-
-      allMatches.push(...matches);
-
-      // Stop if last page
-      if (matches.length < PAGE_SIZE) break;
-
-      offset += PAGE_SIZE;
-    }
+  /* cache hit */
+  const cached = matchCache.get(key);
+  if (cached && now - cached.ts < MATCH_CACHE_TTL) {
+    return cached.data;
   }
+
+  const encodedTag = encodeURIComponent(canonicalBattleTag);
+
+  /* parallel seasons */
+  const seasonResults = await Promise.all(
+    seasons.map((s) => fetchSeasonMatches(encodedTag, s))
+  );
+
+  const allMatches = seasonResults.flat();
+
+  /* cache store */
+  matchCache.set(key, {
+    ts: now,
+    data: allMatches,
+  });
 
   return allMatches;
 }
 
-/* -------------------- PLAYER PAIR RESOLUTION -------------------- */
+/* =====================================================
+   PLAYER PAIR RESOLUTION
+===================================================== */
 
-/**
- * Selection-only robustness:
- * - compare lowercased to find "me" in match payload
- * - does NOT change canonical identity; only picks the row
- */
 export function getPlayerAndOpponent(
   match: any,
   canonicalBattleTag: string
 ): { me: any; opp: any } | null {
+
   if (!match || !Array.isArray(match?.teams)) return null;
 
   const players: any[] = match.teams.flatMap((t: any) =>
     Array.isArray(t?.players) ? t.players : []
   );
 
-  const targetLower = String(canonicalBattleTag ?? "").toLowerCase();
-  if (!targetLower) return null;
+  const targetLower = canonicalBattleTag.toLowerCase();
 
   const me = players.find(
-    (p: any) => String(p?.battleTag ?? "").toLowerCase() === targetLower
+    (p) => String(p?.battleTag ?? "").toLowerCase() === targetLower
   );
   if (!me) return null;
 
-  const opp = players.find((p: any) => p && p !== me);
+  const opp = players.find((p) => p && p !== me);
   if (!opp) return null;
 
   return { me, opp };

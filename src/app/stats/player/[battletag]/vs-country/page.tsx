@@ -1,5 +1,5 @@
 // src/app/stats/player/[battletag]/vs-country/page.tsx
-
+export const revalidate = 300;
 import { notFound } from "next/navigation";
 import { getW3CCountryStats } from "@/services/vsCountry";
 import { PlayerHeader, Section, StatCard } from "@/components/PlayerUI";

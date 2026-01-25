@@ -1,5 +1,5 @@
 // src/app/stats/player/[battletag]/heroes/page.tsx
-
+export const revalidate = 300;
 import { notFound } from "next/navigation";
 import { getW3CHeroStats } from "@/services/playerHeroes";
 import { PlayerHeader, Section, StatRow } from "@/components/PlayerUI";

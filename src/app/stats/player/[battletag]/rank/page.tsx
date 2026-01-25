@@ -1,5 +1,5 @@
 // src/app/stats/player/[battletag]/rank/page.tsx
-
+export const revalidate = 300;
 import { notFound } from "next/navigation";
 import { getW3CRank, type W3CRankResponse } from "@/services/playerRank";
 import { PlayerHeader, StatCard, Section } from "@/components/PlayerUI";

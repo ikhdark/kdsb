@@ -1,5 +1,5 @@
 // src/app/stats/player/[battletag]/maps/page.tsx
-
+export const revalidate = 300;
 import { notFound } from "next/navigation";
 import { getW3CMapStats } from "@/services/playerMaps";
 import { PlayerHeader, Section, StatCard } from "@/components/PlayerUI";
