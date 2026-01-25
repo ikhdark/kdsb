@@ -50,7 +50,7 @@ export default function PlayerLandingPage() {
         </h1>
 
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          Search a BattleTag (stats may take up to 10 seconds on first load)
+          Search a BattleTag
         </p>
 
         <form onSubmit={onSubmit} className="flex flex-col sm:flex-row gap-2">
