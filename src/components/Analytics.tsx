@@ -5,16 +5,6 @@ import { useEffect } from "react";
 import { pageview } from "@/lib/gtag";
 
 /* =========================
-   Type-safe gtag
-========================= */
-
-declare global {
-  interface Window {
-    gtag?: (...args: any[]) => void;
-  }
-}
-
-/* =========================
    Stat page mapping
 ========================= */
 
@@ -36,13 +26,12 @@ const STAT_MAP = {
 function trackStatType(pathname: string) {
   if (!window.gtag) return;
 
-  // only care about /stats/player/*
+  // Only care about /stats/player/*
   if (!pathname.startsWith("/stats/player/")) return;
 
   // /stats/player/<tag>/<stat>
   const parts = pathname.split("/");
   const statSegment = parts[4];
-
   if (!statSegment) return;
 
   const statType = STAT_MAP[statSegment as keyof typeof STAT_MAP];
@@ -65,10 +54,10 @@ export default function Analytics() {
     const qs = searchParams?.toString();
     const url = qs ? `${pathname}?${qs}` : pathname;
 
-    // normal page view
+    // Standard pageview
     pageview(url);
 
-    // stat usage tracking
+    // Stat usage tracking
     trackStatType(pathname);
 
   }, [pathname, searchParams]);
