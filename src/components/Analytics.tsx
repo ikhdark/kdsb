@@ -1,8 +1,7 @@
 "use client";
 
-import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useMemo } from "react";
-import { pageview } from "@/lib/gtag";
+import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 
 const STAT_MAP = {
   summary: "Summary",
@@ -15,7 +14,6 @@ const STAT_MAP = {
   "vs-player": "Vs Player",
 } as const;
 
-// Optional helper to safely send GA events
 function sendEvent(name: string, params: Record<string, any>) {
   if (typeof window !== "undefined" && window.gtag) {
     window.gtag("event", name, params);
@@ -37,15 +35,10 @@ function trackStatType(pathname: string) {
 
 export default function Analytics() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-  const qs = searchParams?.toString();
-  const url = useMemo(() => (qs ? `${pathname}?${qs}` : pathname), [pathname, qs]);
 
   useEffect(() => {
-    pageview(url);
     trackStatType(pathname);
-  }, [url, pathname]);
+  }, [pathname]);
 
   return null;
 }
