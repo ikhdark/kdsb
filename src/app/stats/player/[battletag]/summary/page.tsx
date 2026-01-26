@@ -22,10 +22,10 @@ export async function generateMetadata({
   const tag = decodeURIComponent(battletag);
 
   return {
-    title: `${tag} Stats | W3C Stats`,
-    description: `Warcraft III W3Champions ladder stats for ${tag}. MMR, win rates, heroes, maps, match history and performance breakdowns.`,
+    title: `${tag} W3Champions Ladder Stats – MMR, Heroes, Maps | W3C Stats`,
+    description: `Live W3Champions ladder stats for ${tag}. Track MMR, win rates, heroes, maps, match history and performance trends.`,
     openGraph: {
-      title: `${tag} Stats | W3C Stats`,
+      title: `${tag} W3Champions Ladder Stats – MMR, Heroes, Maps | W3C Stats`,
       description: `Full ladder stats and performance for ${tag}`,
       url: `https://www.w3cstats.com/stats/player/${encodeURIComponent(
         tag
