@@ -56,15 +56,16 @@ export function flattenCountryLadder(payload: unknown): FlattenedLadderRow[] {
 
   const looksLikeBattleTag = (s: string) => s.includes("#");
 
-  const pushRow = (row: FlattenedLadderRow) => {
-    const key =
-      `${row.race}|${row.mmr}|${row.games}|${row.wins}|` +
-      `${row.battleTagLower ?? ""}|${row.playerIdLower ?? ""}`;
+const pushRow = (row: FlattenedLadderRow) => {
+  const key =
+    `${row.race}|${row.mmr}|${row.games}|${row.wins}|` +
+    `${row.battleTagLower ?? ""}|${row.playerIdLower ?? ""}`;
 
-    (seen.has(key))
-    seen.add(key);
-    out.push(row);
-  };
+  if (seen.has(key)) return;
+
+  seen.add(key);
+  out.push(row);
+}
 
   const visit = (node: unknown) => {
     if (!node) return;

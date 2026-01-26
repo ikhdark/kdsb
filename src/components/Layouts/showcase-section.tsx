@@ -1,15 +1,15 @@
 import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
 
-type PropsType = {
+type Props = {
   title: string;
   children: ReactNode;
   className?: string;
 };
 
-export function ShowcaseSection({ title, children, className }: PropsType) {
+export function ShowcaseSection({ title, children, className }: Props) {
   return (
-    <div
+    <section
       className={cn(
         "rounded-[10px] bg-white shadow-1 dark:bg-gray-dark dark:shadow-card",
         className
@@ -22,6 +22,6 @@ export function ShowcaseSection({ title, children, className }: PropsType) {
       <div className="p-4 sm:p-6 xl:p-10">
         {children}
       </div>
-    </div>
+    </section>
   );
 }

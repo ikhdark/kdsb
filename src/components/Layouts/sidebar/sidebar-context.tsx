@@ -1,7 +1,13 @@
 "use client";
 
 import { useIsMobile } from "@/hooks/use-mobile";
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
 
 type SidebarState = "expanded" | "collapsed";
 
@@ -27,23 +33,11 @@ export function useSidebarContext() {
   return context;
 }
 
-export function SidebarProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export function SidebarProvider({ children }: { children: ReactNode }) {
   const isMobile = useIsMobile();
 
-  const [isOpen, setIsOpen] = useState(true);
-
-  /* =========================
-     Sync open state with device
-     mobile  -> closed
-     desktop -> open
-  ========================== */
-  useEffect(() => {
-    setIsOpen(!isMobile);
-  }, [isMobile]);
+  // initialize once instead of syncing forever
+  const [isOpen, setIsOpen] = useState(() => !isMobile);
 
   function toggleSidebar() {
     setIsOpen((prev) => !prev);
@@ -63,9 +57,7 @@ export function SidebarProvider({
         state: isOpen ? "expanded" : "collapsed",
         isOpen,
         setIsOpen,
-
         isMobile,
-
         toggleSidebar,
         openSidebar,
         closeSidebar,

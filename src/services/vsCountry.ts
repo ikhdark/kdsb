@@ -164,43 +164,7 @@ function normalizeMatches(payload: any): any[] {
   if (payload.teams && Array.isArray(payload.teams)) return [payload];
 
   return [];
-}
-
-async function resolveOpponentCountry(
-  opp: any,
-  cache: Map<string, string | null>,
-  canonicalCache: Map<string, string | null>
-): Promise<string | null> {
-  const cc1 = iso2(opp?.countryCode);
-  if (cc1) return cc1;
-
-  const cc2 = iso2(opp?.location);
-  if (cc2) return cc2;
-
-  const rawBt = opp?.battleTag;
-  if (!rawBt) return null;
-
-  const key = normalizeBT(rawBt);
-  if (cache.has(key)) return cache.get(key)!;
-
-  let oppCanonical = canonicalCache.get(key) ?? null;
-  if (oppCanonical === null && !canonicalCache.has(key)) {
-    oppCanonical = await resolveBattleTagViaSearch(String(rawBt));
-    canonicalCache.set(key, oppCanonical);
-  }
-
-  if (!oppCanonical) {
-    cache.set(key, null);
-    return null;
-  }
-
-  const profile = await fetchPlayerProfile(oppCanonical);
-  const cc3 = iso2(profile?.countryCode || profile?.location || "");
-  const out = cc3 || null;
-
-  cache.set(key, out);
-  return out;
-}
+} 
 
 /* -------------------- SERVICE -------------------- */
 
@@ -220,13 +184,9 @@ const canonicalTag =
   let homeCountry = resolveCountryFromProfile(profile);
 
 // matches: try canonical first, then lowercase fallback (some endpoints behave that way)
-const matchesA = normalizeMatches(await fetchAllMatches(canonicalTag, SEASONS));
-const matchesB =
-  canonicalTag.toLowerCase() === canonicalTag
-    ? []
-    : normalizeMatches(await fetchAllMatches(canonicalTag.toLowerCase(), SEASONS));
-
-const matches = matchesA.length ? matchesA : matchesB;
+const matches = normalizeMatches(
+  await fetchAllMatches(canonicalTag, SEASONS)
+);
 
 
 // TEMP: do NOT early-return
@@ -275,6 +235,8 @@ if (!homeCountry) homeCountry = UNKNOWN_COUNTRY;
 const oppCC =
   iso2(opp?.countryCode) ||
   iso2(opp?.location);
+
+if (!oppCC) continue;
 
 if (!oppCC) continue;
 

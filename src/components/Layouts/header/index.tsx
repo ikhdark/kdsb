@@ -21,8 +21,10 @@ export function Header() {
   async function submitSearch(e: FormEvent) {
     e.preventDefault();
 
+    if (loading) return;
+
     const normalized = normalizeBattleTagInput(query);
-    if (!normalized || loading) return;
+    if (!normalized) return;
 
     setLoading(true);
     setError(null);
@@ -31,6 +33,11 @@ export function Header() {
       const res = await fetch(
         `/api/resolve-battletag?q=${encodeURIComponent(normalized)}`
       );
+
+      if (!res.ok) {
+        setError("Player not found");
+        return;
+      }
 
       const data = await res.json();
 
@@ -73,11 +80,12 @@ export function Header() {
             autoComplete="off"
             placeholder="Search BattleTag"
             value={query}
+            disabled={loading}
             onChange={(e) => {
               setQuery(e.target.value);
               setError(null);
             }}
-            className="w-full rounded-full border bg-gray-2 outline-none h-10 text-sm pl-9 pr-3 md:h-12 md:text-base md:pl-12 md:pr-5 dark:border-dark-3 dark:bg-dark-2 focus-visible:border-primary"
+            className="w-full rounded-full border bg-gray-2 outline-none h-10 text-sm pl-9 pr-3 md:h-12 md:text-base md:pl-12 md:pr-5 disabled:opacity-60 disabled:cursor-not-allowed dark:border-dark-3 dark:bg-dark-2 focus-visible:border-primary"
           />
 
           <SearchIcon className="pointer-events-none absolute top-1/2 -translate-y-1/2 left-3 size-4 md:left-5 md:size-5" />

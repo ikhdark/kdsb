@@ -76,7 +76,7 @@ export default async function RankPage({ params }: PageProps) {
 
       {/* RANK TABLE */}
       {ranks.length > 0 && (
-        <Section title="Race Rankings">
+        <Section title="Race Rankings sorted by MMR">
           <div className="rounded-xl border bg-white shadow-sm dark:bg-gray-dark">
 
             <div className="w-full overflow-x-auto">
