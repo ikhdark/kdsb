@@ -1,7 +1,6 @@
 "use client";
 
 import { SearchIcon } from "@/assets/icons";
-import { MenuIcon } from "./icons";
 import { useSidebarContext } from "@/components/Layouts/sidebar/sidebar-context";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
@@ -57,22 +56,27 @@ export function Header() {
   return (
     <header className="sticky top-0 z-20 flex items-center justify-between border-b border-stroke bg-white shadow-1 px-3 py-3 md:px-5 md:py-5 dark:border-stroke-dark dark:bg-gray-dark">
 
-      {/* Sidebar toggle */}
+      {/* ================= MENU BUTTON (PNG) ================= */}
       <button
         onClick={toggleSidebar}
-        className="rounded-lg border p-2 lg:hidden dark:border-stroke-dark"
+        className="p-2 lg:hidden"
+        aria-label="Toggle menu"
       >
-        <MenuIcon />
+        <img
+          src="/assets/logos/Menu_Icon.png"
+          alt="menu"
+          className="w-6 h-6"
+        />
       </button>
 
-      {/* Title (desktop only) */}
+      {/* ================= TITLE ================= */}
       <div className="hidden xl:block">
         <h1 className="text-heading-5 font-bold text-dark dark:text-white">
           KD&apos;S W3C STATS
         </h1>
       </div>
 
-      {/* Search */}
+      {/* ================= SEARCH ================= */}
       <div className="flex flex-1 items-center justify-end">
         <form
           onSubmit={submitSearch}
@@ -101,12 +105,13 @@ export function Header() {
             "
           />
 
+          {/* search icon (SVG still fine) */}
           <SearchIcon
             className="
               pointer-events-none
               absolute top-1/2 -translate-y-1/2 left-3
-              size-5 md:left-5 md:size-5
-              text-gray-600 dark:text-gray-300
+              w-5 h-5
+              text-gray-700 dark:text-gray-200
             "
           />
 
