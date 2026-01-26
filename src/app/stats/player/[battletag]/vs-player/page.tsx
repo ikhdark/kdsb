@@ -171,6 +171,13 @@ export default async function VsPlayerPage({ params }: PageProps) {
       {/* ================= Worst ================= */}
       {data.worst && (
         <Section title="Lowest Winrate vs Opponent">
+          {/* ✅ add summary like Best */}
+          <div className="space-y-2 mb-2">
+            <div>Opponent: {data.worst.tag}</div>
+            <div>Record: {data.worst.wins}-{data.worst.losses}</div>
+            <div>Games: {data.worst.totalGames}</div>
+          </div>
+
           <div className="space-y-1">
             {data.worst.gamesSortedByOppMMRDesc.map((g, i) => (
               <div key={i} className="grid grid-cols-[auto_1fr_auto] gap-x-3">
@@ -201,6 +208,7 @@ export default async function VsPlayerPage({ params }: PageProps) {
           </div>
         </Section>
       )}
+
     </div>
   );
 }
