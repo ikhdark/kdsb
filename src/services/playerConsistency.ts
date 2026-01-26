@@ -9,7 +9,7 @@ import { fetchAllMatches, getPlayerAndOpponent } from "@/lib/w3cUtils";
 
 const SESSION_GAP_MS = 30 * 60 * 1000;
 const MIN_DURATION_SECONDS = 120;
-
+const SEASON = 24; // ← add this
 /* =========================
    HELPERS
 ========================= */
@@ -32,7 +32,7 @@ export async function getPlayerConsistency(input: string) {
 
   const targetLower = battletag.toLowerCase();
 
-  const matches = await fetchAllMatches(battletag);
+  const matches = await fetchAllMatches(battletag, [SEASON]);
   if (!matches.length) return null;
 
   matches.sort(

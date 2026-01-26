@@ -5,7 +5,7 @@ import { resolveBattleTagViaSearch } from "../lib/w3cBattleTagResolver";
    CONFIG
 ========================= */
 
-const SEASONS = [23];
+const SEASONS = [24];
 const MIN_DURATION_SECONDS = 120;
 
 const BUCKET_SIZE = 50;

@@ -2,7 +2,7 @@ import { fetchAllMatches } from "@/lib/w3cUtils";
 import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
 import { fetchPlayerProfile } from "@/services/w3cApi";
 
-const SEASONS = [23];
+const SEASONS = [24];
 const MIN_GAMES = 10;
 
 /* -------------------- MATCH CACHE (PERFORMANCE ONLY) -------------------- */

@@ -3,7 +3,7 @@ import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
 
 /* -------------------- CONSTANTS -------------------- */
 
-const SEASONS = [23];
+const SEASONS = [24];
 const MIN_DURATION_SECONDS = 120;
 const MIN_MAP_GAMES = 10;
 

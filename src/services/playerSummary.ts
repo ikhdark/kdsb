@@ -3,7 +3,7 @@ import { resolveBattleTagViaSearch } from "../lib/w3cBattleTagResolver";
 
 /* -------------------- CONSTANTS -------------------- */
 
-const SEASONS = [20, 21, 22, 23];
+const SEASONS = [21, 22, 23, 24];
 const CURRENT_SEASON = SEASONS[SEASONS.length - 1];
 const LAST_3_SEASONS = SEASONS.slice(-3);
 
