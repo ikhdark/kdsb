@@ -58,7 +58,7 @@ export default function PlayerLandingPage() {
             ref={inputRef}
             autoFocus
             type="text"
-            placeholder="Example: kuhhhdark#1976"
+            placeholder="Example: Moon#1234"
             className="
               flex-1 rounded-lg border border-gray-300 bg-white
               px-4 py-3 text-base text-black
