@@ -231,17 +231,30 @@ const matches = matchesA.length ? matchesA : matchesB;
 
 // TEMP: do NOT early-return
 
-  // Fallback: infer home country from match self rows
-  if (!homeCountry) {
-    for (const m of matches) {
-      const pair = pickOpponent1v1(m, targetLower);
-      if (pair?.self?.countryCode) {
-        homeCountry = iso2(pair.self.countryCode);
-        if (homeCountry) break;
-      }
-    }
+  // Fallback: infer home country from YOUR match rows (majority vote)
+if (!homeCountry) {
+  const counts = new Map<string, number>();
+
+  for (const m of matches) {
+    const pair = pickOpponent1v1(m, targetLower);
+    if (!pair) continue;
+
+    const cc =
+      iso2(pair.self?.countryCode) ||
+      iso2(pair.self?.location);
+
+    if (!cc) continue;
+
+    counts.set(cc, (counts.get(cc) ?? 0) + 1);
   }
-  if (!homeCountry) homeCountry = UNKNOWN_COUNTRY;
+
+  if (counts.size) {
+    homeCountry = [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])[0][0];
+  }
+}
+
+if (!homeCountry) homeCountry = UNKNOWN_COUNTRY;
 
   const countryStats = new Map<string, CountryAgg>();
   const opponentCountryCache = new Map<string, string | null>();
