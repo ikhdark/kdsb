@@ -82,7 +82,7 @@ export function Header() {
       {/* ================= TITLE ================= */}
       <div className="hidden xl:block">
         <h1 className="text-heading-5 font-bold text-dark dark:text-white">
-          KD&apos;S W3C STATS
+          KD W3C STATS
         </h1>
       </div>
 

@@ -46,7 +46,7 @@ export default function PlayerLandingPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 px-4 pt-20">
       <div className="mx-auto w-full max-w-md space-y-6 text-center">
         <h1 className="text-4xl font-semibold text-black dark:text-white">
-          W3Champions
+          KD W3CSTATS
         </h1>
 
         <p className="text-sm text-gray-500 dark:text-gray-400">
