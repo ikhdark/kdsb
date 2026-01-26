@@ -82,7 +82,7 @@ export async function getPlayerConsistency(input: string) {
       longestLoss = Math.max(longestLoss, Math.abs(current));
     }
 
-    const time = new Date(m.startTime).getTime();
+    const time = Date.parse(m.startTime);
 
     /* sessions */
     if (!session || time - lastTime > SESSION_GAP_MS) {
@@ -102,7 +102,7 @@ export async function getPlayerConsistency(input: string) {
 
     /* recent */
     recentResults.push(didWin);
-    if (recentResults.length === 51) recentResults.shift();
+    if (recentResults.length === 50) recentResults.shift();
   }
 
   if (session) sessions.push(session);

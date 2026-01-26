@@ -45,7 +45,7 @@ export default async function RankPage({ params }: PageProps) {
       {/* HEADER */}
       <PlayerHeader
         battletag={titleTag}
-        subtitle={`Rank Stats · Season 23 (Min 25 Games Played per Race)`}
+        subtitle={`Rank Stats · Season 24 (Min 5 Games Played per Race)`}
       />
 
       {/* ERROR */}

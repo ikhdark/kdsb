@@ -10,6 +10,7 @@ export default function WhatsNew() {
         <li>• Added "Total Time Played vs" via Country Stats(1.2)</li>
         <li>• Page loading Loading Speed Improvements (1.3)</li>
         <li>• Added "Time Consistency" Page (1.4)</li>
+         <li>• Added Season 24 (1.5)</li>
       </ul>
     </div>
   );

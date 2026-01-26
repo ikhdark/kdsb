@@ -1,5 +1,7 @@
 // src/app/stats/player/[battletag]/heroes/page.tsx
+
 export const revalidate = 300;
+
 import { notFound } from "next/navigation";
 import { getW3CHeroStats } from "@/services/playerHeroes";
 import { PlayerHeader, Section, StatRow } from "@/components/PlayerUI";
@@ -14,6 +16,8 @@ export default async function HeroesPage({ params }: PageProps) {
 
   const data = await getW3CHeroStats(battletag);
   if (!data) notFound();
+
+  /* -------------------- helpers -------------------- */
 
   const lines = data.result
     .split("\n")
@@ -34,7 +38,10 @@ export default async function HeroesPage({ params }: PageProps) {
 
   function collectSection(headers: string[]) {
     const wanted = headers.map(normalize);
-    const start = lines.findIndex((l) => wanted.includes(normalize(l)));
+
+    const start = lines.findIndex((l) =>
+      wanted.includes(normalize(l))
+    );
     if (start === -1) return [];
 
     const out: string[] = [];
@@ -46,6 +53,8 @@ export default async function HeroesPage({ params }: PageProps) {
 
     return out;
   }
+
+  /* -------------------- sections -------------------- */
 
   const byHeroCount = collectSection(["Your W/L by Your Hero Count"]);
   const vsOppHeroCount = collectSection(["Your W/L vs Opponent Hero Count"]);
@@ -62,13 +71,15 @@ export default async function HeroesPage({ params }: PageProps) {
     "Your Top 5 Worst Winrates vs Opponent Heroes Overall",
   ]);
 
+  /* -------------------- render -------------------- */
+
   return (
     <div className="space-y-10 max-w-6xl mx-auto text-sm leading-relaxed">
 
       {/* HEADER */}
       <PlayerHeader
         battletag={data.battletag}
-        subtitle={`Hero Stats · Season 23`}
+        subtitle={`Hero Stats · Season 24 (Games under 120 seconds excluded)`}
       />
 
       {/* ================= HERO COUNT ================= */}
@@ -138,12 +149,14 @@ export default async function HeroesPage({ params }: PageProps) {
       {/* ================= BEST OVERALL ================= */}
       <Section title="Best Winrates vs Opponent Heroes (Overall)">
         {bestOverall.map((l, i) => {
-          const [label, value] = l.split(":");
+          const idx = l.indexOf(":");
+          const label = idx !== -1 ? l.slice(0, idx) : l;
+          const value = idx !== -1 ? l.slice(idx + 1).trim() : "";
 
           return (
             <div key={i} className="flex justify-between tabular-nums">
               <span>{label}</span>
-              <span className="font-medium">{value?.trim()}</span>
+              <span className="font-medium">{value}</span>
             </div>
           );
         })}
@@ -152,12 +165,14 @@ export default async function HeroesPage({ params }: PageProps) {
       {/* ================= WORST OVERALL ================= */}
       <Section title="Worst Winrates vs Opponent Heroes (Overall)">
         {worstOverall.map((l, i) => {
-          const [label, value] = l.split(":");
+          const idx = l.indexOf(":");
+          const label = idx !== -1 ? l.slice(0, idx) : l;
+          const value = idx !== -1 ? l.slice(idx + 1).trim() : "";
 
           return (
             <div key={i} className="flex justify-between tabular-nums">
               <span>{label}</span>
-              <span className="font-medium">{value?.trim()}</span>
+              <span className="font-medium">{value}</span>
             </div>
           );
         })}

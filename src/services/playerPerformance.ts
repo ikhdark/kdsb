@@ -109,6 +109,7 @@ export async function getPlayerPerformance(
 
   for (const match of matches) {
     if (match.durationInSeconds < MIN_DURATION_SECONDS) continue;
+     if (match.gameMode !== 1) continue;   // ← ADD THIS
     if (!match.teams || match.teams.length !== 2) continue;
 
     const [teamA, teamB] = match.teams;
@@ -129,7 +130,8 @@ export async function getPlayerPerformance(
 
     const opp = me === pA ? pB : pA;
 
-    if (me.oldMmr == null || opp.oldMmr == null) continue;
+   if (typeof me.oldMmr !== "number" || typeof opp.oldMmr !== "number") continue;
+
 
     const diff = me.oldMmr - opp.oldMmr;
     const didWin = !!me.won;

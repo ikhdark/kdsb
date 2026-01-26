@@ -11,8 +11,8 @@ import { applyRacePlacement } from "@/lib/racePlacement";
 /* -------------------- CONSTANTS -------------------- */
 
 const SEASONS = [24];
-const MIN_GAMES = 3;
-const MIN_TOTAL_GAMES = 30;
+const MIN_GAMES = 1;
+const MIN_TOTAL_GAMES = 1;
 const MIN_DURATION_SECONDS = 120;
 const MAX_EXTREME_ABS_MMR_CHANGE = 30;
 const HIGH_GAIN_THRESHOLD = 15;
@@ -142,8 +142,34 @@ export async function getPlayerVsPlayer(
   /* -------------------- MATCH FETCH -------------------- */
 
   const allMatches = await fetchAllMatches(canonicalTag, SEASONS);
-  if (!allMatches.length) return null;
 
+  if (!allMatches.length) {
+  return {
+    battletag: canonicalTag,
+    seasons: SEASONS,
+    rules: {
+      minGames: MIN_GAMES,
+      minTotalGames: MIN_TOTAL_GAMES,
+      minDurationSeconds: MIN_DURATION_SECONDS,
+      maxExtremeAbsMmrChange: MAX_EXTREME_ABS_MMR_CHANGE,
+      highGainThreshold: HIGH_GAIN_THRESHOLD,
+      seasonFilteredTo: SEASONS[0],
+    },
+    totals: { strictGamesAll: 0, opponentsEligible: 0 },
+    extremes: {
+      largestSingleGain: null,
+      largestSingleLoss: null,
+      largestLossGame: null,
+      largestGapWin: null,
+      largestGapLoss: null,
+      highGainGames: [],
+      gainGamesToShow: [],
+    },
+    best: null,
+    worst: null,
+    opponents: [],
+  };
+}
   const targetLower = canonicalTag.toLowerCase();
 
   allMatches.sort(
@@ -156,7 +182,7 @@ export async function getPlayerVsPlayer(
 
   for (const match of allMatches) {
     // Explicitly filter to S23 only (existing behavior)
-    if (match.gameMode !== 1 || match.season !== 23) continue;
+    if (match.gameMode !== 1 || !SEASONS.includes(match.season)) continue;
 
     const pair = getPlayerAndOpponent(match, targetLower);
     if (!pair) continue;
@@ -164,7 +190,6 @@ export async function getPlayerVsPlayer(
     const { me, opp } = pair;
     const race = RACE_MAP[me.race] || "Unknown";
 
-    if (!applyRacePlacement(raceGameCount, me.race)) continue;
 
     if (
       typeof match.durationInSeconds !== "number" ||
@@ -196,7 +221,9 @@ export async function getPlayerVsPlayer(
     });
   }
 
-  if (strictGamesAll.length <= MIN_TOTAL_GAMES) return null;
+  if (strictGamesAll.length < MIN_TOTAL_GAMES) {
+  // allow page to render with limited data
+}
 
   /* -------------------- AGGREGATION -------------------- */
 
@@ -353,7 +380,7 @@ export async function getPlayerVsPlayer(
       minDurationSeconds: MIN_DURATION_SECONDS,
       maxExtremeAbsMmrChange: MAX_EXTREME_ABS_MMR_CHANGE,
       highGainThreshold: HIGH_GAIN_THRESHOLD,
-      seasonFilteredTo: 23,
+      seasonFilteredTo: 24,
     },
 
     totals: {

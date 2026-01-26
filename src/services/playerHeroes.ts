@@ -3,7 +3,7 @@ import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
 import { fetchPlayerProfile } from "@/services/w3cApi";
 
 const SEASONS = [24];
-const MIN_GAMES = 10;
+const MIN_GAMES = 1;
 
 /* -------------------- MATCH CACHE (PERFORMANCE ONLY) -------------------- */
 
@@ -188,15 +188,23 @@ const uniqueOppHeroes: Set<string> = new Set(
 
   /* -------------------- BASELINE -------------------- */
 
-  let totalGames = 0;
-  let totalWins = 0;
+const totalGames = matches.length;
 
-  for (const s of Object.values(opponentHeroStats)) {
-    totalGames += s.games;
-    totalWins += s.wins;
-  }
+let totalWins = 0;
 
-  const baselineWinrate = totalGames ? totalWins / totalGames : 0;
+for (const match of matches) {
+  const players = match.teams?.flatMap((t: any) => t.players ?? []) ?? [];
+
+  const me = players.find(
+    (p: any) =>
+      p?.battleTag?.toLowerCase() === canonicalLower ||
+      (playerIdLower && p?.playerId?.toLowerCase() === playerIdLower)
+  );
+
+  if (me?.won === true) totalWins++;
+}
+
+const baselineWinrate = totalGames ? totalWins / totalGames : 0;
 
   /* -------------------- OUTPUT (UNCHANGED) -------------------- */
 
@@ -255,37 +263,47 @@ const uniqueOppHeroes: Set<string> = new Set(
       )
     );
 
-  line(`\nYour Top 5 Best Winrates vs Opponent Heroes Overall`);
-  Object.entries(opponentHeroStats)
-    .filter(([, s]) => s.games >= MIN_GAMES)
-    .sort(
-      (a, b) =>
-        b[1].wins / b[1].games -
-        baselineWinrate -
-        (a[1].wins / a[1].games - baselineWinrate)
-    )
-    .slice(0, 5)
-    .forEach(([hero, s]) => {
-      const wr = ((100 * s.wins) / s.games).toFixed(1);
-      const delta = (((s.wins / s.games) - baselineWinrate) * 100).toFixed(1);
-      line(`${heroDisplay(hero)}: ${wr}% (+${delta}%)`);
-    });
+/* ================= BEST OVERALL ================= */
 
-  line(`\nYour Top 5 Worst Winrates vs Opponent Heroes Overall`);
-  Object.entries(opponentHeroStats)
-    .filter(([, s]) => s.games >= MIN_GAMES)
-    .sort(
-      (a, b) =>
-        a[1].wins / a[1].games -
-        baselineWinrate -
-        (b[1].wins / b[1].games - baselineWinrate)
-    )
-    .slice(0, 5)
-    .forEach(([hero, s]) => {
-      const wr = ((100 * s.wins) / s.games).toFixed(1);
-      const delta = (((s.wins / s.games) - baselineWinrate) * 100).toFixed(1);
-      line(`${heroDisplay(hero)}: ${wr}% (${delta}%)`);
-    });
+line(`\nYour Top 5 Best Winrates vs Opponent Heroes Overall`);
+
+const sortedByDelta = Object.entries(opponentHeroStats)
+  .filter(([, s]) => s.games >= MIN_GAMES)
+  .sort((a, b) => {
+    const aDelta = a[1].wins / a[1].games - baselineWinrate;
+    const bDelta = b[1].wins / b[1].games - baselineWinrate;
+    return bDelta - aDelta;
+  });
+
+const bestFive = sortedByDelta.slice(0, 5);
+
+bestFive.forEach(([hero, s]) => {
+  const wr = ((100 * s.wins) / s.games).toFixed(1);
+  const delta = (((s.wins / s.games) - baselineWinrate) * 100).toFixed(1);
+  line(`${heroDisplay(hero)}: ${wr}% (+${delta}%)`);
+});
+
+
+/* ================= WORST OVERALL ================= */
+
+line(`\nYour Top 5 Worst Winrates vs Opponent Heroes Overall`);
+
+const bestSet = new Set(bestFive.map(([h]) => h));
+
+sortedByDelta
+  .filter(([hero]) => !bestSet.has(hero)) // prevent overlap
+  .sort((a, b) => {
+    const aDelta = a[1].wins / a[1].games - baselineWinrate;
+    const bDelta = b[1].wins / b[1].games - baselineWinrate;
+    return aDelta - bDelta;
+  })
+  .slice(0, 5)
+  .forEach(([hero, s]) => {
+    const wr = ((100 * s.wins) / s.games).toFixed(1);
+    const delta = (((s.wins / s.games) - baselineWinrate) * 100).toFixed(1);
+    line(`${heroDisplay(hero)}: ${wr}% (${delta}%)`);
+  });
+
 
   return {
     battletag: displayTag,

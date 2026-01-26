@@ -72,7 +72,7 @@ for (let day = 0; day < 7; day++) {
 
       <PlayerHeader
         battletag={data.battletag}
-        subtitle="Consistency · Day/Time Performance (UTC)"
+        subtitle="Consistency · Day/Time Performance · Season 24 (UTC) (Games under 120 seconds excluded)"
       />
 
       <section className="grid gap-4 sm:grid-cols-4">

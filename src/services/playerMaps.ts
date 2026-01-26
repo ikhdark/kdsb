@@ -5,7 +5,7 @@ import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
 
 const SEASONS = [24];
 const MIN_DURATION_SECONDS = 120;
-const MIN_MAP_GAMES = 10;
+const MIN_MAP_GAMES = 1;
 
 const DURATION_BUCKETS = [
   { label: "5–10 min", min: 300, max: 600 },

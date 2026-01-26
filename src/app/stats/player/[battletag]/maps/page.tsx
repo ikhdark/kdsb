@@ -25,7 +25,7 @@ export default async function MapStatsPage({ params }: PageProps) {
       {/* HEADER */}
       <PlayerHeader
         battletag={data.battletag}
-        subtitle={`Map Stats · Season 23`}
+        subtitle={`Map Stats · Season 24 (Games under 120 seconds excluded)`}
       />
 
       {/* ================= SUMMARY ================= */}
