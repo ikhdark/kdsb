@@ -4,7 +4,7 @@ import "@/css/style.css";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import Script from "next/script";
 import Sidebar from "@/components/Layouts/sidebar";
-
+import Analytics from "@/components/Analytics";
 import { Header } from "@/components/Layouts/header";
 import type { Metadata } from "next";
 import NextTopLoader from "nextjs-toploader";
@@ -40,6 +40,9 @@ export default function RootLayout({ children }: PropsWithChildren) {
 
       <body>
         <Providers>
+          {/* ✅ Client-side route tracker + stat page view event */}
+          <Analytics />
+
           <NextTopLoader color="#5750F1" showSpinner={false} />
 
           <div className="flex min-h-screen">
