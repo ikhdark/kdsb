@@ -3,10 +3,10 @@ import {
   fetchAllMatches,
   getPlayerAndOpponent,
   RACE_MAP,
-} from "../lib/w3cUtils";
+} from "@/lib/w3cUtils";
 
-import { resolveBattleTagViaSearch } from "../lib/w3cBattleTagResolver";
-import { applyRacePlacement } from "../lib/racePlacement";
+import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
+import { applyRacePlacement } from "@/lib/racePlacement";
 
 /* -------------------- CONSTANTS -------------------- */
 
@@ -164,12 +164,7 @@ export async function getPlayerVsPlayer(
     const { me, opp } = pair;
     const race = RACE_MAP[me.race] || "Unknown";
 
-    if (
-      !applyRacePlacement({
-        raceCounters: raceGameCount,
-        race,
-      })
-    ) continue;
+    if (!applyRacePlacement(raceGameCount, me.race)) continue;
 
     if (
       typeof match.durationInSeconds !== "number" ||

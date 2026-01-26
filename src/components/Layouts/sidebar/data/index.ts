@@ -27,12 +27,18 @@ export const NAV_DATA = [
         path: "/rank",
         as: "link",
       },
-
-      // ✅ ADD THIS (Performance page)
       {
         title: "Performance",
         icon: Icons.HomeIcon,
         path: "/performance",
+        as: "link",
+      },
+
+      /* ✅ NEW — Consistency page */
+      {
+        title: "Time Consistency",
+        icon: Icons.HomeIcon,
+        path: "/consistency",
         as: "link",
       },
 

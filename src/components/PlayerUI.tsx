@@ -73,6 +73,15 @@ export function StatRow({
       ? Math.min(100, Math.max(0, winrate))
       : null;
 
+  const textColor =
+    pct == null
+      ? ""
+      : pct >= 55
+      ? "text-emerald-600 dark:text-emerald-400"
+      : pct >= 48
+      ? "text-yellow-600 dark:text-yellow-400"
+      : "text-rose-600 dark:text-rose-400";
+
   return (
     <div className={cn("space-y-1", className)}>
       <div className="grid grid-cols-[1fr_auto] items-center gap-x-4">
@@ -80,7 +89,7 @@ export function StatRow({
           {label}
         </span>
 
-        <span className="tabular-nums font-medium">
+        <span className={cn("tabular-nums font-semibold", textColor)}>
           {value}
         </span>
       </div>
