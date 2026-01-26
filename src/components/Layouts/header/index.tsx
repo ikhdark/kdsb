@@ -56,17 +56,27 @@ export function Header() {
   return (
     <header className="sticky top-0 z-20 flex items-center justify-between border-b border-stroke bg-white shadow-1 px-3 py-3 md:px-5 md:py-5 dark:border-stroke-dark dark:bg-gray-dark">
 
-      {/* ================= MENU BUTTON (PNG) ================= */}
+      {/* ================= MENU BUTTON (ICON + TEXT) ================= */}
       <button
         onClick={toggleSidebar}
-        className="p-2 lg:hidden"
         aria-label="Toggle menu"
+        className="
+          flex items-center gap-2
+          px-3 py-2
+          rounded-lg
+          hover:bg-gray-100 dark:hover:bg-gray-800
+          lg:hidden
+        "
       >
         <img
           src="/assets/logos/Menu_Icon.png"
-          alt="menu"
+          alt=""
           className="w-6 h-6"
         />
+
+        <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
+          Menu
+        </span>
       </button>
 
       {/* ================= TITLE ================= */}
@@ -105,7 +115,6 @@ export function Header() {
             "
           />
 
-          {/* search icon (SVG still fine) */}
           <SearchIcon
             className="
               pointer-events-none
