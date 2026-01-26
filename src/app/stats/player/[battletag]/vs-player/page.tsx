@@ -34,7 +34,7 @@ export default async function VsPlayerPage({ params }: PageProps) {
       <Section title="MMR Extremes">
         {data.extremes.gainGamesToShow.length > 0 && (
           <div className="space-y-2">
-            <div className="font-medium">Largest Single-Game Gain (If +15 or more, all will be added)</div>
+            <div className="font-medium">Largest Single-Game Gain/Loss (If +15 or more, all will be added)</div>
 
             {data.extremes.gainGamesToShow.map((g, i) => (
               <div key={i} className="grid grid-cols-[auto_1fr_auto] gap-x-3">
