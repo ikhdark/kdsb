@@ -1,5 +1,4 @@
-// src/global.d.ts
-export {}; // marks this file as a module
+export {};
 
 declare global {
   interface Window {

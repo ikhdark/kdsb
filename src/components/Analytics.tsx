@@ -1,12 +1,8 @@
 "use client";
 
 import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { pageview } from "@/lib/gtag";
-
-/* =========================
-   Stat page mapping
-========================= */
 
 const STAT_MAP = {
   summary: "Summary",
@@ -19,48 +15,37 @@ const STAT_MAP = {
   "vs-player": "Vs Player",
 } as const;
 
-/* =========================
-   Stat tracking
-========================= */
+// Optional helper to safely send GA events
+function sendEvent(name: string, params: Record<string, any>) {
+  if (typeof window !== "undefined" && window.gtag) {
+    window.gtag("event", name, params);
+  }
+}
 
 function trackStatType(pathname: string) {
-  if (!window.gtag) return;
-
-  // Only care about /stats/player/*
   if (!pathname.startsWith("/stats/player/")) return;
 
-  // /stats/player/<tag>/<stat>
   const parts = pathname.split("/");
-  const statSegment = parts[4];
+  const statSegment = parts[4]; // /stats/player/<battletag>/<stat>
   if (!statSegment) return;
 
   const statType = STAT_MAP[statSegment as keyof typeof STAT_MAP];
   if (!statType) return;
 
-  window.gtag("event", "stat_page_view", {
-    stat_type: statType,
-  });
+  sendEvent("stat_page_view", { stat_type: statType });
 }
-
-/* =========================
-   Global analytics listener
-========================= */
 
 export default function Analytics() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  const qs = searchParams?.toString();
+  const url = useMemo(() => (qs ? `${pathname}?${qs}` : pathname), [pathname, qs]);
+
   useEffect(() => {
-    const qs = searchParams?.toString();
-    const url = qs ? `${pathname}?${qs}` : pathname;
-
-    // Standard pageview
     pageview(url);
-
-    // Stat usage tracking
     trackStatType(pathname);
-
-  }, [pathname, searchParams]);
+  }, [url, pathname]);
 
   return null;
 }
