@@ -1,5 +1,6 @@
 // src/app/stats/player/[battletag]/summary/page.tsx
 export const revalidate = 300;
+import type { Metadata } from "next"; // ← ADD THIS
 import { notFound } from "next/navigation";
 import { getPlayerSummary } from "@/services/playerSummary";
 import { displayMyRace } from "@/services/playerVsPlayer";
@@ -8,6 +9,38 @@ import { PlayerHeader, Section, StatCard } from "@/components/PlayerUI";
 type PageProps = {
   params: Promise<{ battletag: string }>;
 };
+
+/* =========================
+   SEO (required for Google indexing)
+   This is the ONLY addition
+========================= */
+
+export async function generateMetadata({
+  params,
+}: PageProps): Promise<Metadata> {
+  const { battletag } = await params;
+  const tag = decodeURIComponent(battletag);
+
+  return {
+    title: `${tag} Stats | W3C Stats`,
+    description: `Warcraft III W3Champions ladder stats for ${tag}. MMR, win rates, heroes, maps, match history and performance breakdowns.`,
+    openGraph: {
+      title: `${tag} Stats | W3C Stats`,
+      description: `Full ladder stats and performance for ${tag}`,
+      url: `https://www.w3cstats.com/stats/player/${encodeURIComponent(
+        tag
+      )}/summary`,
+      siteName: "W3C Stats",
+      type: "website",
+    },
+  };
+}
+
+
+
+
+
+
 
 export default async function SummaryPage({ params }: PageProps) {
   const { battletag } = await params;
@@ -34,6 +67,8 @@ export default async function SummaryPage({ params }: PageProps) {
         ).toLocaleDateString()}`
       : "N/A";
 
+
+      
   /* ================= render ================= */
 
   return (
