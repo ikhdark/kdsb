@@ -134,11 +134,11 @@ export default function TimeHeatmap({ data }: { data: Cell[] }) {
                     key={`${day}-${bucket}`}
                     className="h-10 rounded border border-gray-200 bg-white flex items-center justify-center"
                   >
-                    {cell?.winrate != null ? (
-                      <span className={textColor(cell.winrate)}>
-                        {cell.winrate}%
-                      </span>
-                    ) : "—"}
+                   {cell?.winrate != null ? (
+  <span className={textColor(cell.winrate)}>
+    {cell.winrate}% ({cell.wins}-{cell.games - cell.wins})
+  </span>
+) : "—"}
                   </div>
                 );
               })}
