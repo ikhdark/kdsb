@@ -53,6 +53,9 @@ export default function LadderSearch({
           dark:border-gray-700 dark:bg-gray-800
         "
       />
+
+      {/* ✅ enables Enter key submit */}
+      <button type="submit" className="hidden" />
     </form>
   );
 }
