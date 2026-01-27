@@ -28,9 +28,59 @@ export default function Sidebar() {
     };
   }, [isOpen, isMobile]);
 
+  function renderItem(item: any, depth = 0) {
+    const isSearch = item.title === "Player Search";
+
+    /* HARD DISABLE */
+    if (item.disabled) {
+      return (
+        <div
+          key={item.title}
+          className="flex items-center gap-3 rounded-lg px-4 py-2 text-sm font-medium text-gray-400 opacity-40 select-none"
+        >
+          {item.icon && <item.icon />}
+          {item.title}
+        </div>
+      );
+    }
+
+    /* CONTEXT DISABLE */
+    if (!battletag && !isSearch) {
+      return (
+        <div
+          key={item.title}
+          className="flex items-center gap-3 rounded-lg px-4 py-2 text-sm font-medium text-gray-400 opacity-40 select-none"
+        >
+          {item.icon && <item.icon />}
+          {item.title}
+        </div>
+      );
+    }
+
+    const href = isSearch
+      ? "/"
+      : `/stats/player/${battletag}/${item.path}`;
+
+    const isActive = pathname.startsWith(href);
+
+    return (
+      <MenuItem
+        key={item.title}
+        as="link"
+        href={href}
+        isActive={isActive}
+        onClick={closeSidebar}
+        className={depth ? "ml-6 text-sm opacity-90" : ""}
+      >
+        {item.icon && depth === 0 && <item.icon />}
+        {item.title}
+      </MenuItem>
+    );
+  }
+
   return (
     <>
-      {/* ================= OVERLAY ================= */}
+      {/* OVERLAY */}
       {isMobile && isOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/40"
@@ -38,7 +88,7 @@ export default function Sidebar() {
         />
       )}
 
-      {/* ================= SIDEBAR ================= */}
+      {/* SIDEBAR */}
       <aside
         className={`
           fixed inset-y-0 left-0 z-50 w-72
@@ -58,54 +108,16 @@ export default function Sidebar() {
               </p>
 
               <div className="space-y-1">
-                {group.items.map((item) => {
-                  const isSearch = item.title === "Player Search";
+                {group.items.map((item) => (
+                  <div key={item.title}>
+                    {renderItem(item)}
 
-                  /* HARD DISABLE */
-                  if (item.disabled) {
-                    return (
-                      <div
-                        key={item.title}
-                        className="flex items-center gap-3 rounded-lg px-4 py-2 text-sm font-medium text-gray-400 opacity-40 select-none"
-                      >
-                        {item.icon && <item.icon />}
-                        {item.title}
-                      </div>
-                    );
-                  }
-
-                  /* CONTEXT DISABLE */
-                  if (!battletag && !isSearch) {
-                    return (
-                      <div
-                        key={item.title}
-                        className="flex items-center gap-3 rounded-lg px-4 py-2 text-sm font-medium text-gray-400 opacity-40 select-none"
-                      >
-                        {item.icon && <item.icon />}
-                        {item.title}
-                      </div>
-                    );
-                  }
-
-                  const href = isSearch
-                    ? "/"
-                    : `/stats/player/${battletag}/${item.path}`;
-
-                  const isActive = pathname.startsWith(href);
-
-                  return (
-                    <MenuItem
-                      key={item.title}
-                      as="link"
-                      href={href}
-                      isActive={isActive}
-                      onClick={closeSidebar}
-                    >
-                      {item.icon && <item.icon />}
-                      {item.title}
-                    </MenuItem>
-                  );
-                })}
+                    {/* render submenu if exists */}
+                    {item.items?.map((sub: any) =>
+                      renderItem(sub, 1)
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           ))}

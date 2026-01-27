@@ -12,6 +12,7 @@ export const NAV_DATA = [
       },
     ],
   },
+
   {
     label: "PLAYER PAGES",
     items: [
@@ -27,21 +28,21 @@ export const NAV_DATA = [
         path: "/rank",
         as: "link",
       },
+
+      /* ========================= */
+
       {
         title: "Performance",
         icon: Icons.HomeIcon,
         path: "/performance",
         as: "link",
       },
-
-      /* ✅ NEW — Consistency page */
       {
         title: "Time Consistency",
         icon: Icons.HomeIcon,
         path: "/consistency",
         as: "link",
       },
-
       {
         title: "Hero Stats",
         icon: Icons.HomeIcon,
@@ -66,12 +67,54 @@ export const NAV_DATA = [
         path: "/vs-player",
         as: "link",
       },
+      
+      /* =========================
+         SoS Ladder (with submenu)
+      ========================= */
+
       {
-        title: "More Coming Soon!",
+        title: "SoS Ladder",
         icon: Icons.HomeIcon,
-        path: null,
-        disabled: true,
+        path: "/ladder", // parent default = global
+        as: "link",
+
+        items: [
+          {
+            title: "Global",
+            path: "/ladder",
+            as: "link",
+          },
+            {
+            title: "Random",
+            path: "/ladder/race/random",
+            as: "link",
+          },
+           {
+            title: "Undead",
+            path: "/ladder/race/undead",
+            as: "link",
+          },
+           {
+            title: "Orc",
+            path: "/ladder/race/orc",
+            as: "link",
+          },
+          {
+            title: "Human",
+            path: "/ladder/race/human",
+            as: "link",
+          },
+         
+          {
+            title: "Night Elf",
+            path: "/ladder/race/elf",
+            as: "link",
+          },
+         
+        
+        ],
       },
+
     ],
   },
 ];

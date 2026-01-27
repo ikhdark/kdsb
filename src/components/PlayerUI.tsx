@@ -18,7 +18,7 @@ export function PlayerHeader({
 }: PlayerHeaderProps) {
   return (
     <header className={cn("space-y-1", className)}>
-      <h1 className="text-2xl font-semibold tracking-tight text-black dark:text-white">
+      <h1 className="truncate text-2xl font-semibold tracking-tight text-black dark:text-white">
         {battletag}
       </h1>
 
@@ -46,7 +46,8 @@ export function Section({ title, children, className }: SectionProps) {
         {title}
       </h2>
 
-      <div className="space-y-2 text-sm">{children}</div>
+      {/* slightly larger spacing works better for grids/tables */}
+      <div className="space-y-4 text-sm">{children}</div>
     </section>
   );
 }
@@ -58,7 +59,7 @@ export function Section({ title, children, className }: SectionProps) {
 type StatRowProps = {
   label: string;
   value: string;
-  winrate?: number;
+  winrate?: number; // 0–100 expected
   className?: string;
 };
 
@@ -122,6 +123,7 @@ type StatCardProps = {
   value: string;
   sub?: ReactNode;
   className?: string;
+  compact?: boolean; // optional tighter layout
 };
 
 export function StatCard({
@@ -129,11 +131,13 @@ export function StatCard({
   value,
   sub,
   className,
+  compact,
 }: StatCardProps) {
   return (
     <div
       className={cn(
-        "rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900",
+        "rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900",
+        compact ? "p-3" : "p-5",
         className
       )}
     >

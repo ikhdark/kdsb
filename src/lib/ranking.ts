@@ -23,8 +23,7 @@ export type FlattenedLadderRow = {
   games: number;
   wins: number;
 
-  // Pre-normalized identity fields for comparisons only.
-  // Derived strictly from API strings.
+  battleTag?: string;        // ← ADD THIS
   battleTagLower?: string;
   playerIdLower?: string;
 };
@@ -137,6 +136,7 @@ const pushRow = (row: FlattenedLadderRow) => {
         mmr: Math.round(mmr),
         games: Math.trunc(games),
         wins: Math.trunc(winsRaw), // simplified (no redundant clamp)
+        battleTag,
         battleTagLower,
         playerIdLower,
       });

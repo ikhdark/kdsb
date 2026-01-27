@@ -1,5 +1,6 @@
 // src/app/stats/player/[battletag]/rank/page.tsx
 export const revalidate = 300;
+
 import { notFound } from "next/navigation";
 import { getW3CRank, type W3CRankResponse } from "@/services/playerRank";
 import { PlayerHeader, StatCard, Section } from "@/components/PlayerUI";
@@ -93,37 +94,51 @@ export default async function RankPage({ params }: PageProps) {
                 </thead>
 
                 <tbody>
-                  {ranks.map((r, i) => (
-                    <tr
-                      key={r.raceId}
-                      className={`border-t ${
-                        i % 2 === 0
-                          ? "bg-white dark:bg-gray-dark"
-                          : "bg-gray-50/50 dark:bg-gray-800/40"
-                      }`}
-                    >
-                      <td className="px-5 py-3 font-medium">{r.race}</td>
+                  {ranks.map((r, i) => {
+                    const getRankColor = (rank?: number) => {
+                      if (!rank) return "";
 
-                      <td className="px-5 py-3 tabular-nums">
-                        #{r.globalRank}/{r.globalTotal}
-                      </td>
+                      if (rank <= 10) return "text-green-600 dark:text-green-400";
+                      if (rank <= 25) return "text-yellow-600 dark:text-yellow-400";
+                      if (rank <= 50) return "text-blue-600 dark:text-blue-400";
+                      return "";
+                    };
 
-                      <td className="px-5 py-3 tabular-nums">
-                        {r.countryRank && r.countryTotal
-                          ? `#${r.countryRank}/${r.countryTotal}`
-                          : "—"}
-                      </td>
+                    return (
+                      <tr
+                        key={r.raceId}
+                        className={`border-t ${
+                          i % 2 === 0
+                            ? "bg-white dark:bg-gray-dark"
+                            : "bg-gray-50/50 dark:bg-gray-800/40"
+                        }`}
+                      >
+                        <td className="px-5 py-3 font-medium">{r.race}</td>
 
-                      <td className="px-5 py-3 text-right font-semibold tabular-nums">
-                        {r.mmr}
-                      </td>
+                        {/* Global */}
+                        <td className={`px-5 py-3 tabular-nums font-semibold ${getRankColor(r.globalRank)}`}>
+                          #{r.globalRank}/{r.globalTotal}
+                        </td>
 
-                      <td className="px-5 py-3 text-right text-gray-500 tabular-nums">
-                        {r.games}
-                      </td>
-                    </tr>
-                  ))}
+                        {/* Country */}
+                        <td className={`px-5 py-3 tabular-nums font-semibold ${getRankColor(r.countryRank)}`}>
+                          {r.countryRank && r.countryTotal
+                            ? `#${r.countryRank}/${r.countryTotal}`
+                            : "—"}
+                        </td>
+
+                        <td className="px-5 py-3 text-right font-semibold tabular-nums">
+                          {r.mmr}
+                        </td>
+
+                        <td className="px-5 py-3 text-right text-gray-500 tabular-nums">
+                          {r.games}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
+
               </table>
             </div>
 
