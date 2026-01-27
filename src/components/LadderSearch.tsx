@@ -1,4 +1,3 @@
-// src/components/LadderSearch.tsx
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -16,23 +15,26 @@ export default function LadderSearch({
   const router = useRouter();
   const [q, setQ] = useState("");
 
+  function normalize(s: string) {
+    return s.replace(/\s+/g, "").toLowerCase();
+  }
+
   function submit(e: React.FormEvent) {
     e.preventDefault();
 
     const query = q.trim();
     if (!query) return;
 
-    const lower = query.toLowerCase();
+    const qNorm = normalize(query);
 
     const idx = rows.findIndex((r) =>
-      r.battletag.toLowerCase().includes(lower)
+      normalize(r.battletag).includes(qNorm)
     );
 
     if (idx === -1) return;
 
     const page = Math.floor(idx / PAGE_SIZE) + 1;
 
-    // ✅ include highlight param
     router.push(
       `${base}?page=${page}&highlight=${encodeURIComponent(query)}`
     );
