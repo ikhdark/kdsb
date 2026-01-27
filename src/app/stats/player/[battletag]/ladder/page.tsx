@@ -68,7 +68,7 @@ export default async function LadderPage({
     <div className="space-y-8 max-w-6xl mx-auto">
       <PlayerHeader
         battletag={canonicalBt}
-        subtitle={`Custom Global Ladder · Season 24 · ${poolSize.toLocaleString()} players`}
+        subtitle={`SoS Global Ladder · Season 24 · ${poolSize.toLocaleString()} players`}
       />
 
       <LadderSearch rows={full} base={base} />
