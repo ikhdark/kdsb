@@ -10,6 +10,7 @@ type MenuItemProps = {
   as?: "link" | "button";
   href?: string;
   onClick?: () => void;
+  className?: string; // ✅ add
 };
 
 export default function MenuItem({
@@ -18,11 +19,13 @@ export default function MenuItem({
   as = "button",
   href,
   onClick,
+  className, // ✅ receive
 }: MenuItemProps) {
   const classes = cn(
     "flex items-center gap-3 rounded-lg px-4 py-2 text-sm font-medium transition-colors",
     "text-dark dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800",
-    isActive ? "bg-primary text-white hover:bg-primary" : ""
+    isActive ? "bg-primary text-white hover:bg-primary" : "",
+    className // ✅ merge
   );
 
   if (as === "link" && href) {

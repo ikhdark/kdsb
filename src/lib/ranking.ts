@@ -132,14 +132,13 @@ const pushRow = (row: FlattenedLadderRow) => {
       (battleTagLower || playerIdLower)
     ) {
       pushRow({
-        race,
-        mmr: Math.round(mmr),
-        games: Math.trunc(games),
-        wins: Math.trunc(winsRaw), // simplified (no redundant clamp)
-        battleTag,
-        battleTagLower,
-        playerIdLower,
-      });
+  race,
+  mmr: Math.round(mmr),
+  games: Math.trunc(games),
+  wins: Math.trunc(winsRaw),
+  battleTag: battleTag ?? undefined,
+  playerIdLower,
+});
     }
 
     /* ---------- recurse ONLY arrays (perf-safe) ---------- */

@@ -121,7 +121,8 @@ export default async function RankPage({ params }: PageProps) {
                         </td>
 
                         {/* Country */}
-                        <td className={`px-5 py-3 tabular-nums font-semibold ${getRankColor(r.countryRank)}`}>
+                        <td className={`px-5 py-3 tabular-nums font-semibold ${getRankColor(r.countryRank ?? undefined)}`}>
+
                           {r.countryRank && r.countryTotal
                             ? `#${r.countryRank}/${r.countryTotal}`
                             : "—"}
