@@ -105,8 +105,7 @@ async function fetchGlobalLadder(): Promise<any[]> {
 /* =========================
    SINGLE PASS SoS
 ========================= */
-
-async function computeAllSoS(players: string[]) {
+async function computeAllSoS(players: string[], raceId: number) {
   const map = new Map<string, { sum: number; n: number }>();
 
   for (const p of players) {
@@ -131,7 +130,12 @@ async function computeAllSoS(players: string[]) {
           if (m.durationInSeconds < 120) continue;
 
           const pair = getPlayerAndOpponent(m, tag);
-          if (!pair || typeof pair.opp.oldMmr !== "number") continue;
+          if (!pair) continue;
+
+          // ✅ race filter (this was missing)
+          if (pair.me.race !== raceId) continue;
+
+          if (typeof pair.opp.oldMmr !== "number") continue;
 
           bucket.sum += pair.opp.oldMmr;
           bucket.n++;
@@ -182,7 +186,7 @@ export async function getPlayerRaceLadder(
     .map((r) => r.battleTag)
     .filter(Boolean) as string[];
 
-  const sosMap = await computeAllSoS(tags);
+  const sosMap = await computeAllSoS(tags, raceId);
 
   const inputs: LadderInputRow[] = raceRows.map((r) => {
     const lower = (r.battleTag ?? "").toLowerCase();
