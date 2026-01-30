@@ -1,0 +1,20 @@
+When you change command logic
+(e.g. edit /w3c.js, fix a bug, change output)
+
+Do this:
+
+pm2 restart w3cstats
+
+
+That’s it. No re-registration needed.
+
+When you add a new command file
+(e.g. add commands/utility/newcmd.js)
+
+Do this:
+
+git add .
+git commit -m "describe what you changed"
+git push
+
+npm run build
