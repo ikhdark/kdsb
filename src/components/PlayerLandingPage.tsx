@@ -69,91 +69,95 @@ export default function PlayerLandingPage() {
 
   /* ================= UI ================= */
 
-  return (
-    <div className="min-h-dvh bg-gray-50 dark:bg-gray-900 px-4 pt-14 flex justify-center">
-      <div className="w-full max-w-xl space-y-6 text-center">
+return (
+  <div className="min-h-dvh bg-gray-50 dark:bg-gray-900 px-5 pt-20 flex justify-center">
+    <div className="w-full max-w-xl space-y-8 text-center">
 
-        {/* TEXT WRAPPER (prevents ugly wrapping) */}
-        <div className="max-w-md mx-auto space-y-3">
+      {/* HERO */}
+      <div className="space-y-4">
 
-          <h1 className="text-3xl font-bold text-black dark:text-white">
-            KD's W3Champions Stats
-          </h1>
+        <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-black dark:text-white">
+          KD's W3Champions Stats
+        </h1>
 
-          <p className="text-sm font-semibold text-black dark:text-white">
-            Strength of Schedule Ladder • 8 Detailed Stat Reports
-          </p>
+        <p className="text-base sm:text-lg font-semibold text-black dark:text-white leading-relaxed">
+          Strength of Schedule Ladder
+          <br />
+          8 Detailed Stat Reports
+        </p>
 
-          <p className="text-xs text-gray-500">
-            4v4 support is being added over the next few weeks
-          </p>
+        <p className="text-sm text-gray-500">
+          4v4 support coming soon
+        </p>
 
-          <p className="text-sm text-gray-500">
-            Search any BattleTag to get started
-          </p>
-
-        </div>
-
-        {/* SEARCH */}
-        <form onSubmit={onSubmit} className="flex flex-col gap-3 w-full">
-          <input
-            ref={inputRef}
-            autoFocus
-            type="text"
-            placeholder="Moon#1234"
-            disabled={loading}
-            onChange={() => setError(null)}
-            className="
-              w-full rounded-xl border border-gray-300 bg-white
-              px-5 py-4 text-lg
-              focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500
-              dark:border-gray-700 dark:bg-gray-800 dark:text-white
-            "
-          />
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="
-              w-full rounded-xl bg-emerald-500 py-4 text-lg font-semibold text-white
-              hover:bg-emerald-600 disabled:opacity-60
-            "
-          >
-            {loading ? "Searching..." : "Search Player"}
-          </button>
-        </form>
-
-        {error && <p className="text-xs text-red-500">{error}</p>}
-
-        {/* EXAMPLES */}
-        <div className="text-xs text-gray-500">
-          Try:{" "}
-          <button onClick={() => quickGo("Grubby#1278")} className="underline">
-            Grubby#1278
-          </button>{" • "}
-          <button onClick={() => quickGo("KAHO#31819")} className="underline">
-            KAHO#31819
-          </button>{" • "}
-          <button onClick={() => quickGo("StarBuck#2732")} className="underline">
-            StarBuck#2732
-          </button>
-        </div>
-
-        {/* BOOKMARK */}
-        <button
-          onClick={bookmark}
-          className="
-            w-full rounded-xl border border-gray-300 py-3 text-sm
-            hover:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-800
-          "
-        >
-          ⭐ Bookmark this site
-        </button>
-
-        {/* WHATS NEW */}
-        <WhatsNew />
+        <p className="text-base text-gray-600 dark:text-gray-400">
+          Search any BattleTag to get started
+        </p>
 
       </div>
+
+      {/* SEARCH */}
+      <form onSubmit={onSubmit} className="flex flex-col gap-4 w-full">
+        <input
+          ref={inputRef}
+          autoFocus
+          type="text"
+          placeholder="Moon#1234"
+          disabled={loading}
+          onChange={() => setError(null)}
+          className="
+            w-full rounded-xl border border-gray-300 bg-white
+            px-5 py-5 text-xl
+            focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500
+            dark:border-gray-700 dark:bg-gray-800 dark:text-white
+          "
+        />
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="
+            w-full rounded-xl bg-emerald-500 py-5 text-xl font-semibold text-white
+            hover:bg-emerald-600 disabled:opacity-60
+          "
+        >
+          {loading ? "Searching..." : "Search Player"}
+        </button>
+      </form>
+
+      {error && <p className="text-sm text-red-500">{error}</p>}
+
+      {/* EXAMPLES */}
+      <div className="text-sm text-gray-500 space-x-2">
+        Try:
+        <button onClick={() => quickGo("Grubby#1278")} className="underline">
+          Grubby#1278
+        </button>
+        •
+        <button onClick={() => quickGo("KAHO#31819")} className="underline">
+          KAHO#31819
+        </button>
+        •
+        <button onClick={() => quickGo("StarBuck#2732")} className="underline">
+          StarBuck#2732
+        </button>
+      </div>
+
+      {/* BOOKMARK */}
+      <button
+        onClick={bookmark}
+        className="
+          w-full rounded-xl border border-gray-300 py-3 text-base
+          hover:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-800
+        "
+      >
+        ⭐ Bookmark this site
+      </button>
+
+      <WhatsNew />
+
     </div>
-  );
+  </div>
+);
+
 }
