@@ -12,22 +12,12 @@ type PageProps = {
 
 const PAGE_SIZE = 50;
 
-/* =========================
-   helpers
-========================= */
-
-function pct(n: number) {
-  return `${(n * 100).toFixed(1)}%`;
-}
+/* helpers */
 
 function num(n: number | null | undefined, d = 0) {
   if (n == null) return "—";
   return n.toFixed(d);
 }
-
-/* =========================
-   page
-========================= */
 
 export default async function LadderPage({
   params,
@@ -66,14 +56,13 @@ export default async function LadderPage({
     <div className="space-y-8 max-w-6xl mx-auto">
       <PlayerHeader
         battletag={canonicalBt}
-        subtitle={`SoS Global Ladder · Season 24 · ${poolSize.toLocaleString()} players`}
+        subtitle={`SoS Global Ladder · Season 24 · ${poolSize.toLocaleString()} players | Players with under 30 total lifetime games per race, will be excluded to keep ladder clean of smurfs`}
       />
 
       <LadderSearch rows={rows} base={base} />
 
       <p className="text-xs text-gray-500 -mt-4">
-        Ranked by <b>Score</b> (MMR + SoS + Winrate) with inactivity decay and a
-        small activity bonus for recent play.
+        Ranked by <b>Score</b> (MMR + SoS + Activity).
       </p>
 
       <p className="text-xs text-gray-500 -mt-2">
@@ -83,8 +72,8 @@ export default async function LadderPage({
       {me && (
         <Section title="Your Rank">
           <div className="text-sm">
-            Rank <b>#{me.rank}</b> · Score <b>{num(me.score, 1)}</b> · Activity{" "}
-            <b>+{num((me as any).bonus, 1)}</b> · MMR <b>{me.mmr}</b>
+            Rank <b>#{me.rank}</b> · Score <b>{num(me.score, 1)}</b> · MMR{" "}
+            <b>{me.mmr}</b>
           </div>
         </Section>
       )}
@@ -97,11 +86,9 @@ export default async function LadderPage({
                 <th className="text-left w-12">#</th>
                 <th className="text-left w-44">Player</th>
                 <th className="text-right w-20">Score</th>
-                <th className="text-right w-14">Act</th> {/* NEW */}
                 <th className="text-right w-20">MMR</th>
                 <th className="text-right w-20">SoS</th>
                 <th className="text-right w-16">W-L</th>
-                <th className="text-right w-16">WR</th>
               </tr>
             </thead>
 
@@ -121,34 +108,20 @@ export default async function LadderPage({
                     }`}
                   >
                     <td className="py-1.5">#{p.rank}</td>
-
                     <td className="py-1.5 truncate font-sans">
                       {p.battletag}
                     </td>
-
                     <td className="py-1.5 text-right font-semibold">
                       {num(p.score, 1)}
                     </td>
-
-                    {/* Activity bonus column */}
-                    <td className="py-1.5 text-right text-xs text-gray-500">
-                      +{num(p.bonus, 1)}
-                    </td>
-
                     <td className="py-1.5 text-right font-semibold">
                       {p.mmr}
                     </td>
-
                     <td className="py-1.5 text-right font-semibold">
                       {num(p.sos, 0)}
                     </td>
-
                     <td className="py-1.5 text-right">
                       {p.wins}-{p.losses}
-                    </td>
-
-                    <td className="py-1.5 text-right">
-                      {pct(p.winrate)}
                     </td>
                   </tr>
                 );
@@ -157,22 +130,15 @@ export default async function LadderPage({
           </table>
         </div>
 
-        {/* pagination */}
         <div className="flex items-center justify-center gap-2 pt-4 text-sm">
           {currentPage > 1 && (
-            <Link
-              href={`${base}?page=${currentPage - 1}`}
-              className="px-3 py-1 border rounded"
-            >
+            <Link href={`${base}?page=${currentPage - 1}`} className="px-3 py-1 border rounded">
               Prev
             </Link>
           )}
 
           {Array.from({ length: totalPages }, (_, i) => i + 1)
-            .slice(
-              Math.max(0, currentPage - 3),
-              Math.min(totalPages, currentPage + 2)
-            )
+            .slice(Math.max(0, currentPage - 3), Math.min(totalPages, currentPage + 2))
             .map((p) => (
               <Link
                 key={p}
@@ -188,10 +154,7 @@ export default async function LadderPage({
             ))}
 
           {currentPage < totalPages && (
-            <Link
-              href={`${base}?page=${currentPage + 1}`}
-              className="px-3 py-1 border rounded"
-            >
+            <Link href={`${base}?page=${currentPage + 1}`} className="px-3 py-1 border rounded">
               Next
             </Link>
           )}

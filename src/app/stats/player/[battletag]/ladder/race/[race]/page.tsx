@@ -16,10 +16,6 @@ const PAGE_SIZE = 50;
 
 /* helpers */
 
-function pct(n: number) {
-  return `${(n * 100).toFixed(1)}%`;
-}
-
 function num(n: number | null | undefined, d = 0) {
   if (n == null) return "—";
   return n.toFixed(d);
@@ -49,7 +45,6 @@ export default async function RaceLadderPage({
   const race = raceParam.toLowerCase() as Race;
   const rawPage = Number(page) || 1;
 
-  // ✅ service handles caching + pagination
   const data = await getPlayerRaceLadder(
     battletag,
     race,
@@ -79,14 +74,13 @@ export default async function RaceLadderPage({
     <div className="space-y-8 max-w-6xl mx-auto">
       <PlayerHeader
         battletag={canonicalBt}
-        subtitle={`${raceLabel(race)} Ladder · Season 24 · ${poolSize.toLocaleString()} players`}
+        subtitle={`${raceLabel(race)} Ladder · Season 24 · ${poolSize.toLocaleString()} players | Players with under 30 total lifetime games per race, will be excluded to keep ladder clean of smurfs.`}
       />
 
       <LadderSearch rows={rows} base={base} />
 
       <p className="text-xs text-gray-500 -mt-4">
-        Ranked by <b>Score</b> (performance index) which = MMR, SoS, Winrate,
-        with activity decay applied.
+        Ranked by <b>Score</b> (MMR + SoS + Activity).
       </p>
 
       {me && (
@@ -101,78 +95,62 @@ export default async function RaceLadderPage({
       <Section title={`Page ${currentPage} / ${totalPages}`}>
         <div className="overflow-x-auto">
           <table className="w-full table-fixed text-sm border-collapse font-mono tabular-nums">
+            <thead className="text-xs uppercase text-gray-500">
+              <tr className="border-b border-gray-300 dark:border-gray-700">
+                <th className="text-left w-12">#</th>
+                <th className="text-left w-44">Player</th>
+                <th className="text-right w-20">Score</th>
+                <th className="text-right w-20">MMR</th>
+                <th className="text-right w-20">SoS</th>
+                <th className="text-right w-16">W-L</th>
+              </tr>
+            </thead>
 
-       <thead className="text-xs uppercase text-gray-500">
-  <tr className="border-b border-gray-300 dark:border-gray-700">
-    <th className="text-left w-12">#</th>
-    <th className="text-left w-44">Player</th>
-    <th className="text-right w-20">Score</th>
-    <th className="text-right w-20">MMR</th>
-    <th className="text-right w-20">SoS</th>
-    <th className="text-right w-16">W-L</th>
-    <th className="text-right w-16">WR</th>
-  </tr>
-</thead>
-<tbody>
-  {rows.map((p) => {
-    const isHighlight =
-      highlightLower &&
-      p.battletag.toLowerCase().includes(highlightLower);
+            <tbody>
+              {rows.map((p) => {
+                const isHighlight =
+                  highlightLower &&
+                  p.battletag.toLowerCase().includes(highlightLower);
 
-    return (
-      <tr
-        key={`${p.battletag}-${p.rank}`}
-        className={`border-b border-gray-200 dark:border-gray-800 ${
-          isHighlight ? "bg-yellow-100 dark:bg-yellow-900/40" : ""
-        }`}
-      >
-        <td className="py-1.5">#{p.rank}</td>
-
-        <td className="py-1.5 truncate font-sans">
-          {p.battletag}
-        </td>
-
-        <td className="py-1.5 text-right font-semibold">
-          {num(p.score, 1)}
-        </td>
-
-        <td className="py-1.5 text-right font-semibold">
-          {p.mmr}
-        </td>
-
-        <td className="py-1.5 text-right font-semibold">
-          {num(p.sos, 0)}
-        </td>
-
-        <td className="py-1.5 text-right">
-          {p.wins}-{p.losses}
-        </td>
-
-        <td className="py-1.5 text-right">
-          {pct(p.winrate)}
-        </td>
-      </tr>
-    );
-  })}
-</tbody>
+                return (
+                  <tr
+                    key={`${p.battletag}-${p.rank}`}
+                    className={`border-b border-gray-200 dark:border-gray-800 ${
+                      isHighlight
+                        ? "bg-yellow-100 dark:bg-yellow-900/40"
+                        : ""
+                    }`}
+                  >
+                    <td className="py-1.5">#{p.rank}</td>
+                    <td className="py-1.5 truncate font-sans">{p.battletag}</td>
+                    <td className="py-1.5 text-right font-semibold">
+                      {num(p.score, 1)}
+                    </td>
+                    <td className="py-1.5 text-right font-semibold">
+                      {p.mmr}
+                    </td>
+                    <td className="py-1.5 text-right font-semibold">
+                      {num(p.sos, 0)}
+                    </td>
+                    <td className="py-1.5 text-right">
+                      {p.wins}-{p.losses}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
           </table>
         </div>
 
         <div className="flex items-center justify-center gap-2 pt-4 text-sm">
           {currentPage > 1 && (
-            <Link
-              href={`${base}?page=${currentPage - 1}`}
-              className="px-3 py-1 border rounded"
-            >
+            <Link href={`${base}?page=${currentPage - 1}`} className="px-3 py-1 border rounded">
               Prev
             </Link>
           )}
 
           {Array.from({ length: totalPages }, (_, i) => i + 1)
-            .slice(
-              Math.max(0, currentPage - 2),
-              Math.min(totalPages, currentPage + 1)
-            )
+            .slice(Math.max(0, currentPage - 2), Math.min(totalPages, currentPage + 1))
             .map((p) => (
               <Link
                 key={p}
@@ -188,10 +166,7 @@ export default async function RaceLadderPage({
             ))}
 
           {currentPage < totalPages && (
-            <Link
-              href={`${base}?page=${currentPage + 1}`}
-              className="px-3 py-1 border rounded"
-            >
+            <Link href={`${base}?page=${currentPage + 1}`} className="px-3 py-1 border rounded">
               Next
             </Link>
           )}

@@ -1,6 +1,11 @@
 // src/lib/ladderEngine.ts
 // PURE RANKING ENGINE
-// deterministic, readable scores, activity decay + activity bonus
+// deterministic, linear weighted model
+// MMR + SoS + Activity only
+
+/* =========================
+   TYPES
+========================= */
 
 export type LadderInputRow = {
   battletag: string;
@@ -8,9 +13,6 @@ export type LadderInputRow = {
   wins: number;
   games: number;
   sos: number | null;
-
-  // recent activity for decay
-  recentGames?: number;
 };
 
 export type LadderRow = {
@@ -25,12 +27,6 @@ export type LadderRow = {
   wins: number;
   losses: number;
   games: number;
-  winrate: number;
-
-  // NEW — show on table
-  decay: number;
-
-  tier: string;
 };
 
 /* =========================
@@ -40,153 +36,86 @@ export type LadderRow = {
 const MMR_CAP = 3000;
 
 /*
-Weights (sum ≈ 1)
-Readable + stable
+Weights (sum = 1.0)
 */
-const W_MMR = 0.45;
+const W_MMR = 0.50;
 const W_SOS = 0.40;
-const W_WR  = 0.05;
+const W_ACTIVITY = 0.10;
 
 /*
-Activity decay (punish inactivity)
+Activity normalization
+0–100 games → 0–2000 ladder-scale
 */
-const DECAY_MIN = 0.75;     // worst = 75%
-const DECAY_TARGET = 100;   // games for full strength
-
-/*
-Activity bonus (reward play volume)
-Additive points to score (NOT multiplier)
-Small so it can't be abused
-*/
-const ACTIVITY_BONUS_MAX = 40;   // max ladder points added
-const ACTIVITY_TARGET = 100;     // games to hit max bonus
+const ACTIVITY_TARGET = 100;
 
 /* =========================
    HELPERS
 ========================= */
 
-function tierFromRank(rank: number): string {
-  if (rank <= 100) return "Top 100";
-  if (rank <= 200) return "Top 200";
-  if (rank <= 500) return "Top 500";
-  if (rank <= 1000) return "Top 1000";
-  return "Field";
-}
+function activityScore(games: number) {
+  const STEP = 5;              // every 5 games
+  const MAX_GAMES = 200;       // full credit cap
+  const MAX_SCORE = 2000;
 
-function winrate(wins: number, games: number) {
-  return games ? wins / games : 0;
-}
+  const bucket = Math.min(
+    Math.floor(games / STEP) * STEP,
+    MAX_GAMES
+  );
 
-/*
-Linear decay
-0 recent → 0.75
-100+ → 1.0
-*/
-function activityMultiplier(recentGames = 0) {
-  const t = Math.min(recentGames / DECAY_TARGET, 1);
-  return DECAY_MIN + (1 - DECAY_MIN) * t;
-}
-
-/*
-Reward activity (sqrt = diminishing returns)
-0 → 0
-100 → +40
-*/
-function activityBonus(totalGames: number) {
-  const t = Math.min(totalGames / ACTIVITY_TARGET, 1);
-  return Math.sqrt(t) * ACTIVITY_BONUS_MAX;
+  return (bucket / MAX_GAMES) * MAX_SCORE;
 }
 
 /* =========================
-   SCORE (UX-optimized)
+   SCORE
 ========================= */
-/*
-Final scale:
-~400–800 typical
-*/
 
 function computeScore(
   mmr: number,
   sos: number | null,
-  wr: number,
-  recentGames: number,
-  totalGames: number
+  games: number
 ): number {
   const sosVal = sos ?? mmr;
 
   const raw =
     mmr * W_MMR +
     sosVal * W_SOS +
-    wr * 2000 * W_WR;
+    activityScore(games) * W_ACTIVITY;
 
-  // shrink for readability
-  const scaled = raw / 10;
-
-  // inactivity penalty
-  const decayed = scaled * activityMultiplier(recentGames);
-
-  // activity reward
-  const finalScore = decayed + activityBonus(totalGames);
-
-  return Math.round(finalScore * 10) / 10;
+  return Math.round((raw / 10) * 10) / 10;
 }
 
 /* =========================
    MAIN ENGINE
 ========================= */
 
-export function buildLadder(
-  rows: LadderInputRow[]
-): LadderRow[] {
+export function buildLadder(rows: LadderInputRow[]): LadderRow[] {
+  const ladder: LadderRow[] = rows
+    .filter((r) => r.mmr <= MMR_CAP)
+    .map((r) => {
+      const losses = r.games - r.wins;
 
-  /* ---------- eligibility filter ---------- */
-  const eligible = rows.filter((r) => r.mmr <= MMR_CAP);
+      return {
+        rank: 0,
+        battletag: r.battletag,
 
-  /* ---------- build rows ---------- */
-  const ladder: LadderRow[] = eligible.map((r) => {
-    const losses = r.games - r.wins;
-    const wr = winrate(r.wins, r.games);
+        mmr: r.mmr,
+        sos: r.sos,
 
-    const recent = r.recentGames ?? 0;
-    const decay = activityMultiplier(recent);
+        score: computeScore(r.mmr, r.sos, r.games),
 
-    return {
-      rank: 0,
-      battletag: r.battletag,
+        wins: r.wins,
+        losses,
+        games: r.games,
+      };
+    });
 
-      mmr: r.mmr,
-      sos: r.sos,
-
-      score: computeScore(
-        r.mmr,
-        r.sos,
-        wr,
-        recent,
-        r.games   // ← NEW
-      ),
-
-      wins: r.wins,
-      losses,
-      games: r.games,
-      winrate: wr,
-
-      decay,
-
-      tier: "",
-    };
-  });
-
-  /* ---------- sort ---------- */
   ladder.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
-    if (b.mmr !== a.mmr) return b.mmr - a.mmr;
-    return b.winrate - a.winrate;
+    return b.mmr - a.mmr;
   });
 
-  /* ---------- assign ranks ---------- */
   ladder.forEach((p, i) => {
     p.rank = i + 1;
-    p.tier = tierFromRank(p.rank);
   });
 
   return ladder;

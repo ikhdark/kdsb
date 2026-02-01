@@ -6,7 +6,7 @@ import {
 } from "@/lib/w3cUtils";
 
 import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
-import { applyRacePlacement } from "@/lib/racePlacement";
+
 
 /* -------------------- CONSTANTS -------------------- */
 

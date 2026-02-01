@@ -16,16 +16,20 @@ const SEASON = 24;
 const GAME_MODE = 1;
 const GATEWAY = 20;
 
+const MIN_GAMES = 5;
+
 const MIN_LEAGUE = 1;
-const MAX_LEAGUE = 20;
+const MAX_LEAGUE = 50;
 
 const SOS_CONCURRENCY = 25;
 const MATCH_TTL = 5 * 60 * 1000;
 
-const matchCache = new Map<
-  string,
-  { ts: number; matches: any[] }
->();
+/* =========================
+   MATCH CACHE
+========================= */
+
+const matchCache = new Map<string, { ts: number; matches: any[] }>();
+
 /* =========================
    TYPES
 ========================= */
@@ -40,7 +44,7 @@ export type PlayerLadderResponse = {
 };
 
 /* =========================
-   FETCH ALL LEAGUES (FAST)
+   FETCH ALL LEAGUES
 ========================= */
 
 async function fetchAllLeagues(): Promise<any[]> {
@@ -67,7 +71,7 @@ async function fetchAllLeagues(): Promise<any[]> {
 }
 
 /* =========================
-   SoS ONLY FOR GIVEN ROWS
+   SoS FOR GIVEN ROWS
 ========================= */
 
 async function computeSoS(rows: LadderRow[]) {
@@ -77,18 +81,19 @@ async function computeSoS(rows: LadderRow[]) {
     await Promise.all(
       chunk.map(async (row) => {
         const key = row.battletag.toLowerCase();
-const now = Date.now();
+        const now = Date.now();
 
-let matches: any[];
+        let matches: any[];
 
-const cached = matchCache.get(key);
+        const cached = matchCache.get(key);
 
-if (cached && now - cached.ts < MATCH_TTL) {
-  matches = cached.matches;
-} else {
-  matches = await fetchAllMatches(row.battletag, [SEASON]);
-  matchCache.set(key, { ts: now, matches });
-}
+        if (cached && now - cached.ts < MATCH_TTL) {
+          matches = cached.matches;
+        } else {
+          matches = await fetchAllMatches(row.battletag, [SEASON]);
+          matchCache.set(key, { ts: now, matches });
+        }
+
         let sum = 0;
         let n = 0;
 
@@ -122,29 +127,32 @@ export async function getPlayerLadder(
   const battletag = await resolveBattleTagViaSearch(inputBattleTag);
   if (!battletag) return null;
 
-  /* ---------- build ladder fast ---------- */
-
   const payload = await fetchAllLeagues();
   const rows = flattenCountryLadder(payload);
 
-  const inputs: LadderInputRow[] = rows.map((r) => ({
-    battletag: r.battleTag ?? "",
-    mmr: r.mmr,
-    wins: r.wins,
-    games: r.games,
-    sos: null,
-  }));
+  /*
+    ✅ THIS IS THE ONLY eligibility gate
+    (same pattern as playerRank.ts)
+  */
+  const inputs: LadderInputRow[] = rows
+    .filter((r) =>
+      (r.games ?? 0) >= MIN_GAMES &&
+      (r.mmr ?? 0) > 0
+    )
+    .map((r) => ({
+      battletag: r.battleTag ?? "",
+      mmr: r.mmr,
+      wins: r.wins,
+      games: r.games,
+      sos: null,
+    }));
 
   const ladder = buildLadder(inputs);
-
-  /* ---------- slice first ---------- */
 
   const start = (page - 1) * pageSize;
   const end = start + pageSize;
 
   const visible = ladder.slice(start, end);
-
-  /* ---------- SoS ONLY for visible ---------- */
 
   await computeSoS(visible);
 
@@ -152,6 +160,10 @@ export async function getPlayerLadder(
     ladder.find(
       (r) => r.battletag?.toLowerCase() === battletag.toLowerCase()
     ) ?? null;
+
+  if (me && !visible.includes(me)) {
+    await computeSoS([me]);
+  }
 
   return {
     battletag,
