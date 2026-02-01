@@ -40,7 +40,6 @@ export default async function LadderPage({
 
   const rawPage = Number(page) || 1;
 
-  // ✅ service now handles pagination + caching
   const data = await getPlayerLadder(battletag, rawPage, PAGE_SIZE);
   if (!data) notFound();
 
@@ -73,9 +72,8 @@ export default async function LadderPage({
       <LadderSearch rows={rows} base={base} />
 
       <p className="text-xs text-gray-500 -mt-4">
-        Ranked by <b>Score</b> (performance index) which = MMR, SoS (Strength of
-        Schedule), Winrate. There is also a decay metric applied to inactive
-        players.
+        Ranked by <b>Score</b> (MMR + SoS + Winrate) with inactivity decay and a
+        small activity bonus for recent play.
       </p>
 
       <p className="text-xs text-gray-500 -mt-2">
@@ -85,8 +83,8 @@ export default async function LadderPage({
       {me && (
         <Section title="Your Rank">
           <div className="text-sm">
-            Rank <b>#{me.rank}</b> · Score <b>{num(me.score, 1)}</b> · MMR{" "}
-            <b>{me.mmr}</b>
+            Rank <b>#{me.rank}</b> · Score <b>{num(me.score, 1)}</b> · Activity{" "}
+            <b>+{num((me as any).bonus, 1)}</b> · MMR <b>{me.mmr}</b>
           </div>
         </Section>
       )}
@@ -99,6 +97,7 @@ export default async function LadderPage({
                 <th className="text-left w-12">#</th>
                 <th className="text-left w-44">Player</th>
                 <th className="text-right w-20">Score</th>
+                <th className="text-right w-14">Act</th> {/* NEW */}
                 <th className="text-right w-20">MMR</th>
                 <th className="text-right w-20">SoS</th>
                 <th className="text-right w-16">W-L</th>
@@ -107,7 +106,7 @@ export default async function LadderPage({
             </thead>
 
             <tbody>
-              {rows.map((p) => {
+              {rows.map((p: any) => {
                 const isHighlight =
                   highlightLower &&
                   p.battletag.toLowerCase().includes(highlightLower);
@@ -129,6 +128,11 @@ export default async function LadderPage({
 
                     <td className="py-1.5 text-right font-semibold">
                       {num(p.score, 1)}
+                    </td>
+
+                    {/* Activity bonus column */}
+                    <td className="py-1.5 text-right text-xs text-gray-500">
+                      +{num(p.bonus, 1)}
                     </td>
 
                     <td className="py-1.5 text-right font-semibold">
@@ -153,6 +157,7 @@ export default async function LadderPage({
           </table>
         </div>
 
+        {/* pagination */}
         <div className="flex items-center justify-center gap-2 pt-4 text-sm">
           {currentPage > 1 && (
             <Link
@@ -181,6 +186,15 @@ export default async function LadderPage({
                 {p}
               </Link>
             ))}
+
+          {currentPage < totalPages && (
+            <Link
+              href={`${base}?page=${currentPage + 1}`}
+              className="px-3 py-1 border rounded"
+            >
+              Next
+            </Link>
+          )}
         </div>
       </Section>
     </div>

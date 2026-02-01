@@ -10,7 +10,14 @@ import { fetchAllMatches, getPlayerAndOpponent } from "@/lib/w3cUtils";
 const SESSION_GAP_MS = 30 * 60 * 1000;
 const MIN_DURATION_SECONDS = 120;
 const SEASON = 24;
+/* ---------- match cache ---------- */
 
+const MATCH_TTL = 5 * 60 * 1000;
+
+const matchCache = new Map<
+  string,
+  { ts: number; matches: any[] }
+>();
 /* =========================
    HELPERS
 ========================= */
@@ -35,8 +42,21 @@ export async function getPlayerConsistency(input: string) {
 
   /* ---------- fetch ---------- */
 
-  const allMatches = await fetchAllMatches(battletag, [SEASON]);
-  if (!allMatches.length) return null;
+  const key = battletag.toLowerCase();
+const now = Date.now();
+
+let allMatches: any[];
+
+const cached = matchCache.get(key);
+
+if (cached && now - cached.ts < MATCH_TTL) {
+  allMatches = cached.matches;
+} else {
+  allMatches = await fetchAllMatches(battletag, [SEASON]);
+  matchCache.set(key, { ts: now, matches: allMatches });
+}
+
+if (!allMatches.length) return null;
 
   /* ---------- pre-filter FIRST (faster) ---------- */
 

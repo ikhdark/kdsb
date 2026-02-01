@@ -16,6 +16,15 @@ const DURATION_BUCKETS = [
   { label: "30+ min", min: 1801, max: Infinity },
 ];
 
+/* -------------------- MATCH CACHE -------------------- */
+
+const MATCH_TTL = 5 * 60 * 1000;
+
+const matchCache = new Map<
+  string,
+  { ts: number; matches: any[] }
+>();
+
 /* -------------------- HELPERS -------------------- */
 
 function resolveMapName(match: any): string {
@@ -36,11 +45,30 @@ function resolveMapName(match: any): string {
 export async function getW3CMapStats(inputTag: string) {
   if (!inputTag) return null;
 
+  /* ---------- resolve FIRST ---------- */
   const canonical =
     (await resolveBattleTagViaSearch(inputTag)) || inputTag;
 
-  const matches = await fetchAllMatches(canonical, SEASONS);
+  /* ---------- cache + fetch ---------- */
+  const key = canonical.toLowerCase();
+  const now = Date.now();
+
+  let matches: any[];
+
+  const cached = matchCache.get(key);
+
+  if (cached && now - cached.ts < MATCH_TTL) {
+    matches = cached.matches;
+  } else {
+    matches = await fetchAllMatches(canonical, SEASONS);
+    matchCache.set(key, { ts: now, matches });
+  }
+
   if (!matches.length) return null;
+
+  /* ---------- compute ---------- */
+
+  const lower = canonical.toLowerCase();
 
   const durationStats = DURATION_BUCKETS.map(b => ({
     label: b.label,
@@ -74,7 +102,7 @@ export async function getW3CMapStats(inputTag: string) {
   for (const m of matches) {
     if (m?.gameMode !== 1) continue;
 
-    const pair = getPlayerAndOpponent(m, canonical.toLowerCase());
+    const pair = getPlayerAndOpponent(m, lower);
     if (!pair) continue;
 
     const { me, opp } = pair;
@@ -101,6 +129,7 @@ export async function getW3CMapStats(inputTag: string) {
     }
 
     const agg = mapAgg[map];
+
     agg.games++;
     agg.totalSecs += dur;
     agg.netMMR += me.mmrGain;
@@ -130,7 +159,7 @@ export async function getW3CMapStats(inputTag: string) {
           oppTag: opp.battleTag,
           oppMMR: opp.oldMmr,
           mmrChange: me.mmrGain,
-          secs: dur
+          secs: dur,
         };
       }
     } else {
@@ -140,6 +169,7 @@ export async function getW3CMapStats(inputTag: string) {
     }
 
     const heroes = Array.isArray(me.heroes) ? me.heroes : [];
+
     if (heroes.length >= 1 && heroes.length <= 3) {
       agg.heroCounts[heroes.length as 1 | 2 | 3]++;
     }
@@ -177,61 +207,14 @@ export async function getW3CMapStats(inputTag: string) {
 
   const byWinrate = [...validMaps].sort((a, b) => b.winrate - a.winrate);
 
-  const pos = validMaps.filter(m => m.winrate >= 50);
-  const neg = validMaps.filter(m => m.winrate < 50);
-
   return {
     battletag: canonical,
     seasons: SEASONS,
-
-    winrateByDuration: durationStats.map(b => ({
-      label: b.label,
-      wins: b.wins,
-      losses: b.losses,
-      winrate:
-        b.wins + b.losses
-          ? +((b.wins / (b.wins + b.losses)) * 100).toFixed(1)
-          : 0,
-    })),
-
+    winrateByDuration: durationStats,
     avgWinMinutes: winGames ? +(winTime / winGames / 60).toFixed(1) : null,
     avgLossMinutes: lossGames ? +(lossTime / lossGames / 60).toFixed(1) : null,
-
     longestWin,
-
     topMaps: byWinrate.slice(0, 5),
     worstMaps: [...byWinrate].reverse().slice(0, 5),
-
-    heroLevels: {
-      highestAvgHeroLevel:
-        validMaps.filter(m => m.heroAvgLevel != null).sort(
-          (a, b) => b.heroAvgLevel! - a.heroAvgLevel!
-        )[0] || null,
-      lowestAvgHeroLevel:
-        validMaps.filter(m => m.heroAvgLevel != null).sort(
-          (a, b) => a.heroAvgLevel! - b.heroAvgLevel!
-        )[0] || null,
-    },
-
-    mapsWithHighestHeroCount: {
-      oneHeroMap: validMaps.sort((a, b) => b.heroCounts[1] - a.heroCounts[1])[0]?.map || null,
-      twoHeroMap: validMaps.sort((a, b) => b.heroCounts[2] - a.heroCounts[2])[0]?.map || null,
-      threeHeroMap: validMaps.sort((a, b) => b.heroCounts[3] - a.heroCounts[3])[0]?.map || null,
-    },
-
-    shortestLongestByWL: {
-      shortestPositive: pos.sort((a, b) => a.avgMinutes - b.avgMinutes)[0] || null,
-      longestPositive: pos.sort((a, b) => b.avgMinutes - a.avgMinutes)[0] || null,
-      shortestNegative: neg.sort((a, b) => a.avgMinutes - b.avgMinutes)[0] || null,
-      longestNegative: neg.sort((a, b) => b.avgMinutes - a.avgMinutes)[0] || null,
-    },
-
-    mmrContext: {
-      mostPlayed: validMaps.sort((a, b) => b.games - a.games)[0] || null,
-      bestNet: validMaps.sort((a, b) => b.netMMR - a.netMMR)[0] || null,
-      worstNet: validMaps.sort((a, b) => a.netMMR - b.netMMR)[0] || null,
-      mostVsHigher: validMaps.sort((a, b) => b.vsHigher - a.vsHigher)[0] || null,
-      mostVsLower: validMaps.sort((a, b) => b.vsLower - a.vsLower)[0] || null,
-    },
   };
 }

@@ -1,7 +1,8 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
+import { pageview } from "@/lib/gtag"; // ← add this
 
 const STAT_MAP = {
   summary: "Summary",
@@ -24,8 +25,7 @@ function trackStatType(pathname: string) {
   if (!pathname.startsWith("/stats/player/")) return;
 
   const parts = pathname.split("/");
-  const statSegment = parts[4]; // /stats/player/<battletag>/<stat>
-  if (!statSegment) return;
+  const statSegment = parts[4];
 
   const statType = STAT_MAP[statSegment as keyof typeof STAT_MAP];
   if (!statType) return;
@@ -35,10 +35,18 @@ function trackStatType(pathname: string) {
 
 export default function Analytics() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
+    const url =
+      pathname + (searchParams?.toString() ? `?${searchParams}` : "");
+
+    // ✅ REQUIRED for GA page tracking
+    pageview(url);
+
+    // ✅ your custom stat event
     trackStatType(pathname);
-  }, [pathname]);
+  }, [pathname, searchParams]);
 
   return null;
 }

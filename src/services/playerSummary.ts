@@ -109,7 +109,8 @@ export async function getPlayerSummary(inputTag: string) {
     }
 
     lastPlayedRace[race] = date;
-    lastPlayedLadder = date;
+    if (!lastPlayedLadder || date > lastPlayedLadder)
+  lastPlayedLadder = date;
 
     if (
       !highestCurrentRace ||

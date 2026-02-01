@@ -217,8 +217,6 @@ if (!homeCountry) {
 if (!homeCountry) homeCountry = UNKNOWN_COUNTRY;
 
   const countryStats = new Map<string, CountryAgg>();
-  const opponentCountryCache = new Map<string, string | null>();
-  const opponentCanonicalCache = new Map<string, string | null>();
   let totalTimeSec = 0;
 
   for (const m of matches) {
@@ -235,8 +233,6 @@ if (!homeCountry) homeCountry = UNKNOWN_COUNTRY;
 const oppCC =
   iso2(opp?.countryCode) ||
   iso2(opp?.location);
-
-if (!oppCC) continue;
 
 if (!oppCC) continue;
 

@@ -78,23 +78,23 @@ export async function getPlayerPerformance(
   inputBattleTag: string
 ): Promise<PlayerPerformanceStats | null> {
 
-  const key = inputBattleTag.toLowerCase();
+  /* resolve FIRST */
+  const battletag = await resolveBattleTagViaSearch(inputBattleTag);
+  if (!battletag) return null;
+
+  const key = battletag.toLowerCase();
   const now = Date.now();
 
-  /* ---------- cache hit ---------- */
-
+  /* cache hit */
   const cached = cache.get(key);
   if (cached && now - cached.ts < CACHE_TTL) {
     return cached.data;
   }
 
-  /* ---------- fetch ---------- */
-
-  const battletag = await resolveBattleTagViaSearch(inputBattleTag);
-  if (!battletag) return null;
-
+  /* fetch matches AFTER cache miss */
   const matches = await fetchAllMatches(battletag, SEASONS);
   if (!matches?.length) return null;
+
 
   /* ---------- compute ---------- */
 

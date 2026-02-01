@@ -177,11 +177,10 @@ export async function getPlayerVsPlayer(
       new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
   );
 
-  const raceGameCount: Record<string, number> = {};
   const strictGamesAll: Game[] = [];
 
   for (const match of allMatches) {
-    // Explicitly filter to S23 only (existing behavior)
+    // Explicitly filter to S24 only (existing behavior)
     if (match.gameMode !== 1 || !SEASONS.includes(match.season)) continue;
 
     const pair = getPlayerAndOpponent(match, targetLower);

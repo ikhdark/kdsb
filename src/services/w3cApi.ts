@@ -64,7 +64,7 @@ export async function fetchPlayerProfile(battletag: string): Promise<PlayerProfi
       // Some payloads use battleTag, others battleTag; also id is often battletag
       const canonical =
         pickString(json?.battleTag) ||
-        pickString(json?.battleTag) ||
+        pickString(json?.battletag) ||
         pickString(json?.id) ||
         battletag;
 

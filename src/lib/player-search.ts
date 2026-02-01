@@ -1,10 +1,18 @@
 // src/lib/player-search.ts
 export async function validateBattleTag(input: string) {
-  if (!input.trim()) return null;
+  const trimmed = input.trim();
+  if (!trimmed) return null;
 
-  const res = await fetch(`/api/resolve-battletag?q=${encodeURIComponent(input)}`);
-  const data = await res.json();
+  try {
+    const res = await fetch(
+      `/api/resolve-battletag?q=${encodeURIComponent(trimmed)}`
+    );
 
-  if (!data?.ok) return null;
-  return data.battleTag;
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    return data?.ok ? data.battleTag : null;
+  } catch {
+    return null;
+  }
 }

@@ -22,6 +22,11 @@ const MAX_LEAGUE = 20;
 const SOS_CONCURRENCY = 25;
 
 /* =========================
+   MATCH CACHE (ADD HERE)
+========================= */
+
+const matchCache = new Map<string, any[]>();
+/* =========================
    TYPES
 ========================= */
 
@@ -88,7 +93,14 @@ async function computeSoS(rows: LadderRow[], raceId: number) {
 
     await Promise.all(
       chunk.map(async (row) => {
-        const matches = await fetchAllMatches(row.battletag, [SEASON]);
+        const key = row.battletag.toLowerCase();
+
+let matches = matchCache.get(key);
+
+if (!matches) {
+  matches = await fetchAllMatches(row.battletag, [SEASON]);
+  matchCache.set(key, matches);
+}
 
         let sum = 0;
         let n = 0;

@@ -1,6 +1,6 @@
 // src/lib/ladderEngine.ts
 // PURE RANKING ENGINE
-// deterministic, readable scores, activity decay
+// deterministic, readable scores, activity decay + activity bonus
 
 export type LadderInputRow = {
   battletag: string;
@@ -48,10 +48,18 @@ const W_SOS = 0.40;
 const W_WR  = 0.05;
 
 /*
-Activity decay (UX tuned)
+Activity decay (punish inactivity)
 */
 const DECAY_MIN = 0.75;     // worst = 75%
 const DECAY_TARGET = 100;   // games for full strength
+
+/*
+Activity bonus (reward play volume)
+Additive points to score (NOT multiplier)
+Small so it can't be abused
+*/
+const ACTIVITY_BONUS_MAX = 40;   // max ladder points added
+const ACTIVITY_TARGET = 100;     // games to hit max bonus
 
 /* =========================
    HELPERS
@@ -71,12 +79,22 @@ function winrate(wins: number, games: number) {
 
 /*
 Linear decay
-0 games → 0.7
-30+ games → 1.0
+0 recent → 0.75
+100+ → 1.0
 */
 function activityMultiplier(recentGames = 0) {
   const t = Math.min(recentGames / DECAY_TARGET, 1);
   return DECAY_MIN + (1 - DECAY_MIN) * t;
+}
+
+/*
+Reward activity (sqrt = diminishing returns)
+0 → 0
+100 → +40
+*/
+function activityBonus(totalGames: number) {
+  const t = Math.min(totalGames / ACTIVITY_TARGET, 1);
+  return Math.sqrt(t) * ACTIVITY_BONUS_MAX;
 }
 
 /* =========================
@@ -91,7 +109,8 @@ function computeScore(
   mmr: number,
   sos: number | null,
   wr: number,
-  recentGames: number
+  recentGames: number,
+  totalGames: number
 ): number {
   const sosVal = sos ?? mmr;
 
@@ -103,8 +122,11 @@ function computeScore(
   // shrink for readability
   const scaled = raw / 10;
 
-  // apply decay
-  const finalScore = scaled * activityMultiplier(recentGames);
+  // inactivity penalty
+  const decayed = scaled * activityMultiplier(recentGames);
+
+  // activity reward
+  const finalScore = decayed + activityBonus(totalGames);
 
   return Math.round(finalScore * 10) / 10;
 }
@@ -135,7 +157,13 @@ export function buildLadder(
       mmr: r.mmr,
       sos: r.sos,
 
-      score: computeScore(r.mmr, r.sos, wr, recent),
+      score: computeScore(
+        r.mmr,
+        r.sos,
+        wr,
+        recent,
+        r.games   // ← NEW
+      ),
 
       wins: r.wins,
       losses,
@@ -163,5 +191,3 @@ export function buildLadder(
 
   return ladder;
 }
-
-
