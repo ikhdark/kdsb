@@ -31,25 +31,31 @@ function resolveMapName(match: any): string {
   if (typeof match?.mapName === "string" && match.mapName.trim()) {
     return match.mapName.trim();
   }
+
   if (typeof match?.map === "string") {
     return match.map
       .replace(/^.*?(?=[A-Z])/, "")
       .replace(/v\d+_.*/, "")
       .trim();
   }
+
   return "Unknown";
 }
 
-/* -------------------- SERVICE -------------------- */
+/* ===================================================
+   SERVICE
+=================================================== */
 
 export async function getW3CMapStats(inputTag: string) {
   if (!inputTag) return null;
 
   /* ---------- resolve FIRST ---------- */
+
   const canonical =
     (await resolveBattleTagViaSearch(inputTag)) || inputTag;
 
   /* ---------- cache + fetch ---------- */
+
   const key = canonical.toLowerCase();
   const now = Date.now();
 
@@ -66,11 +72,13 @@ export async function getW3CMapStats(inputTag: string) {
 
   if (!matches.length) return null;
 
-  /* ---------- compute ---------- */
+  /* ===================================================
+     COMPUTE
+  =================================================== */
 
   const lower = canonical.toLowerCase();
 
-  const durationStats = DURATION_BUCKETS.map(b => ({
+  const durationStats = DURATION_BUCKETS.map((b) => ({
     label: b.label,
     wins: 0,
     losses: 0,
@@ -106,6 +114,7 @@ export async function getW3CMapStats(inputTag: string) {
     if (!pair) continue;
 
     const { me, opp } = pair;
+
     const dur = Number(m?.durationInSeconds);
 
     if (!Number.isFinite(dur) || dur < MIN_DURATION_SECONDS) continue;
@@ -137,6 +146,8 @@ export async function getW3CMapStats(inputTag: string) {
     if (me.oldMmr < opp.oldMmr) agg.vsHigher++;
     if (me.oldMmr > opp.oldMmr) agg.vsLower++;
 
+    /* ---------- duration buckets ---------- */
+
     for (let i = 0; i < DURATION_BUCKETS.length; i++) {
       const b = DURATION_BUCKETS[i];
       if (dur >= b.min && dur <= b.max) {
@@ -144,6 +155,8 @@ export async function getW3CMapStats(inputTag: string) {
         break;
       }
     }
+
+    /* ---------- win/loss ---------- */
 
     if (me.won) {
       agg.wins++;
@@ -154,8 +167,6 @@ export async function getW3CMapStats(inputTag: string) {
         longestWin = {
           map,
           minutes: +(dur / 60).toFixed(1),
-          myTag: me.battleTag,
-          myMMR: me.oldMmr,
           oppTag: opp.battleTag,
           oppMMR: opp.oldMmr,
           mmrChange: me.mmrGain,
@@ -167,6 +178,8 @@ export async function getW3CMapStats(inputTag: string) {
       lossTime += dur;
       lossGames++;
     }
+
+    /* ---------- hero tracking ---------- */
 
     const heroes = Array.isArray(me.heroes) ? me.heroes : [];
 
@@ -186,6 +199,10 @@ export async function getW3CMapStats(inputTag: string) {
     }
   }
 
+  /* ===================================================
+     FLATTEN MAP DATA
+  =================================================== */
+
   const validMaps = Object.entries(mapAgg)
     .filter(([, m]) => m.games >= MIN_MAP_GAMES)
     .map(([map, m]) => ({
@@ -193,7 +210,7 @@ export async function getW3CMapStats(inputTag: string) {
       games: m.games,
       wins: m.wins,
       losses: m.losses,
-      winrate: +(m.wins / m.games * 100).toFixed(1),
+      winrate: +( (m.wins / m.games) * 100 ).toFixed(1),
       avgMinutes: +(m.totalSecs / m.games / 60).toFixed(1),
       netMMR: m.netMMR,
       vsHigher: m.vsHigher,
@@ -207,14 +224,88 @@ export async function getW3CMapStats(inputTag: string) {
 
   const byWinrate = [...validMaps].sort((a, b) => b.winrate - a.winrate);
 
+  /* ===================================================
+     HERO + MMR CONTEXT (what your page expects)
+  =================================================== */
+
+  let highestAvgHeroLevel: any = null;
+  let lowestAvgHeroLevel: any = null;
+
+  let oneHeroMap: string | null = null;
+  let twoHeroMap: string | null = null;
+  let threeHeroMap: string | null = null;
+
+  let mostPlayed: any = null;
+  let bestNet: any = null;
+  let worstNet: any = null;
+  let mostVsHigher: any = null;
+  let mostVsLower: any = null;
+
+  for (const m of validMaps) {
+    if (m.heroAvgLevel != null) {
+      if (!highestAvgHeroLevel || m.heroAvgLevel > highestAvgHeroLevel.heroAvgLevel)
+        highestAvgHeroLevel = m;
+
+      if (!lowestAvgHeroLevel || m.heroAvgLevel < lowestAvgHeroLevel.heroAvgLevel)
+        lowestAvgHeroLevel = m;
+    }
+
+    if (!oneHeroMap || m.heroCounts[1] > mapAgg[oneHeroMap]?.heroCounts[1])
+      oneHeroMap = m.map;
+
+    if (!twoHeroMap || m.heroCounts[2] > mapAgg[twoHeroMap]?.heroCounts[2])
+      twoHeroMap = m.map;
+
+    if (!threeHeroMap || m.heroCounts[3] > mapAgg[threeHeroMap]?.heroCounts[3])
+      threeHeroMap = m.map;
+
+    if (!mostPlayed || m.games > mostPlayed.games) mostPlayed = m;
+    if (!bestNet || m.netMMR > bestNet.netMMR) bestNet = m;
+    if (!worstNet || m.netMMR < worstNet.netMMR) worstNet = m;
+    if (!mostVsHigher || m.vsHigher > mostVsHigher.vsHigher) mostVsHigher = m;
+    if (!mostVsLower || m.vsLower > mostVsLower.vsLower) mostVsLower = m;
+  }
+
+  /* ===================================================
+     RETURN
+  =================================================== */
+
   return {
     battletag: canonical,
     seasons: SEASONS,
-    winrateByDuration: durationStats,
+
+    winrateByDuration: durationStats.map((b) => ({
+      ...b,
+      winrate:
+        b.wins + b.losses > 0
+          ? +((b.wins / (b.wins + b.losses)) * 100).toFixed(1)
+          : 0,
+    })),
+
     avgWinMinutes: winGames ? +(winTime / winGames / 60).toFixed(1) : null,
     avgLossMinutes: lossGames ? +(lossTime / lossGames / 60).toFixed(1) : null,
     longestWin,
+
     topMaps: byWinrate.slice(0, 5),
     worstMaps: [...byWinrate].reverse().slice(0, 5),
+
+    heroLevels: {
+      highestAvgHeroLevel,
+      lowestAvgHeroLevel,
+    },
+
+    mapsWithHighestHeroCount: {
+      oneHeroMap,
+      twoHeroMap,
+      threeHeroMap,
+    },
+
+    mmrContext: {
+      mostPlayed,
+      bestNet,
+      worstNet,
+      mostVsHigher,
+      mostVsLower,
+    },
   };
 }

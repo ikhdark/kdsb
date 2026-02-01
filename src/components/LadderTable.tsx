@@ -11,10 +11,6 @@ type Props = {
   highlight?: string;
 };
 
-function pct(n: number) {
-  return `${(n * 100).toFixed(1)}%`;
-}
-
 function num(n: number | null | undefined, d = 0) {
   if (n == null) return "—";
   return n.toFixed(d);
@@ -41,8 +37,6 @@ export default function LadderTable({
             <col className="w-20" />
             <col className="w-20" />
             <col className="w-24" />
-            <col className="w-20" />
-            <col className="w-24" />
           </colgroup>
 
           <thead className="text-xs uppercase text-gray-500 whitespace-nowrap">
@@ -53,8 +47,6 @@ export default function LadderTable({
               <th className="text-right">MMR</th>
               <th className="text-right">SoS</th>
               <th className="text-right">W-L</th>
-              <th className="text-right">WR</th>
-              <th className="text-right">Decay</th>
             </tr>
           </thead>
 
@@ -63,8 +55,6 @@ export default function LadderTable({
               const isHighlight =
                 highlightLower &&
                 p.battletag.toLowerCase().includes(highlightLower);
-
-              const penalty = p.decay ?? 0;
 
               return (
                 <tr
@@ -95,18 +85,6 @@ export default function LadderTable({
 
                   <td className="py-1.5 text-right">
                     {p.wins}-{p.losses}
-                  </td>
-
-                  <td className="py-1.5 text-right">
-                    {pct(p.winrate)}
-                  </td>
-
-                  <td className="py-1.5 text-right font-semibold">
-                    {penalty > 0 ? (
-                      <span className="text-red-500">-{penalty}</span>
-                    ) : (
-                      "-"
-                    )}
                   </td>
                 </tr>
               );
