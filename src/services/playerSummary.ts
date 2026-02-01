@@ -171,12 +171,20 @@ export async function getPlayerSummary(inputTag: string) {
       };
     }
 
-    const gap = Math.abs(me.oldMmr - opp.oldMmr);
-    if (me.won && me.oldMmr < opp.oldMmr) {
-      if (!largestGapWin || gap > largestGapWin.gap) {
-        largestGapWin = { gap };
-      }
-    }
+const gap = Math.abs(me.oldMmr - opp.oldMmr);
+
+if (me.won && me.oldMmr < opp.oldMmr) {
+  if (!largestGapWin || gap > largestGapWin.gap) {
+    largestGapWin = {
+      gap,
+      myRace: race,
+      myMMR: me.oldMmr,
+      oppName: opp.battleTag,
+      oppRace: resolveEffectiveRace(opp),
+      oppMMR: opp.oldMmr,
+    };
+  }
+}
   }
 
   /* ---------- results ---------- */

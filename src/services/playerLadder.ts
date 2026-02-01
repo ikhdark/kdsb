@@ -19,7 +19,7 @@ const GATEWAY = 20;
 const MIN_GAMES = 5;
 
 const MIN_LEAGUE = 1;
-const MAX_LEAGUE = 50;
+const MAX_LEAGUE = 30;
 
 const SOS_CONCURRENCY = 25;
 const MATCH_TTL = 5 * 60 * 1000;

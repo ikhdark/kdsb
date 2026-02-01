@@ -38,6 +38,14 @@ export default async function RankPage({ params }: PageProps) {
 
   const showEmpty = !serviceError && (!data || ranks.length === 0);
 
+  const getRankColor = (rank?: number) => {
+    if (!rank) return "";
+    if (rank <= 10) return "text-green-600 dark:text-green-400";
+    if (rank <= 25) return "text-yellow-600 dark:text-yellow-400";
+    if (rank <= 50) return "text-blue-600 dark:text-blue-400";
+    return "";
+  };
+
   /* ================= render ================= */
 
   return (
@@ -46,7 +54,7 @@ export default async function RankPage({ params }: PageProps) {
       {/* HEADER */}
       <PlayerHeader
         battletag={titleTag}
-        subtitle={`Rank Stats · Season 24 (Min 5 Games Played per Race)`}
+        subtitle={`Rank Stats · Season 24 | Players with under 30 total lifetime games per race, will be excluded to keep ladder clean of smurf accounts.`}
       />
 
       {/* ERROR */}
@@ -75,78 +83,88 @@ export default async function RankPage({ params }: PageProps) {
         <StatCard label="Races Ranked" value={ranks.length.toString()} />
       </section>
 
-      {/* RANK TABLE */}
+      {/* ================= RANK TABLE ================= */}
       {ranks.length > 0 && (
         <Section title="Race Rankings sorted by MMR">
-          <div className="rounded-xl border bg-white shadow-sm dark:bg-gray-dark">
 
-            <div className="w-full overflow-x-auto">
-              <table className="min-w-[620px] w-full text-sm table-fixed">
+          {/* ================= DESKTOP TABLE ================= */}
+          <div className="hidden sm:block rounded-xl border bg-white shadow-sm dark:bg-gray-dark">
+            <table className="w-full text-sm table-fixed">
 
-                <thead className="bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs uppercase tracking-wider">
-                  <tr>
+              <thead className="bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs uppercase tracking-wider">
+                <tr>
                   <th className="px-5 py-3 text-left w-28">Race</th>
-<th className="px-5 py-3 text-right w-28">Global</th>
-<th className="px-5 py-3 text-right w-28">Country</th>
-<th className="px-5 py-3 text-right w-20">MMR</th>
-<th className="px-5 py-3 text-right w-20">Games</th>
+                  <th className="px-5 py-3 text-right w-28">Global</th>
+                  <th className="px-5 py-3 text-right w-28">Country</th>
+                  <th className="px-5 py-3 text-right w-20">MMR</th>
+                  <th className="px-5 py-3 text-right w-20">Games</th>
+                </tr>
+              </thead>
 
+              <tbody>
+                {ranks.map((r, i) => (
+                  <tr
+                    key={r.raceId}
+                    className={`border-t ${
+                      i % 2 === 0
+                        ? "bg-white dark:bg-gray-dark"
+                        : "bg-gray-50/50 dark:bg-gray-800/40"
+                    }`}
+                  >
+                    <td className="px-5 py-3 font-medium">{r.race}</td>
+
+                    <td className={`px-5 py-3 text-right font-semibold ${getRankColor(r.globalRank)}`}>
+                      #{r.globalRank}/{r.globalTotal}
+                    </td>
+
+                    <td className={`px-5 py-3 text-right font-semibold ${getRankColor(r.countryRank ?? undefined)}`}>
+                      {r.countryRank && r.countryTotal
+                        ? `#${r.countryRank}/${r.countryTotal}`
+                        : "—"}
+                    </td>
+
+                    <td className="px-5 py-3 text-right font-semibold">{r.mmr}</td>
+                    <td className="px-5 py-3 text-right text-gray-500">{r.games}</td>
                   </tr>
-                </thead>
-
-                <tbody>
-                  {ranks.map((r, i) => {
-                    const getRankColor = (rank?: number) => {
-                      if (!rank) return "";
-
-                      if (rank <= 10) return "text-green-600 dark:text-green-400";
-                      if (rank <= 25) return "text-yellow-600 dark:text-yellow-400";
-                      if (rank <= 50) return "text-blue-600 dark:text-blue-400";
-                      return "";
-                    };
-
-                    return (
-                      <tr
-                        key={r.raceId}
-                        className={`border-t ${
-                          i % 2 === 0
-                            ? "bg-white dark:bg-gray-dark"
-                            : "bg-gray-50/50 dark:bg-gray-800/40"
-                        }`}
-                      >
-                        <td className="px-5 py-3 font-medium">{r.race}</td>
-
-                        {/* Global */}
-                        <td className={`px-5 py-3 text-right tabular-nums font-semibold ${getRankColor(r.globalRank)}`}>
-
-                          #{r.globalRank}/{r.globalTotal}
-                        </td>
-
-                        {/* Country */}
-                        <td className={`px-5 py-3 text-right tabular-nums font-semibold ${getRankColor(r.countryRank ?? undefined)}`}>
-
-
-                          {r.countryRank && r.countryTotal
-                            ? `#${r.countryRank}/${r.countryTotal}`
-                            : "—"}
-                        </td>
-
-                        <td className="px-5 py-3 text-right font-semibold tabular-nums">
-                          {r.mmr}
-                        </td>
-
-                        <td className="px-5 py-3 text-right text-gray-500 tabular-nums">
-                          {r.games}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-
-              </table>
-            </div>
-
+                ))}
+              </tbody>
+            </table>
           </div>
+
+          {/* ================= MOBILE STACK ================= */}
+          <div className="sm:hidden space-y-3">
+            {ranks.map((r) => (
+              <div
+                key={r.raceId}
+                className="rounded-lg border bg-white dark:bg-gray-dark p-4 space-y-2"
+              >
+                <div className="font-semibold text-base">{r.race}</div>
+
+                <div className="grid grid-cols-2 gap-y-1 text-sm">
+
+                  <span className="text-gray-500">Global</span>
+                  <span className={`text-right font-semibold ${getRankColor(r.globalRank)}`}>
+                    #{r.globalRank}/{r.globalTotal}
+                  </span>
+
+                  <span className="text-gray-500">Country</span>
+                  <span className={`text-right font-semibold ${getRankColor(r.countryRank ?? undefined)}`}>
+                    {r.countryRank && r.countryTotal
+                      ? `#${r.countryRank}/${r.countryTotal}`
+                      : "—"}
+                  </span>
+
+                  <span className="text-gray-500">MMR</span>
+                  <span className="text-right font-semibold">{r.mmr}</span>
+
+                  <span className="text-gray-500">Games</span>
+                  <span className="text-right">{r.games}</span>
+
+                </div>
+              </div>
+            ))}
+          </div>
+
         </Section>
       )}
     </div>

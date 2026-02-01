@@ -18,19 +18,9 @@ const GATEWAY = 20;
 
 const MIN_GAMES = 5;
 const MIN_LEAGUE = 1;
-const MAX_LEAGUE = 50;
+const MAX_LEAGUE = 30;
 
 const SOS_CONCURRENCY = 25;
-const MATCH_TTL = 5 * 60 * 1000;
-
-/* =========================
-   MATCH CACHE
-========================= */
-
-const matchCache = new Map<
-  string,
-  { ts: number; matches: any[] }
->();
 
 /* =========================
    TYPES
@@ -90,23 +80,19 @@ async function fetchAllLeagues(): Promise<any[]> {
 ========================= */
 
 async function computeSoS(rows: LadderRow[], raceId: number) {
+  // request-scoped cache (safe + faster)
+  const matchCache = new Map<string, any[]>();
+
   for (let i = 0; i < rows.length; i += SOS_CONCURRENCY) {
     const chunk = rows.slice(i, i + SOS_CONCURRENCY);
 
     await Promise.all(
       chunk.map(async (row) => {
-        const key = row.battletag.toLowerCase();
-        const now = Date.now();
+        let matches = matchCache.get(row.battletag);
 
-        let matches: any[];
-
-        const cached = matchCache.get(key);
-
-        if (cached && now - cached.ts < MATCH_TTL) {
-          matches = cached.matches;
-        } else {
+        if (!matches) {
           matches = await fetchAllMatches(row.battletag, [SEASON]);
-          matchCache.set(key, { ts: now, matches });
+          matchCache.set(row.battletag, matches);
         }
 
         let sum = 0;
@@ -120,9 +106,14 @@ async function computeSoS(rows: LadderRow[], raceId: number) {
           if (!pair) continue;
 
           if (raceId !== 0 && pair.me.race !== raceId) continue;
-          if (typeof pair.opp.oldMmr !== "number") continue;
 
-          sum += pair.opp.oldMmr;
+          const oppMmr =
+            pair.opp.oldMmr ??
+            pair.opp.newMmr ??
+            pair.opp.mmr ??
+            0;
+
+          sum += oppMmr;
           n++;
         }
 
@@ -170,7 +161,7 @@ export async function getPlayerRaceLadder(
 
   const ladder = buildLadder(inputs);
 
-  /* lifetime eligibility check only for rows we might show */
+  /* lifetime eligibility */
 
   const start = (page - 1) * pageSize;
   const end = start + pageSize;
@@ -189,7 +180,6 @@ export async function getPlayerRaceLadder(
   );
 
   const eligibility = new Map<string, boolean>();
-
   [...unique.values()].forEach((r, i) =>
     eligibility.set(r.battletag, checks[i])
   );
@@ -207,14 +197,15 @@ export async function getPlayerRaceLadder(
         r.battletag.toLowerCase() === battletag.toLowerCase()
     ) ?? null;
 
-  /* compute SoS only for rows we actually show */
+  /* compute SoS only for rows actually rendered */
 
-  const sosNeeded = new Map<string, LadderRow>();
+  const sosRows = new Map<string, LadderRow>();
 
-  for (const r of visible) sosNeeded.set(r.battletag, r);
-  if (me) sosNeeded.set(me.battletag, me);
+  for (const r of visible) sosRows.set(r.battletag, r);
+  for (const r of top) sosRows.set(r.battletag, r);
+  if (me) sosRows.set(me.battletag, me);
 
-  await computeSoS([...sosNeeded.values()], raceId);
+  await computeSoS([...sosRows.values()], raceId);
 
   return {
     battletag,
