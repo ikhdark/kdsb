@@ -45,7 +45,7 @@ export default function Sidebar() {
     }
 
     /* CONTEXT DISABLE */
-    if (!battletag && !isSearch) {
+   if (!battletag && !isSearch && !item.global) {
       return (
         <div
           key={item.title}
@@ -57,9 +57,11 @@ export default function Sidebar() {
       );
     }
 
-    const href = isSearch
-      ? "/"
-      : `/stats/player/${battletag}/${item.path}`;
+ const href = isSearch
+  ? "/"
+  : item.global
+    ? `/stats/${item.path}`
+    : `/stats/player/${battletag}/${item.path}`;
 
     const isActive = pathname.startsWith(href);
 

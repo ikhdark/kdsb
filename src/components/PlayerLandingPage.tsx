@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import WhatsNew from "@/components/WhatsNew";
+import { useBattleTagAutocomplete } from "@/hooks/useBattleTagAutocomplete";
 
 const RECENT_KEY = "w3c_recent_searches";
 
@@ -39,10 +40,13 @@ export default function PlayerLandingPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // ✅ reactive recent list
   const [recent, setRecent] = useState<string[]>([]);
 
-  // ✅ load once on mount
+  /* ✅ shared autocomplete hook */
+  const { results, clear } = useBattleTagAutocomplete(query);
+
+  /* ================= INIT ================= */
+
   useEffect(() => {
     setRecent(readRecent());
   }, []);
@@ -75,7 +79,7 @@ export default function PlayerLandingPage() {
       if (!data?.battleTag) throw new Error();
 
       writeRecent(data.battleTag);
-      setRecent(readRecent()); // ✅ update immediately
+      setRecent(readRecent());
 
       router.replace(
         `/stats/player/${encodeURIComponent(data.battleTag)}/summary`
@@ -88,7 +92,7 @@ export default function PlayerLandingPage() {
 
   function quickGo(tag: string) {
     writeRecent(tag);
-    setRecent(readRecent()); // ✅ update immediately
+    setRecent(readRecent());
 
     router.replace(`/stats/player/${encodeURIComponent(tag)}/summary`);
   }
@@ -125,18 +129,38 @@ export default function PlayerLandingPage() {
 
         <div className="space-y-6 rounded-2xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-md p-6">
 
-          {/* SEARCH */}
           <form onSubmit={onSubmit} className="space-y-4">
-            <input
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setError(null);
-              }}
-              disabled={loading}
-              placeholder="Search any BattleTag (e.g. Moon#1234)"
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-5 py-4 text-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-            />
+
+            <div className="relative">
+              <input
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setError(null);
+                }}
+                disabled={loading}
+                placeholder="Search any BattleTag (e.g. Moon#1234)"
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-5 py-4 text-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              />
+
+              {results.length > 0 && (
+                <div className="absolute z-20 mt-1 w-full bg-white border rounded-lg shadow text-left">
+                  {results.slice(0, 6).map((r) => (
+                    <button
+                      key={r.battleTag}
+                      type="button"
+                      onClick={() => {
+                        setQuery(r.battleTag);
+                        clear();
+                      }}
+                      className="block w-full px-4 py-2 hover:bg-gray-100 text-sm"
+                    >
+                      {r.battleTag}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {error && (
               <p className="text-sm text-rose-500 text-left -mt-2">
@@ -153,24 +177,6 @@ export default function PlayerLandingPage() {
             </button>
           </form>
 
-          {/* EXAMPLES */}
-          <div className="text-sm text-gray-500 dark:text-gray-400 space-x-3">
-            <span>Try:</span>
-
-            <button onClick={() => quickGo("Grubby#1278")} className="underline hover:text-black dark:hover:text-white">
-              Grubby#1278
-            </button>
-
-            <button onClick={() => quickGo("KAHO#31819")} className="underline hover:text-black dark:hover:text-white">
-              KAHO#31819
-            </button>
-
-            <button onClick={() => quickGo("StarBuck#2732")} className="underline hover:text-black dark:hover:text-white">
-              StarBuck#2732
-            </button>
-          </div>
-
-          {/* LAST 3 SEARCHED */}
           {recent.length > 0 && (
             <div className="text-sm text-gray-500 dark:text-gray-400 space-x-3">
               <span>Last 3 Battletags Searched:</span>
@@ -186,7 +192,6 @@ export default function PlayerLandingPage() {
             </div>
           )}
 
-          {/* BOOKMARK */}
           <button
             onClick={bookmark}
             className="mx-auto flex items-center justify-center gap-2 text-sm font-medium text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 transition"

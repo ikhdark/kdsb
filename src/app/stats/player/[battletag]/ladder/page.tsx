@@ -6,8 +6,11 @@ import { PlayerHeader, Section } from "@/components/PlayerUI";
 import LadderSearch from "@/components/LadderSearch";
 
 type PageProps = {
-  params: Promise<{ battletag: string }>;
-  searchParams: Promise<{ page?: string; highlight?: string }>;
+  params: { battletag: string };
+  searchParams: {
+    page?: string;
+    highlight?: string;
+  };
 };
 
 const PAGE_SIZE = 50;

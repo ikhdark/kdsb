@@ -247,3 +247,41 @@ export function getPlayerAndOpponent(
 
   return { me, opp };
 }
+/* =====================================================
+   MATCH DETAIL (FULL TELEMETRY)
+   Required for playerScores / economy / heroScore
+===================================================== */
+
+const matchDetailCache = new Map<
+  string,
+  { ts: number; data: any }
+>();
+
+const MATCH_DETAIL_TTL = 10 * 60 * 1000;
+
+export async function fetchMatchDetail(
+  matchId: string
+): Promise<any | null> {
+  if (!matchId) return null;
+
+  const now = Date.now();
+
+  const cached = matchDetailCache.get(matchId);
+  if (cached && now - cached.ts < MATCH_DETAIL_TTL) {
+    return cached.data;
+  }
+
+  const url =
+    `https://website-backend.w3champions.com/api/matches/${matchId}`;
+
+  const json = await fetchJson<any>(url);
+
+  if (json) {
+    matchDetailCache.set(matchId, {
+      ts: now,
+      data: json,
+    });
+  }
+
+  return json;
+}

@@ -1,6 +1,29 @@
 import * as Icons from "../icons";
 
-export const NAV_DATA = [
+/* ================= TYPES ================= */
+
+type NavItem = {
+  title: string;
+  icon?: any;
+  path: string;
+  as: "link";
+  global?: boolean;
+  disabled?: boolean;
+  items?: NavItem[]; // ← CRITICAL (fixes your TS error)
+};
+
+type NavGroup = {
+  label: string;
+  items: NavItem[];
+};
+
+/* ================= DATA ================= */
+
+export const NAV_DATA: NavGroup[] = [
+  /* =====================================================
+     GLOBAL / NON-PLAYER PAGES
+  ===================================================== */
+
   {
     label: "MAIN MENU",
     items: [
@@ -9,6 +32,14 @@ export const NAV_DATA = [
         icon: Icons.HomeIcon,
         path: "/",
         as: "link",
+      },
+
+      {
+        title: "Matchup",
+        icon: Icons.HomeIcon,
+        path: "matchup",
+        as: "link",
+        global: true,
       },
     ],
   },
@@ -63,7 +94,7 @@ export const NAV_DATA = [
         as: "link",
       },
 
-      /* ---------------- SoS Ladder ---------------- */
+      /* ---------- SoS Ladder ---------- */
 
       {
         title: "SoS Ladder",
