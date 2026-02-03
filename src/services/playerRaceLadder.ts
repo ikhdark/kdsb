@@ -24,7 +24,7 @@ const MIN_GAMES = 5;
 const MIN_LEAGUE = 0;
 const MAX_LEAGUE = 25;
 
-const SOS_CONCURRENCY = 50;
+const SOS_CONCURRENCY = 25;
 
 /* =========================
    TYPES
@@ -207,16 +207,14 @@ if (battletag) {
     ) ?? null;
 }
 
-  /* compute SoS only for rows actually rendered */
+/* compute SoS only for rows actually rendered (deduped) */
 
-const toCompute: LadderRow[] = [
-  ...visible,
-  ...top,
-  ...(me ? [me] : []),
-];
+const uniq = new Map<string, LadderRow>();
 
-await computeSoS(toCompute, raceId);
+[...visible, ...top, ...(me ? [me] : [])]
+  .forEach(r => uniq.set(r.battletag, r));
 
+await computeSoS([...uniq.values()], raceId);
   return {
     battletag: battletag ?? "",
     race,
