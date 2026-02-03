@@ -1,16 +1,16 @@
 import {
   fetchCountryLadder,
   fetchPlayerProfile,
-  type PlayerProfile,
 } from "@/services/w3cApi";
 
-import { hasLifetimeRaceGames } from "@/lib/raceEligibility";
 import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
-import { flattenCountryLadder, rankByMMR } from "@/lib/ranking";
+import { flattenCountryLadder } from "@/lib/ranking";
+import { fetchAllMatches, fetchJson } from "@/lib/w3cUtils";
+
 import {
-  fetchAllMatches,
-  fetchJson,
-} from "@/lib/w3cUtils";
+  buildLadder,
+  type LadderInputRow,
+} from "@/lib/ladderEngine";
 
 /* =========================
    CONFIG
@@ -30,8 +30,6 @@ const SEASON = 24;
 const MAX_LEAGUE_PAGE = 76;
 
 const MIN_GAMES = 5;
-const MIN_LIFETIME_RACE_GAMES = 35;
-
 const GLOBAL_CACHE_TTL = 5 * 60 * 1000;
 
 /* =========================
@@ -59,7 +57,7 @@ export type W3CRankResponse = {
 };
 
 /* =========================
-   GLOBAL LADDER CACHE
+   GLOBAL CACHE
 ========================= */
 
 let cachedRowsByPage: Map<number, any[]> | null = null;
@@ -94,7 +92,7 @@ async function fetchGlobalRowsByPage(): Promise<Map<number, any[]>> {
 }
 
 /* =========================
-   COUNTRY INFERENCE
+   COUNTRY HELPERS
 ========================= */
 
 function iso2(code: unknown): string {
@@ -131,31 +129,16 @@ export async function getW3CRank(
   const canonicalTag = await resolveBattleTagViaSearch(inputTag);
   if (!canonicalTag) return null;
 
-  /* --------------------------------
-     PARALLEL FETCH (only change)
-     removes unnecessary latency
-  -------------------------------- */
-
   const [profile, matches] = await Promise.all([
     fetchPlayerProfile(canonicalTag),
     fetchAllMatches(canonicalTag, [SEASON]),
   ]);
 
   const canonicalLower = canonicalTag.toLowerCase();
-  const playerIdLower =
-    typeof profile.playerId === "string"
-      ? profile.playerId.toLowerCase()
-      : null;
-
-  /* =========================
-     COUNTRY
-  ========================== */
 
   const inferredCountry = inferCountryFromMatches(matches, canonicalLower);
   const profileCountry = iso2(profile.countryCode);
   const countryCode = inferredCountry || profileCountry;
-
-  /* ========================= */
 
   const [rowsByPage, countryPayload] = await Promise.all([
     fetchGlobalRowsByPage(),
@@ -167,45 +150,7 @@ export async function getW3CRank(
   const countryRows = flattenCountryLadder(countryPayload);
 
   /* =========================
-     BUILD GLOBAL POOLS
-  ========================== */
-
-  const globalPools: Record<number, any[]> = {};
-  for (const raceId of Object.keys(RACE_MAP).map(Number)) {
-    globalPools[raceId] = [];
-  }
-
-  for (const rawRows of rowsByPage.values()) {
-    const flat = flattenCountryLadder(rawRows);
-
-    for (const r of flat) {
-      if (r.games < MIN_GAMES) continue;
-
-      const pool = globalPools[r.race];
-      if (!pool) continue;
-
-      pool.push({
-        battleTagLower: r.battleTagLower,
-        playerIdLower: r.playerIdLower,
-        mmr: r.mmr,
-        games: r.games,
-        winPct: r.games ? r.wins / r.games : 0,
-      });
-    }
-  }
-
-  for (const raceId of Object.keys(RACE_MAP).map(Number)) {
-    globalPools[raceId].sort((a, b) =>
-      b.mmr !== a.mmr
-        ? b.mmr - a.mmr
-        : b.winPct !== a.winPct
-        ? b.winPct - a.winPct
-        : b.games - a.games
-    );
-  }
-
-  /* =========================
-     RANK CALC
+     BUILD RANKS USING SAME ENGINE
   ========================== */
 
   const ranks: RankRow[] = [];
@@ -213,40 +158,77 @@ export async function getW3CRank(
   for (const [raceIdStr, raceName] of Object.entries(RACE_MAP)) {
     const raceId = Number(raceIdStr);
 
-    const eligible = await hasLifetimeRaceGames(
-      canonicalTag,
-      raceId,
-      MIN_LIFETIME_RACE_GAMES
+    /* ---------- GLOBAL LADDER ---------- */
+
+    const globalInputs: LadderInputRow[] = [];
+
+    for (const rawRows of rowsByPage.values()) {
+      const flat = flattenCountryLadder(rawRows);
+
+      for (const r of flat) {
+        if (r.games < MIN_GAMES) continue;
+        if (r.race !== raceId) continue;
+        if (!r.battleTag) continue;
+
+        globalInputs.push({
+          battletag: r.battleTag,
+          mmr: r.mmr,
+          wins: r.wins,
+          games: r.games,
+          sos: null,
+        });
+      }
+    }
+
+    const globalLadder = buildLadder(globalInputs);
+
+    const gIdx = globalLadder.findIndex(
+      (p) => p.battletag.toLowerCase() === canonicalLower
     );
-    if (!eligible) continue;
 
-    const pool = globalPools[raceId];
+    if (gIdx === -1) continue;
 
-    const idx = pool.findIndex(
-      (p) =>
-        p.battleTagLower === canonicalLower ||
-        (playerIdLower && p.playerIdLower === playerIdLower)
-    );
+    /* ---------- COUNTRY LADDER (FIXED) ---------- */
 
-    if (idx === -1) continue;
+    let countryRank: number | null = null;
+    let countryTotal: number | null = null;
 
-    const countryRes = rankByMMR(
-      countryRows,
-      canonicalLower,
-      raceId,
-      MIN_GAMES,
-      playerIdLower
-    );
+    if (countryRows.length) {
+      const countryInputs: LadderInputRow[] = countryRows
+        .filter(
+          (r) =>
+            r.race === raceId &&
+            r.games >= MIN_GAMES &&
+            r.battleTag
+        )
+        .map((r) => ({
+          battletag: r.battleTag!,
+          mmr: r.mmr,
+          wins: r.wins,
+          games: r.games,
+          sos: null,
+        }));
+
+      const countryLadder = buildLadder(countryInputs);
+
+      countryTotal = countryLadder.length;
+
+      const cIdx = countryLadder.findIndex(
+        (p) => p.battletag.toLowerCase() === canonicalLower
+      );
+
+      countryRank = cIdx === -1 ? null : cIdx + 1;
+    }
 
     ranks.push({
       race: raceName,
       raceId,
-      globalRank: idx + 1,
-      globalTotal: pool.length,
-      countryRank: countryRes?.rank ?? null,
-      countryTotal: countryRes?.total ?? null,
-      mmr: pool[idx].mmr,
-      games: pool[idx].games,
+      globalRank: gIdx + 1,
+      globalTotal: globalLadder.length,
+      countryRank,
+      countryTotal,
+      mmr: globalLadder[gIdx].mmr,
+      games: globalLadder[gIdx].games,
     });
   }
 

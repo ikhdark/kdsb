@@ -1,7 +1,8 @@
 // src/lib/ladderEngine.ts
 // PURE RANKING ENGINE
 // deterministic, linear weighted model
-// MMR + SoS + Activity only
+// MMR + SoS + Activity
+// + BOTH MMR + SoS confidence
 
 /* =========================
    TYPES
@@ -36,26 +37,32 @@ export type LadderRow = {
 const MMR_CAP = 3000;
 
 /*
-Weights (sum = 1.0)
+Weights
 */
-const W_MMR = 0.50;
+const W_MMR = 0.55;
 const W_SOS = 0.40;
-const W_ACTIVITY = 0.10;
+const W_ACTIVITY = 0.05;
 
 /*
-Activity normalization
-0–100 games → 0–2000 ladder-scale
+Confidence ramps
+Lower = faster full strength
 */
-const ACTIVITY_TARGET = 100;
+const SOS_CONFIDENCE_K = 1;
+const MMR_CONFIDENCE_K = 1;
+
+/*
+Score scaling (visual only)
+*/
+const SCORE_SCALE = 10;
 
 /* =========================
    HELPERS
 ========================= */
 
 function activityScore(games: number) {
-  const STEP = 5;              // every 5 games
-  const MAX_GAMES = 200;       // full credit cap
-  const MAX_SCORE = 2000;
+  const STEP = 5;
+  const MAX_GAMES = 200;
+  const MAX_SCORE = 200;
 
   const bucket = Math.min(
     Math.floor(games / STEP) * STEP,
@@ -63,6 +70,10 @@ function activityScore(games: number) {
   );
 
   return (bucket / MAX_GAMES) * MAX_SCORE;
+}
+
+function confidence(games: number, k: number) {
+  return games / (games + k);
 }
 
 /* =========================
@@ -76,12 +87,16 @@ function computeScore(
 ): number {
   const sosVal = sos ?? mmr;
 
+  // BOTH confidences applied independently
+  const mmrEff = mmr * confidence(games, MMR_CONFIDENCE_K);
+  const sosEff = sosVal * confidence(games, SOS_CONFIDENCE_K);
+
   const raw =
-    mmr * W_MMR +
-    sosVal * W_SOS +
+    mmrEff * W_MMR +
+    sosEff * W_SOS +
     activityScore(games) * W_ACTIVITY;
 
-  return Math.round((raw / 10) * 10) / 10;
+  return Math.round((raw / SCORE_SCALE) * 10) / 10;
 }
 
 /* =========================
