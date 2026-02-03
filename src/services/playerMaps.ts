@@ -40,21 +40,17 @@ function resolveMapName(match: any): string {
 export async function getW3CMapStats(inputTag: string) {
   if (!inputTag) return null;
 
-  /* ---------- resolve ---------- */
-
   const canonical =
     (await resolveBattleTagViaSearch(inputTag)) || inputTag;
-
-  /* ---------- single fetch (utils handles cache) ---------- */
 
   const matches = await fetchAllMatches(canonical, SEASONS);
   if (!matches.length) return null;
 
+  const lower = canonical.toLowerCase();
+
   /* ===================================================
      COMPUTE
   =================================================== */
-
-  const lower = canonical.toLowerCase();
 
   const durationStats = DURATION_BUCKETS.map((b) => ({
     label: b.label,
@@ -196,11 +192,87 @@ export async function getW3CMapStats(inputTag: string) {
 
   const byWinrate = [...validMaps].sort((a, b) => b.winrate - a.winrate);
 
+  const avgWinMinutes =
+    winGames > 0 ? +(winTime / winGames / 60).toFixed(1) : null;
+
+  const avgLossMinutes =
+    lossGames > 0 ? +(lossTime / lossGames / 60).toFixed(1) : null;
+
+  /* ---------- winrate by duration ---------- */
+
+  const winrateByDuration = durationStats.map((b) => {
+    const games = b.wins + b.losses;
+    return {
+      label: b.label,
+      wins: b.wins,
+      losses: b.losses,
+      winrate: games > 0 ? +((b.wins / games) * 100).toFixed(1) : 0,
+    };
+  });
+
+  /* ---------- hero levels ---------- */
+
+  let highestAvgHeroLevel: any = null;
+  let lowestAvgHeroLevel: any = null;
+
+  for (const m of validMaps) {
+    if (m.heroAvgLevel == null) continue;
+
+    if (!highestAvgHeroLevel || m.heroAvgLevel > highestAvgHeroLevel.heroAvgLevel)
+      highestAvgHeroLevel = m;
+
+    if (!lowestAvgHeroLevel || m.heroAvgLevel < lowestAvgHeroLevel.heroAvgLevel)
+      lowestAvgHeroLevel = m;
+  }
+
+  /* ---------- hero count leaders ---------- */
+
+  const oneHeroMap =
+    [...validMaps].sort((a, b) => b.heroCounts[1] - a.heroCounts[1])[0]?.map ?? null;
+
+  const twoHeroMap =
+    [...validMaps].sort((a, b) => b.heroCounts[2] - a.heroCounts[2])[0]?.map ?? null;
+
+  const threeHeroMap =
+    [...validMaps].sort((a, b) => b.heroCounts[3] - a.heroCounts[3])[0]?.map ?? null;
+
+  /* ---------- mmr context ---------- */
+
+  const mostPlayed = [...validMaps].sort((a, b) => b.games - a.games)[0] ?? null;
+  const bestNet = [...validMaps].sort((a, b) => b.netMMR - a.netMMR)[0] ?? null;
+  const worstNet = [...validMaps].sort((a, b) => a.netMMR - b.netMMR)[0] ?? null;
+  const mostVsHigher = [...validMaps].sort((a, b) => b.vsHigher - a.vsHigher)[0] ?? null;
+  const mostVsLower = [...validMaps].sort((a, b) => b.vsLower - a.vsLower)[0] ?? null;
+
   return {
     battletag: canonical,
     seasons: SEASONS,
+
+    avgWinMinutes,
+    avgLossMinutes,
+    winrateByDuration,
+
     topMaps: byWinrate.slice(0, 5),
     worstMaps: [...byWinrate].reverse().slice(0, 5),
     longestWin,
+
+    heroLevels: {
+      highestAvgHeroLevel,
+      lowestAvgHeroLevel,
+    },
+
+    mapsWithHighestHeroCount: {
+      oneHeroMap,
+      twoHeroMap,
+      threeHeroMap,
+    },
+
+    mmrContext: {
+      mostPlayed,
+      bestNet,
+      worstNet,
+      mostVsHigher,
+      mostVsLower,
+    },
   };
 }
