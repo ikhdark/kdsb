@@ -11,6 +11,26 @@ export type GlobalSearchResult = {
   relevanceId?: string;
 };
 
+/* =====================================================
+   CACHE (hot path optimization)
+===================================================== */
+
+const SEARCH_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+const searchCache = new Map<
+  string,
+  { ts: number; results: GlobalSearchResult[] | null }
+>();
+
+const searchInFlight = new Map<
+  string,
+  Promise<GlobalSearchResult[] | null>
+>();
+
+/* =====================================================
+   helpers
+===================================================== */
+
 function decodeInput(input: unknown): string {
   let raw = String(input ?? "").trim();
   try {
@@ -28,32 +48,73 @@ function parseBattleTag(raw: string): { name: string; id: string } | null {
   return { name, id };
 }
 
-async function globalSearchByName(name: string): Promise<GlobalSearchResult[] | null> {
-  let res: Response;
+/* =====================================================
+   SEARCH (cached + deduped)
+===================================================== */
 
-  try {
-    res = await fetch(
-      `https://website-backend.w3champions.com/api/players/global-search` +
-        `?search=${encodeURIComponent(name)}&pageSize=20`
-    );
-  } catch {
-    return null;
+async function globalSearchByName(
+  name: string
+): Promise<GlobalSearchResult[] | null> {
+  const now = Date.now();
+
+  /* cache hit */
+  const cached = searchCache.get(name);
+  if (cached && now - cached.ts < SEARCH_CACHE_TTL) {
+    return cached.results;
   }
 
-  if (!res.ok) return null;
+  /* in-flight dedupe */
+  const inFlight = searchInFlight.get(name);
+  if (inFlight) return inFlight;
+
+  const request = (async () => {
+    let res: Response;
+
+    try {
+      res = await fetch(
+        `https://website-backend.w3champions.com/api/players/global-search` +
+          `?search=${encodeURIComponent(name)}&pageSize=20`
+      );
+    } catch {
+      return null;
+    }
+
+    if (!res.ok) return null;
+
+    try {
+      const json = (await res.json()) as unknown;
+      return Array.isArray(json) ? (json as GlobalSearchResult[]) : null;
+    } catch {
+      return null;
+    }
+  })();
+
+  searchInFlight.set(name, request);
 
   try {
-    const json = (await res.json()) as unknown;
-    return Array.isArray(json) ? (json as GlobalSearchResult[]) : null;
-  } catch {
-    return null;
+    const results = await request;
+
+    searchCache.set(name, {
+      ts: Date.now(),
+      results,
+    });
+
+    return results;
+  } finally {
+    searchInFlight.delete(name);
   }
 }
+
+/* =====================================================
+   PUBLIC RESOLVERS
+===================================================== */
 
 /**
  * Baseline: resolves to EXACT casing BattleTag from backend.
  */
-export async function resolveBattleTagViaSearch(input: unknown): Promise<string | null> {
+export async function resolveBattleTagViaSearch(
+  input: unknown
+): Promise<string | null> {
   const raw = decodeInput(input);
   const parsed = parseBattleTag(raw);
   if (!parsed) return null;
@@ -71,14 +132,15 @@ export async function resolveBattleTagViaSearch(input: unknown): Promise<string 
 
   if (!matches.length) return null;
 
-  matches.sort((a, b) => (b.seasons?.length ?? 0) - (a.seasons?.length ?? 0));
+  matches.sort(
+    (a, b) => (b.seasons?.length ?? 0) - (a.seasons?.length ?? 0)
+  );
 
   return matches[0].battleTag;
 }
 
 /**
- * Same resolver rules, but also returns relevanceId (useful as playerId fallback).
- * Identity rules unchanged: we return exact backend strings only.
+ * Same resolver rules, but also returns relevanceId.
  */
 export async function resolveBattleTagAndPlayerIdViaSearch(
   input: unknown
@@ -100,12 +162,17 @@ export async function resolveBattleTagAndPlayerIdViaSearch(
 
   if (!matches.length) return null;
 
-  matches.sort((a, b) => (b.seasons?.length ?? 0) - (a.seasons?.length ?? 0));
+  matches.sort(
+    (a, b) => (b.seasons?.length ?? 0) - (a.seasons?.length ?? 0)
+  );
 
   const top = matches[0];
 
   return {
     battleTag: top.battleTag,
-    playerId: typeof top.relevanceId === "string" && top.relevanceId.length ? top.relevanceId : null,
+    playerId:
+      typeof top.relevanceId === "string" && top.relevanceId.length
+        ? top.relevanceId
+        : null,
   };
 }

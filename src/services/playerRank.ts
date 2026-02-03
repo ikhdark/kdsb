@@ -58,6 +58,9 @@ export type W3CRankResponse = {
   ranks: RankRow[];
 };
 
+/* =========================
+   GLOBAL LADDER CACHE
+========================= */
 
 let cachedRowsByPage: Map<number, any[]> | null = null;
 let lastFetchTime = 0;
@@ -76,9 +79,7 @@ async function fetchGlobalRowsByPage(): Promise<Map<number, any[]>> {
       `https://website-backend.w3champions.com/api/ladder/${page}` +
       `?gateWay=${GATEWAY}&gameMode=${GAMEMODE}&season=${SEASON}`;
 
-    requests.push(
-      fetchJson<any[]>(url).then((json) => json ?? [])
-    );
+    requests.push(fetchJson<any[]>(url).then((json) => json ?? []));
   }
 
   const pages = await Promise.all(requests);
@@ -93,7 +94,7 @@ async function fetchGlobalRowsByPage(): Promise<Map<number, any[]>> {
 }
 
 /* =========================
-   COUNTRY INFERENCE (CRITICAL)
+   COUNTRY INFERENCE
 ========================= */
 
 function iso2(code: unknown): string {
@@ -130,7 +131,15 @@ export async function getW3CRank(
   const canonicalTag = await resolveBattleTagViaSearch(inputTag);
   if (!canonicalTag) return null;
 
-  const profile: PlayerProfile = await fetchPlayerProfile(canonicalTag);
+  /* --------------------------------
+     PARALLEL FETCH (only change)
+     removes unnecessary latency
+  -------------------------------- */
+
+  const [profile, matches] = await Promise.all([
+    fetchPlayerProfile(canonicalTag),
+    fetchAllMatches(canonicalTag, [SEASON]),
+  ]);
 
   const canonicalLower = canonicalTag.toLowerCase();
   const playerIdLower =
@@ -139,14 +148,11 @@ export async function getW3CRank(
       : null;
 
   /* =========================
-     COUNTRY FIX (THIS WAS MISSING)
+     COUNTRY
   ========================== */
-
-  const matches = await fetchAllMatches(canonicalTag, [SEASON]);
 
   const inferredCountry = inferCountryFromMatches(matches, canonicalLower);
   const profileCountry = iso2(profile.countryCode);
-
   const countryCode = inferredCountry || profileCountry;
 
   /* ========================= */
@@ -216,9 +222,10 @@ export async function getW3CRank(
 
     const pool = globalPools[raceId];
 
-    const idx = pool.findIndex((p) =>
-      p.battleTagLower === canonicalLower ||
-      (playerIdLower && p.playerIdLower === playerIdLower)
+    const idx = pool.findIndex(
+      (p) =>
+        p.battleTagLower === canonicalLower ||
+        (playerIdLower && p.playerIdLower === playerIdLower)
     );
 
     if (idx === -1) continue;
