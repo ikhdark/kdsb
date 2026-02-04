@@ -18,7 +18,7 @@ export default async function CountriesPage({ params, searchParams }: Props) {
 
   const data = await getW3CCountryStats(battletag);
  if (!data || !data.countries?.length) {
-  return <EmptyState message="No country data available" />;
+  return <EmptyState message="Not enough data/recent games available" />;
 }
 
   const {

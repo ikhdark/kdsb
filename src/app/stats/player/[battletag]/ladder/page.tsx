@@ -41,7 +41,7 @@ export default async function LadderPage({
 
   // service handles pagination + caching
   const data = await getPlayerLadder(battletag, rawPage, PAGE_SIZE);
-  if (!data || !data.full?.length) return <EmptyState message="No ladder data available yet" />;
+  if (!data || !data.full?.length) return <EmptyState message="Not enough data/recent games available" />;
 
   const {
     battletag: canonicalBt,

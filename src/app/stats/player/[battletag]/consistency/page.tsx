@@ -21,7 +21,7 @@ export default async function ConsistencyPage({ params }: PageProps) {
   const data = await getPlayerConsistency(battletag);
 
   if (!data || !data.matches?.length) {
-    return <EmptyState message="Not enough data available" />;
+    return <EmptyState message="Not enough data/recent games available" />;
   }
 
   /* ================= BUILD CELLS FROM matches ================= */

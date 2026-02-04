@@ -12,7 +12,7 @@ export default async function VsPlayerPage({ params }: PageProps) {
   if (!battletag) return <EmptyState message="Player not found" />;
 
   const data = await getPlayerPerformance(battletag);
-  if (!data) return <EmptyState message="Not enough data available" />;
+  if (!data) return <EmptyState message="Not enough data/recent games available" />;
 
   const {
     battletag: canonicalBt,

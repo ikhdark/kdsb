@@ -15,7 +15,7 @@ export default async function HeroesPage({ params }: PageProps) {
   if (!battletag) return <EmptyState message="Player not found" />;
 
   const data = await getW3CHeroStats(battletag);
- if (!data || !data.result) return <EmptyState message="Not enough data available" />;
+ if (!data || !data.result) return <EmptyState message="Not enough data/recent games available" />;
 
   /* -------------------- helpers -------------------- */
 

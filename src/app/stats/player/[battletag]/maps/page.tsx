@@ -17,7 +17,7 @@ export default async function MapStatsPage({ params }: PageProps) {
  if (!battletag) return <EmptyState message="Player not found" />;
 
   const data = await getW3CMapStats(battletag);
-  if (!data) return <EmptyState message="Not enough data available" />;
+  if (!data) return <EmptyState message="Not enough data/recent games available" />;
 
   return (
     <div className="space-y-10 max-w-6xl mx-auto text-sm leading-relaxed">

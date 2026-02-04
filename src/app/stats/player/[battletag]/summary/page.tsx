@@ -56,7 +56,7 @@ if (!battletag) {
   ]);
 
  if (!rankData && !summaryData) {
-  return <EmptyState message="No stats available yet" />;
+  return <EmptyState message="Not enough data/recent games available" />;
 }
 
   const s = summaryData?.summary;

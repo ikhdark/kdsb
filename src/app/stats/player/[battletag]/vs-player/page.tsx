@@ -16,7 +16,7 @@ export default async function VsPlayerPage({ params }: PageProps) {
 
   const data = await getPlayerVsPlayer(battletag);
   if (!data) {
-  return <EmptyState message="No opponent stats available yet" />;
+  return <EmptyState message="Not enough data/recent games available" />;
 }
 
   /* ================= helpers ================= */
