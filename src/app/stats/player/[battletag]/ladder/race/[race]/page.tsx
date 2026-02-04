@@ -103,61 +103,61 @@ if (!data || !data.full?.length) {
       )}
 
       <Section title={`Page ${currentPage} / ${totalPages}`}>
-        <div className="overflow-x-auto">
-          <table className="w-full table-fixed text-xs md:text-sm border-collapse font-mono tabular-nums">
+     <div className="overflow-x-auto">
+  <table className="w-full text-sm border-collapse font-mono tabular-nums">
 
-            <thead className="text-xs uppercase text-gray-500">
-              <tr className="border-b border-gray-300 dark:border-gray-700">
-                <th className="text-left w-10 md:w-12">#</th>
-<th className="text-left w-28 md:w-44">Player</th>
-<th className="text-right w-16 md:w-20">Score</th>
-<th className="text-right w-16 md:w-20">MMR</th>
-<th className="text-right w-16 md:w-20">SoS</th>
-<th className="text-right w-14 md:w-16">W-L</th>
-              </tr>
-            </thead>
+    <thead className="text-[11px] uppercase text-gray-500 tracking-wide">
+      <tr className="border-b border-gray-300 dark:border-gray-700">
+        <th className="text-left w-14 px-3 py-2">#</th>
+        <th className="text-left min-w-[180px] px-3 py-2">Player</th>
+        <th className="text-right w-24 px-3 py-2">Score</th>
+        <th className="text-right w-20 px-3 py-2">MMR</th>
+        <th className="text-right w-20 px-3 py-2">SoS</th>
+        <th className="text-right w-20 px-3 py-2">W-L</th>
+      </tr>
+    </thead>
 
-            <tbody>
-              {rows.map((p) => {
-                const isHighlight =
-                  highlightLower &&
-                  p.battletag.toLowerCase().includes(highlightLower);
+    <tbody>
+      {rows.map((p) => {
+        const isHighlight =
+          highlightLower &&
+          p.battletag.toLowerCase().includes(highlightLower);
 
-                return (
-                  <tr
-                    key={`${p.battletag}-${p.rank}`}
-                    className={`border-b border-gray-200 dark:border-gray-800 ${
-                      isHighlight ? "bg-yellow-100 dark:bg-yellow-900/40" : ""
-                    }`}
-                  >
-                    <td className="px-2 md:px-4 py-1.5 ">#{p.rank}</td>
+        return (
+          <tr
+            key={`${p.battletag}-${p.rank}`}
+            className={`border-b border-gray-200 dark:border-gray-800 ${
+              isHighlight ? "bg-yellow-100 dark:bg-yellow-900/40" : ""
+            } hover:bg-gray-50 dark:hover:bg-gray-800/40`}
+          >
+            <td className="px-3 py-2 text-gray-600">#{p.rank}</td>
 
-                    <td className="px-2 md:px-4 py-1.5  truncate font-sans">
-                      {p.battletag}
-                    </td>
+            {/* keep mono here too for alignment consistency */}
+            <td className="px-3 py-2 font-mono truncate">
+              {p.battletag}
+            </td>
 
-                    <td className="px-2 md:px-4 py-1.5 text-right font-semibold">
-                      {num(p.score, 1)}
-                    </td>
+            <td className="px-3 py-2 text-right font-semibold">
+              {num(p.score, 1)}
+            </td>
 
-                    <td className="px-2 md:px-4 py-1.5 text-right font-semibold">
-                      {p.mmr}
-                    </td>
+            <td className="px-3 py-2 text-right font-semibold">
+              {p.mmr}
+            </td>
 
-                    <td className="px-2 md:px-4 py-1.5 text-right font-semibold">
-                      {num(p.sos, 0)}
-                    </td>
+            <td className="px-3 py-2 text-right font-semibold">
+              {num(p.sos, 0)}
+            </td>
 
-                    <td className="px-2 md:px-4 py-1.5 text-right">
-                      {p.wins}-{p.losses}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-
-          </table>
-        </div>
+            <td className="px-3 py-2 text-right">
+              {p.wins}-{p.losses}
+            </td>
+          </tr>
+        );
+      })}
+    </tbody>
+  </table>
+</div>
 
         <div className="flex items-center justify-center gap-2 pt-4 text-xs md:text-sm">
           {currentPage > 1 && (
