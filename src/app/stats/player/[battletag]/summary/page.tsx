@@ -93,7 +93,7 @@ if (!battletag) {
 
       <PlayerHeader
         battletag={rankData?.battletag ?? s?.battletag ?? decoded}
-        subtitle="Player Stats · Season 24"
+        subtitle="Player Stats · Seasons 21-24"
       />
 
       {/* =================================================
