@@ -2,7 +2,7 @@
 
 export const revalidate = 300;
 
-import { notFound } from "next/navigation";
+import EmptyState from "@/components/EmptyState";
 import { getW3CHeroStats } from "@/services/playerHeroes";
 import { PlayerHeader, Section, StatRow } from "@/components/PlayerUI";
 
@@ -12,10 +12,10 @@ type PageProps = {
 
 export default async function HeroesPage({ params }: PageProps) {
   const { battletag } = await params;
-  if (!battletag) notFound();
+  if (!battletag) return <EmptyState message="Player not found" />;
 
   const data = await getW3CHeroStats(battletag);
-  if (!data) notFound();
+ if (!data || !data.result) return <EmptyState message="Not enough data available" />;
 
   /* -------------------- helpers -------------------- */
 

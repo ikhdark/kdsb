@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import EmptyState from "@/components/EmptyState";
 import Link from "next/link";
 
 import { getPlayerLadder } from "@/services/playerLadder";
@@ -35,13 +35,13 @@ export default async function LadderPage({
   const { battletag } = await params;
   const { page, highlight } = await searchParams;
 
-  if (!battletag) notFound();
+  if (!battletag) return <EmptyState message="Player not found" />;
 
   const rawPage = Number(page) || 1;
 
   // service handles pagination + caching
   const data = await getPlayerLadder(battletag, rawPage, PAGE_SIZE);
-  if (!data) notFound();
+  if (!data || !data.full?.length) return <EmptyState message="No ladder data available yet" />;
 
   const {
     battletag: canonicalBt,

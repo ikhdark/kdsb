@@ -1,10 +1,9 @@
 // src/app/stats/player/[battletag]/consistency/page.tsx
 
-import { notFound } from "next/navigation";
 import { getPlayerConsistency } from "@/services/playerConsistency";
 import { PlayerHeader, StatCard } from "@/components/PlayerUI";
 import TimeHeatmap from "@/components/TimeHeatmap";
-
+import EmptyState from "@/components/EmptyState";
 
 type PageProps = {
   params: Promise<{ battletag: string }>;
@@ -13,10 +12,17 @@ type PageProps = {
 export default async function ConsistencyPage({ params }: PageProps) {
   const { battletag } = await params;
 
-  if (!battletag) notFound();
+  /* ================= SAFE GUARDS ================= */
+
+  if (!battletag) {
+    return <EmptyState message="Player not found" />;
+  }
 
   const data = await getPlayerConsistency(battletag);
-  if (!data) notFound();
+
+  if (!data || !data.matches?.length) {
+    return <EmptyState message="Not enough data available" />;
+  }
 
   /* ================= BUILD CELLS FROM matches ================= */
 
@@ -44,26 +50,26 @@ export default async function ConsistencyPage({ params }: PageProps) {
     });
   }
 
-const cells = [];
+  const cells = [];
 
-for (let day = 0; day < 7; day++) {
-  for (let bucket = 0; bucket < 3; bucket++) {
-    const key = `${day}-${bucket}`;
-    const v = map.get(key);
+  for (let day = 0; day < 7; day++) {
+    for (let bucket = 0; bucket < 3; bucket++) {
+      const key = `${day}-${bucket}`;
+      const v = map.get(key);
 
-    const games = v?.games ?? 0;
-    const wins  = v?.wins ?? 0;
+      const games = v?.games ?? 0;
+      const wins  = v?.wins ?? 0;
 
-    cells.push({
-      day,
-      bucket,
-      games,
-      wins,
-      winrate: games ? Math.round((wins / games) * 100) : null,
-      netMMR: 0,
-    });
+      cells.push({
+        day,
+        bucket,
+        games,
+        wins,
+        winrate: games ? Math.round((wins / games) * 100) : null,
+        netMMR: 0,
+      });
+    }
   }
-}
 
   /* ================= RENDER ================= */
 

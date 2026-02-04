@@ -1,7 +1,7 @@
 export const revalidate = 300;
-
+import EmptyState from "@/components/EmptyState";
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+
 
 import {
   getW3CRank,
@@ -44,7 +44,9 @@ export async function generateMetadata({
 
 export default async function PlayerPage({ params }: PageProps) {
   const { battletag } = await params;
-  if (!battletag) notFound();
+if (!battletag) {
+  return <EmptyState message="Invalid player" />;
+}
 
   const decoded = decodeURIComponent(battletag);
 
@@ -53,7 +55,9 @@ export default async function PlayerPage({ params }: PageProps) {
     getPlayerSummary(decoded),
   ]);
 
-  if (!rankData && !summaryData) notFound();
+ if (!rankData && !summaryData) {
+  return <EmptyState message="No stats available yet" />;
+}
 
   const s = summaryData?.summary;
   const ranks = rankData?.ranks ?? [];

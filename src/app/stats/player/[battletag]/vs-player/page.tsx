@@ -1,6 +1,6 @@
 // src/app/stats/player/[battletag]/vs-player/page.tsx
 export const revalidate = 300;
-import { notFound } from "next/navigation";
+import EmptyState from "@/components/EmptyState";
 import { getPlayerVsPlayer, displayMyRace } from "@/services/playerVsPlayer";
 import { PlayerHeader, Section } from "@/components/PlayerUI";
 
@@ -10,10 +10,14 @@ type PageProps = {
 
 export default async function VsPlayerPage({ params }: PageProps) {
   const { battletag } = await params;
-  if (!battletag) notFound();
+  if (!battletag) {
+  return <EmptyState message="Invalid player" />;
+}
 
   const data = await getPlayerVsPlayer(battletag);
-  if (!data) notFound();
+  if (!data) {
+  return <EmptyState message="No opponent stats available yet" />;
+}
 
   /* ================= helpers ================= */
 

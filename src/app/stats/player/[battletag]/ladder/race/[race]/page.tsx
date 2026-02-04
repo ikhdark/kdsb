@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import EmptyState from "@/components/EmptyState";
 import Link from "next/link";
 
 import { getPlayerRaceLadder } from "@/services/playerRaceLadder";
@@ -40,12 +40,14 @@ export default async function RaceLadderPage({
   const { battletag, race: raceParam } = await params;
   const { page, highlight } = await searchParams;
 
-  if (!battletag || !raceParam) notFound();
+if (!battletag || !raceParam) {
+  return <EmptyState message="Invalid player" />;
+}
 
-  const race = raceParam.toLowerCase() as Race;
+const race = raceParam.toLowerCase() as Race;
 
 if (!["human","orc","elf","undead","random"].includes(race)) {
-  notFound();
+  return <EmptyState message="Invalid race" />;
 }
   const rawPage = Math.max(1, Number(page) || 1);
 
@@ -57,7 +59,9 @@ if (!["human","orc","elf","undead","random"].includes(race)) {
     PAGE_SIZE
   );
 
-  if (!data) notFound();
+if (!data || !data.full?.length) {
+  return <EmptyState message="No ladder data available yet" />;
+}
 
   const {
     battletag: canonicalBt,

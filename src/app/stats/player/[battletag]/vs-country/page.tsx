@@ -1,6 +1,6 @@
 // src/app/stats/player/[battletag]/vs-country/page.tsx
 export const revalidate = 300;
-import { notFound } from "next/navigation";
+import EmptyState from "@/components/EmptyState";
 import { getW3CCountryStats } from "@/services/vsCountry";
 import { PlayerHeader, Section, StatCard } from "@/components/PlayerUI";
 
@@ -12,12 +12,14 @@ type Props = {
 export default async function CountriesPage({ params, searchParams }: Props) {
   const { battletag: routeBt } = await params;
   const battletag = routeBt || searchParams?.bt;
-  if (!battletag) notFound();
+  if (!battletag) {
+  return <EmptyState message="Invalid player" />;
+}
 
   const data = await getW3CCountryStats(battletag);
-  if (!data || !data.countries?.length) {
-    return <div className="text-sm text-gray-500">No country data available</div>;
-  }
+ if (!data || !data.countries?.length) {
+  return <EmptyState message="No country data available" />;
+}
 
   const {
     battletag: canonicalBt,

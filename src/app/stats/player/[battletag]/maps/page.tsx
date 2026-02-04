@@ -1,6 +1,6 @@
 // src/app/stats/player/[battletag]/maps/page.tsx
 export const revalidate = 300;
-import { notFound } from "next/navigation";
+import EmptyState from "@/components/EmptyState";
 import { getW3CMapStats } from "@/services/playerMaps";
 import { PlayerHeader, Section, StatCard } from "@/components/PlayerUI";
 
@@ -14,10 +14,10 @@ function signed(n: number) {
 
 export default async function MapStatsPage({ params }: PageProps) {
   const { battletag } = await params;
-  if (!battletag) notFound();
+ if (!battletag) return <EmptyState message="Player not found" />;
 
   const data = await getW3CMapStats(battletag);
-  if (!data) notFound();
+  if (!data) return <EmptyState message="Not enough data available" />;
 
   return (
     <div className="space-y-10 max-w-6xl mx-auto text-sm leading-relaxed">

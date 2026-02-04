@@ -1,5 +1,5 @@
 export const revalidate = 300;
-import { notFound } from "next/navigation";
+import EmptyState from "@/components/EmptyState";
 import { getPlayerPerformance } from "@/services/playerPerformance";
 import { PlayerHeader, Section, StatCard } from "@/components/PlayerUI";
 
@@ -9,10 +9,10 @@ type PageProps = {
 
 export default async function VsPlayerPage({ params }: PageProps) {
   const { battletag } = await params;
-  if (!battletag) notFound();
+  if (!battletag) return <EmptyState message="Player not found" />;
 
   const data = await getPlayerPerformance(battletag);
-  if (!data) notFound();
+  if (!data) return <EmptyState message="Not enough data available" />;
 
   const {
     battletag: canonicalBt,
