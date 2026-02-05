@@ -55,39 +55,40 @@ export default async function MapStatsPage({ params }: PageProps) {
 
       {/* ================= WINRATE BY LENGTH ================= */}
       <Section title="Winrate by Game Length">
-        <div className="space-y-2">
-          {data.winrateByDuration.map((b) => {
-            let barColor = "bg-rose-500";
-            if (b.winrate >= 50) barColor = "bg-emerald-500";
-            else if (b.winrate >= 40) barColor = "bg-yellow-500";
+  <div className="space-y-2">
+    {data.winrateByDuration
+      .filter((b) => b.wins + b.losses > 0) // only show brackets with games
+      .map((b) => {
+        let barColor = "bg-rose-500";
+        if (b.winrate >= 50) barColor = "bg-emerald-500";
+        else if (b.winrate >= 40) barColor = "bg-yellow-500";
 
-            let textColor = "text-rose-500";
-            if (b.winrate >= 50) textColor = "text-emerald-500";
-            else if (b.winrate >= 40) textColor = "text-yellow-500";
+        let textColor = "text-rose-500";
+        if (b.winrate >= 50) textColor = "text-emerald-500";
+        else if (b.winrate >= 40) textColor = "text-yellow-500";
 
-            return (
+        return (
+          <div
+            key={b.label}
+            className="grid grid-cols-[80px_1fr_auto] md:grid-cols-[110px_1fr_auto] items-center gap-x-3"
+          >
+            <div className="text-gray-500">{b.label}</div>
+
+            <div className="h-2 rounded bg-gray-200 overflow-hidden">
               <div
-                key={b.label}
-                className="grid grid-cols-[80px_1fr_auto] md:grid-cols-[110px_1fr_auto] items-center gap-x-3"
+                className={`h-full ${barColor}`}
+                style={{ width: `${b.winrate}%` }}
+              />
+            </div>
 
-              >
-                <div className="text-gray-500">{b.label}</div>
-
-                <div className="h-2 rounded bg-gray-200 overflow-hidden">
-                  <div
-                    className={`h-full ${barColor}`}
-                    style={{ width: `${b.winrate}%` }}
-                  />
-                </div>
-
-                <div className={`tabular-nums font-medium ${textColor}`}>
-                  {b.winrate}% ({b.wins}-{b.losses})
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </Section>
+            <div className={`tabular-nums font-medium ${textColor}`}>
+              {b.winrate}% ({b.wins}-{b.losses})
+            </div>
+          </div>
+        );
+      })}
+  </div>
+</Section>
 
       {/* ================= TOP / WORST MAPS ================= */}
       <Section title="Top / Worst Maps">
