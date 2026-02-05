@@ -1,5 +1,5 @@
 import { Section } from "@/components/PlayerUI";
-
+import type { RaceBreakdownRow } from "@/services/vsPlayer";
 /* ========================================= */
 
 function pct(n: number) {
@@ -77,21 +77,21 @@ export default function MatchupView({ stats }: { stats: any }) {
 
 <Section title="Overview for the last 2 seasons (Season 22-24)">
   {(() => {
-    const RACE_LABEL: Record<string, string> = {
-      "0": "Human",
-      "1": "Undead",
-      "2": "Random",
-      "3": "Night Elf",
-      "4": "Orc",
-    };
+const RACE_LABEL: Record<string, string> = {
+  "0": "Human",
+  "1": "Undead",
+  "2": "Random",
+  "3": "Night Elf",
+  "4": "Orc",
+};
 
-    const raceRows = Object.entries(stats.raceBreakdown ?? {}).map(
-      ([race, r]: any) => ({
-        label: RACE_LABEL[race] ?? race, // ← map number → name
-        a: `${r.aWins}-${r.aLosses} (${pct(r.aWinrate)})`,
-        b: `${r.bWins}-${r.bLosses} (${pct(r.bWinrate)})`,
-      })
-    );
+const raceRows = stats.raceBreakdown
+  .filter((r: RaceBreakdownRow) => r.aGames > 0 || r.bGames > 0)
+  .map((r: RaceBreakdownRow) => ({
+    label: RACE_LABEL[r.race] ?? r.race,
+    a: r.aGames ? `${r.aWins}-${r.aLosses} (${pct(r.aWinrate)})` : "-",
+    b: r.bGames ? `${r.bWins}-${r.bLosses} (${pct(r.bWinrate)})` : "-",
+}));
 
     return (
       <>
