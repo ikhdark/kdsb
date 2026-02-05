@@ -122,7 +122,9 @@ const favoredLarge  = buildThresholds(favoredBuckets, [200, 250, 300]);
         </thead>
 
         <tbody>
-          {rows.map((b) => (
+  {rows
+    .filter((b) => b.games > 0) // ← hide empty stats
+    .map((b) => (
             <tr key={b.min} className="border-t dark:border-gray-700">
               <td className="px-2 md:px-4 py-2 font-mono">{label(b)}</td>
               <td className="px-2 md:px-4 py-2">{b.games}</td>
