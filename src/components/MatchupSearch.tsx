@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import BattleTagInput from "@/components/BattleTagInput";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 export default function MatchupSearch({
   initialA,
@@ -16,13 +17,10 @@ export default function MatchupSearch({
   const [a, setA] = useState(initialA ?? "");
   const [b, setB] = useState(initialB ?? "");
 
-  useEffect(() => {
-    setA(initialA ?? "");
-  }, [initialA]);
+  const [pending, startTransition] = useTransition(); // ← key
 
-  useEffect(() => {
-    setB(initialB ?? "");
-  }, [initialB]);
+  useEffect(() => setA(initialA ?? ""), [initialA]);
+  useEffect(() => setB(initialB ?? ""), [initialB]);
 
   function run(e?: React.FormEvent) {
     e?.preventDefault();
@@ -32,32 +30,36 @@ export default function MatchupSearch({
 
     if (!A || !B) return;
 
-    router.push(`/stats/matchup?a=${encodeURIComponent(A)}&b=${encodeURIComponent(B)}`);
+    startTransition(() => {
+      router.push(
+        `/stats/matchup?a=${encodeURIComponent(A)}&b=${encodeURIComponent(B)}`
+      );
+    });
   }
 
   return (
-    <form
-      onSubmit={run}
-      className="flex gap-2 max-w-xl rounded-xl border bg-white dark:bg-gray-900 p-4 shadow-sm mt-6"
-    >
-      <BattleTagInput
-        value={a}
-        onChange={setA}
-        placeholder="Player A"
-      />
-
-      <BattleTagInput
-        value={b}
-        onChange={setB}
-        placeholder="Player B"
-      />
-
-      <button
-        type="submit"
-        className="rounded bg-emerald-600 text-white px-4"
+    <>
+      <form
+        onSubmit={run}
+        className="flex gap-2 max-w-xl rounded-xl border bg-white dark:bg-gray-900 p-4 shadow-sm mt-6"
       >
-        Compare
-      </button>
-    </form>
+        <BattleTagInput value={a} onChange={setA} placeholder="Player A" />
+        <BattleTagInput value={b} onChange={setB} placeholder="Player B" />
+
+        <button
+          type="submit"
+          disabled={pending}
+          className="rounded bg-emerald-600 text-white px-4 disabled:opacity-50"
+        >
+          {pending ? "Loading…" : "Compare"}
+        </button>
+      </form>
+
+      {pending && (
+        <div className="mt-6">
+          <LoadingSpinner />
+        </div>
+      )}
+    </>
   );
 }
