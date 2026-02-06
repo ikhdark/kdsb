@@ -20,7 +20,7 @@ type WL = {
   winrate: number;
 };
 
-export type SideStats = {
+type SideStats= {
   overall: WL;
 
   avgDurationSec: number;

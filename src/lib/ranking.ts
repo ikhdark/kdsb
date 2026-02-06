@@ -1,12 +1,6 @@
 // src/lib/ranking.ts
-
-export const RACE_MAP: Record<number, string> = {
-  1: "Human",
-  2: "Orc",
-  4: "Night Elf",
-  8: "Undead",
-  0: "Random",
-};
+// Ladder flattening only (no ranking logic here)
+// Ranking is handled by ladderEngine
 
 export type FlattenedLadderRow = {
   race: number;
@@ -26,7 +20,6 @@ export type FlattenedLadderRow = {
 export function flattenCountryLadder(payload: unknown): FlattenedLadderRow[] {
   const out: FlattenedLadderRow[] = [];
 
-  // ✅ identity-only dedupe
   const seen = new Set<string>();
 
   const toNum = (v: unknown): number | null => {
@@ -41,8 +34,7 @@ export function flattenCountryLadder(payload: unknown): FlattenedLadderRow[] {
   const looksLikeBattleTag = (s: string) => s.includes("#");
 
   const pushRow = (row: FlattenedLadderRow) => {
- const key =
-  `${row.race}|${row.battleTagLower ?? row.playerIdLower ?? ""}`;
+    const key = `${row.race}|${row.battleTagLower ?? row.playerIdLower ?? ""}`;
 
     if (!key || seen.has(key)) return;
 
@@ -123,46 +115,6 @@ export function flattenCountryLadder(payload: unknown): FlattenedLadderRow[] {
   };
 
   visit(payload);
+
   return out;
-}
-
-/* =========================
-   RANK BY MMR
-========================= */
-
-export function rankByMMR(
-  rows: FlattenedLadderRow[] | null | undefined,
-  canonicalLower: string,
-  raceId: number,
-  minGames: number,
-  fallbackPlayerIdLower: string | null = null
-): { rank: number; total: number } | null {
-  if (!Array.isArray(rows) || rows.length === 0) return null;
-
-  const pidLower = fallbackPlayerIdLower ?? null;
-
-  const pool = rows
-    .filter((row) => {
-      if (!row) return false;
-      if (row.race !== raceId) return false;
-      if (row.games < minGames) return false;
-      return typeof row.mmr === "number";
-    })
-    .sort((a, b) => {
-      if (b.mmr !== a.mmr) return b.mmr - a.mmr;
-
-      const aWinPct = a.games ? a.wins / a.games : 0;
-      const bWinPct = b.games ? b.wins / b.games : 0;
-      if (bWinPct !== aWinPct) return bWinPct - aWinPct;
-
-      return b.games - a.games;
-    });
-
-  const idx = pool.findIndex((r) =>
-    r.battleTagLower === canonicalLower ||
-    (pidLower && r.playerIdLower === pidLower)
-  );
-
-  if (idx === -1) return null;
-  return { rank: idx + 1, total: pool.length };
 }

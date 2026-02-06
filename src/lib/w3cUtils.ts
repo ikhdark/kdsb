@@ -19,7 +19,7 @@ function requestKey(url: string, init?: RequestInit) {
   return `${(init?.method ?? "GET").toUpperCase()}:${url}`;
 }
 
-export async function fetchWithDedup(
+async function fetchWithDedup(
   url: string,
   init?: RequestInit
 ): Promise<Response> {
@@ -64,7 +64,7 @@ const PAGE_SIZE = 50;
 const MAX_PAGES_PER_SEASON = 2000;
 
 /* =====================================================
-   RACES
+   RACES (KEEP THESE)
 ===================================================== */
 
 export const RACE_MAP: Record<number, string> = {
@@ -75,26 +75,17 @@ export const RACE_MAP: Record<number, string> = {
   8: "Undead",
 };
 
-export function resolveQueuedRace(player: any): string {
-  return RACE_MAP[player?.race] || "Unknown";
-}
 
+/**
+ * Race actually played (effective)
+ * Used all over analytics → keep centralized
+ */
 export function resolveEffectiveRace(player: any): string {
-  return RACE_MAP[player?.race] || "Unknown";
+  return RACE_MAP[player?.race] ?? "Unknown";
 }
 
 /* =====================================================
-   CANONICAL RESOLUTION
-===================================================== */
-
-export async function resolveCanonicalBattleTag(
-  input: string
-): Promise<string | null> {
-  return resolveBattleTagViaSearch(input);
-}
-
-/* =====================================================
-   MATCH FETCH (CACHED + BATCHED PARALLEL)
+   MATCH FETCH (CACHED + PARALLEL)
 ===================================================== */
 
 const MATCH_CACHE_TTL = 10 * 60 * 1000;
@@ -198,32 +189,8 @@ export async function fetchAllMatches(
 }
 
 /* =====================================================
-   TEAM + PLAYER RESOLUTION
+   PLAYER RESOLUTION
 ===================================================== */
-
-export function getPlayerTeam(
-  match: any,
-  canonicalBattleTag: string
-): { me: any; team: any; enemies: any[] } | null {
-  if (!match || !Array.isArray(match?.teams)) return null;
-
-  const lower = canonicalBattleTag.toLowerCase();
-
-  for (const team of match.teams) {
-    const players = Array.isArray(team?.players) ? team.players : [];
-
-    const me = players.find(
-      (p: any) => String(p?.battleTag ?? "").toLowerCase() === lower
-    );
-
-    if (me) {
-      const enemies = match.teams.filter((t: any) => t !== team);
-      return { me, team, enemies };
-    }
-  }
-
-  return null;
-}
 
 export function getPlayerAndOpponent(
   match: any,
@@ -231,11 +198,11 @@ export function getPlayerAndOpponent(
 ): { me: any; opp: any } | null {
   if (!match || !Array.isArray(match?.teams)) return null;
 
+  const lower = canonicalBattleTag.toLowerCase();
+
   const players: any[] = match.teams.flatMap((t: any) =>
     Array.isArray(t?.players) ? t.players : []
   );
-
-  const lower = canonicalBattleTag.toLowerCase();
 
   const me = players.find(
     (p) => String(p?.battleTag ?? "").toLowerCase() === lower
@@ -247,9 +214,9 @@ export function getPlayerAndOpponent(
 
   return { me, opp };
 }
+
 /* =====================================================
-   MATCH DETAIL (FULL TELEMETRY)
-   Required for playerScores / economy / heroScore
+   MATCH DETAIL
 ===================================================== */
 
 const matchDetailCache = new Map<

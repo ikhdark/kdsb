@@ -77,11 +77,6 @@ if (!battletag) {
         ).toLocaleDateString()}`
       : "N/A";
 
-  const topRace =
-    ranks.length > 0
-      ? [...ranks].sort((a, b) => b.mmr - a.mmr)[0]
-      : null;
-
   const country = rankData?.country ?? "—";
 
   /* =====================================================

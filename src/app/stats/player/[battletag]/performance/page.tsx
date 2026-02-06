@@ -65,8 +65,6 @@ export default async function VsPlayerPage({ params }: PageProps) {
     .filter((b) => b.min < 0)
     .sort((a, b) => b.min - a.min);
 
-  const SPLIT = 150;
-
   
   /* ================= EXTREME (CUMULATIVE THRESHOLDS) ================= */
   /* THIS IS THE IMPORTANT PART */

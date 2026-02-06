@@ -142,28 +142,6 @@ function pickOpponent1v1(
   if (!opp) return null;
 
   return { self, opp };
-}
-
-function normalizeMatches(payload: any): any[] {
-  if (!payload) return [];
-
-  // Most common shapes we’ve seen:
-  // 1) Array<match>
-  if (Array.isArray(payload)) return payload;
-
-  // 2) { matches: Array<match> }
-  if (Array.isArray(payload.matches)) return payload.matches;
-
-  // 3) { data: { matches: Array<match> } }
-  if (payload.data && Array.isArray(payload.data.matches)) return payload.data.matches;
-
-  // 4) { result: { matches: Array<match> } } (rare, but cheap to support)
-  if (payload.result && Array.isArray(payload.result.matches)) return payload.result.matches;
-
-  // 5) Single match object (treat as 1-element list)
-  if (payload.teams && Array.isArray(payload.teams)) return [payload];
-
-  return [];
 } 
 
 /* -------------------- SERVICE -------------------- */

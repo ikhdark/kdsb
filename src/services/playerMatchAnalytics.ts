@@ -32,7 +32,7 @@ const MIN_DURATION_SECONDS = 120;
    TYPES
 ====================================================== */
 
-export type PlayerScoreBlock = {
+type PlayerScoreBlock = {
   /* unit */
   unitsProduced: number;
   unitsKilled: number;
@@ -158,8 +158,6 @@ function pickPing(
 
   const avgPing =
     typeof row?.averagePing === "number" ? row.averagePing : null;
-  const currentPing =
-    typeof row?.currentPing === "number" ? row.currentPing : null;
 
   return { avgPing };
 }
@@ -267,7 +265,6 @@ export async function getPlayerMatchAnalytics(input: string) {
           won: !!pair.me.won,
 
           avgPing: mePing.avgPing,
-          currentPing: mePing,
 
           heroes: (pair.me.heroes ?? []).map((h: any) => ({
             id: h.id,
@@ -290,7 +287,6 @@ export async function getPlayerMatchAnalytics(input: string) {
           won: !!pair.opp.won,
 
           avgPing: oppPing.avgPing,
-          currentPing: oppPing,
 
           heroes: (pair.opp.heroes ?? []).map((h: any) => ({
             id: h.id,

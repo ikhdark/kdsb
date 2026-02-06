@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
-import { pageview } from "@/lib/gtag";
+import { pageview, event } from "@/lib/ga";
 
 const STAT_MAP = {
   summary: "Summary",
@@ -15,35 +15,22 @@ const STAT_MAP = {
   "vs-player": "Vs Player",
 } as const;
 
-function sendEvent(name: string, params: Record<string, any>) {
-  if (typeof window !== "undefined" && window.gtag) {
-    window.gtag("event", name, params);
-  }
-}
-
-function trackStatType(pathname: string) {
-  if (!pathname.startsWith("/stats/player/")) return;
-
-  const parts = pathname.split("/");
-  const statSegment = parts[4];
-
-  const statType = STAT_MAP[statSegment as keyof typeof STAT_MAP];
-  if (!statType) return;
-
-  sendEvent("stat_page_view", { stat_type: statType });
-}
-
 export default function Analytics() {
   const pathname = usePathname();
 
   useEffect(() => {
-    const search =
-      typeof window !== "undefined" ? window.location.search : "";
-
-    const url = pathname + search;
+    const url = pathname + window.location.search;
 
     pageview(url);
-    trackStatType(pathname);
+
+    if (pathname.startsWith("/stats/player/")) {
+      const statSegment = pathname.split("/").at(4);
+      const statType = STAT_MAP[statSegment as keyof typeof STAT_MAP];
+
+      if (statType) {
+        event("stat_page_view", { stat_type: statType });
+      }
+    }
   }, [pathname]);
 
   return null;
