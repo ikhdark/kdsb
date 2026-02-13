@@ -7,6 +7,7 @@ type Player = {
   name: string
   battleTag: string
   oldMmr: number
+  race: number   // bitmask
 }
 
 type ProcessedMatch = {
@@ -24,6 +25,22 @@ type ProcessedMatch = {
 const ENDPOINT =
   "https://website-backend.w3champions.com/api/matches/ongoing?offset=0&gateway=20&pageSize=50&gameMode=1&map=Overall&sort=startTimeDescending"
 
+/* ======================
+   Normalize live enum
+   to ladder bitmask
+====================== */
+
+function liveEnumToBitmask(race: number | undefined): number {
+  switch (race) {
+    case 1: return 1  // Human
+    case 2: return 2  // Orc
+    case 3: return 8  // Undead
+    case 4: return 4  // Night Elf
+    case 0: return 0  // Random
+    default: return 0
+  }
+}
+
 export default function LiveMatches() {
   const [matches, setMatches] = useState<ProcessedMatch[]>([])
   const [loading, setLoading] = useState(true)
@@ -33,7 +50,6 @@ export default function LiveMatches() {
       const res = await fetch(ENDPOINT)
       const data = await res.json()
 
-      // Collect unique live players
       const livePlayers = new Set<string>()
 
       data.matches.forEach((m: any) => {
@@ -43,7 +59,6 @@ export default function LiveMatches() {
         }
       })
 
-      // Request SoS only for live players
       const sosRes = await fetch("/api/sos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -66,16 +81,14 @@ export default function LiveMatches() {
           const sosA = sosData[p1.battleTag.toLowerCase()]
           const sosB = sosData[p2.battleTag.toLowerCase()]
 
-          // Directional ping advantage
           const pingA =
             m.serverInfo?.playerServerInfos?.[0]?.averagePing ?? 0
           const pingB =
             m.serverInfo?.playerServerInfos?.[1]?.averagePing ?? 0
 
           const pingAdvantage = pingB - pingA
-          const pingRatingImpact = pingAdvantage * 0.5 // 10ms ≈ 5 rating
+          const pingRatingImpact = pingAdvantage * 0.5
 
-          // Balanced blended model
           const blendedA =
             (sosA ?? mmrA) * 0.7 +
             mmrA * 0.3 +
@@ -107,11 +120,13 @@ export default function LiveMatches() {
               name: p1.name,
               battleTag: p1.battleTag,
               oldMmr: mmrA,
+              race: liveEnumToBitmask(p1.race),
             },
             playerB: {
               name: p2.name,
               battleTag: p2.battleTag,
               oldMmr: mmrB,
+              race: liveEnumToBitmask(p2.race),
             },
             winProbA,
             pingDiff,

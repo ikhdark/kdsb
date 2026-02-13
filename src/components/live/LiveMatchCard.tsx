@@ -1,3 +1,11 @@
+const RACE_MAP: Record<number, string> = {
+  1: "Human",
+  2: "Orc",
+  4: "Night Elf",
+  8: "Undead",
+  0: "Random",
+}
+
 type Props = {
   match: {
     mapName: string
@@ -5,10 +13,12 @@ type Props = {
     playerA: {
       name: string
       oldMmr: number
+      race: number
     }
     playerB: {
       name: string
       oldMmr: number
+      race: number
     }
     winProbA: number
     pingDiff: number
@@ -40,13 +50,13 @@ export default function LiveMatchCard({ match }: Props) {
   return (
     <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 sm:px-6 py-4 shadow-md">
       
-      {/* Top row */}
+      {/* Top Row */}
       <div className="flex justify-between text-xs sm:text-sm uppercase tracking-wide text-gray-500 dark:text-gray-400">
         <span className="truncate max-w-[45%]">{mapName}</span>
         <span className="truncate max-w-[45%] text-right">{serverName}</span>
       </div>
 
-      {/* Main row */}
+      {/* Main Row */}
       <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-x-3 sm:gap-x-8">
 
         {/* Player A */}
@@ -54,13 +64,20 @@ export default function LiveMatchCard({ match }: Props) {
           <div className="truncate text-base sm:text-xl font-semibold text-gray-900 dark:text-gray-100">
             {playerA.name}
           </div>
+          <div className="text-xs text-gray-400">
+            {RACE_MAP[playerA.race] ?? "Unknown"}
+          </div>
           <div className="text-xs sm:text-sm text-gray-500 tabular-nums">
             {playerA.oldMmr}
           </div>
         </div>
 
         {/* Probability */}
-        <div className="w-20 sm:w-32 text-center">
+        <div className="w-24 sm:w-36 text-center">
+          <div className="text-[10px] sm:text-xs uppercase tracking-wide text-gray-400 mb-1">
+            Win Probability
+          </div>
+
           <div className="flex justify-between text-base sm:text-xl font-bold tabular-nums">
             <span className={isAFavored ? "text-emerald-500" : "text-gray-500"}>
               {winProbA}%
@@ -76,13 +93,16 @@ export default function LiveMatchCard({ match }: Props) {
           <div className="truncate text-base sm:text-xl font-semibold text-gray-900 dark:text-gray-100">
             {playerB.name}
           </div>
+          <div className="text-xs text-gray-400">
+            {RACE_MAP[playerB.race] ?? "Unknown"}
+          </div>
           <div className="text-xs sm:text-sm text-gray-500 tabular-nums">
             {playerB.oldMmr}
           </div>
         </div>
       </div>
 
-      {/* Bottom row */}
+      {/* Bottom Row */}
       <div className="mt-3 flex justify-between text-xs sm:text-sm">
         <span className={pingColor}>Δ {pingDiff}ms</span>
         <span className="text-gray-500 dark:text-gray-400">
