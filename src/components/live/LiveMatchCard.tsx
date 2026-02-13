@@ -79,11 +79,11 @@ export default function LiveMatchCard({ match }: Props) {
                 {playerA.oldMmr}
               </div>
 
-              <div className="text-[10px] uppercase tracking-wide text-gray-400 mt-2">
+              <div className="text-[12px] uppercase tracking-wide text-gray-400 mt-2">
                 Predicted MMR: If Win / If Lose
               </div>
 
-              <div className="text-[11px] tabular-nums">
+              <div className="text-[12px] tabular-nums">
                 <span className="text-emerald-500">
                   {playerA.mmrIfWin > 0 ? `+${playerA.mmrIfWin}` : playerA.mmrIfWin}
                 </span>
@@ -155,12 +155,12 @@ export default function LiveMatchCard({ match }: Props) {
       </div>
 
       {/* Bottom Row */}
-      <div className="mt-3 flex justify-between text-xs sm:text-sm">
-        <span className={pingColor}>Δ {pingDiff}ms</span>
-        <span className="text-gray-500 dark:text-gray-400">
-          {startedMinutesAgo}m ago
-        </span>
-      </div>
+<div className="text-[12px] uppercase tracking-wide text-gray-400">
+  Ping Difference
+</div>
+<div className={pingColor}>
+  Δ {pingDiff}ms
+</div>
     </div>
   )
 }
