@@ -40,7 +40,7 @@ export default function LiveMatchCard({ match }: Props) {
   return (
     <div className="rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 py-3 shadow-sm">
       {/* Top meta */}
-      <div className="flex justify-between text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+      <div className="flex justify-between text-[12px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
         <span className="truncate">{mapName}</span>
         <span className="truncate">{serverName}</span>
       </div>
@@ -69,7 +69,7 @@ export default function LiveMatchCard({ match }: Props) {
             </span>
           </div>
 
-          <div className="mt-0.5 text-[11px] text-gray-400">
+          <div className="mt-0.5 text-[12px] text-gray-400">
             {isAFavored ? ">" : "<"}
           </div>
         </div>
