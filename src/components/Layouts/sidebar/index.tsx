@@ -32,55 +32,34 @@ export default function Sidebar() {
 
   function renderItem(item: any, depth = 0) {
     const isSearch = item.title === "Player Search";
+    const requiresPlayer = !item.global && !isSearch;
+    const isDisabled = requiresPlayer && !battletag;
 
-    /* disabled */
-    if (item.disabled) {
-      return (
-        <div
-          key={item.title}
-          className="px-4 py-2 text-sm opacity-40 text-gray-400 select-none"
-        >
-          {item.title}
-        </div>
-      );
-    }
-
-    /* player required */
-    if (!battletag && !item.global && !isSearch) {
-      return (
-        <div
-          key={item.title}
-          className="px-4 py-2 text-sm opacity-40 text-gray-400 select-none"
-        >
-          {item.title}
-        </div>
-      );
-    }
-
-    const href = isSearch
-      ? "/"
-      : item.global
-      ? `/stats/${item.path}`
-      : `/stats/player/${battletag}/${item.path}`;
-
+const href = isSearch
+  ? "/"
+  : item.global
+  ? `/${item.path}`
+  : battletag
+  ? `/stats/player/${battletag}/${item.path}`
+  : "#";
     let isActive: boolean;
 
-if (href === "/") {
-  // root must be exact only
-  isActive = pathname === "/";
-} else {
-  // everything else can use prefix
-  isActive = pathname === href || pathname.startsWith(href + "/");
-}
+    if (href === "/") {
+      isActive = pathname === "/";
+    } else {
+      isActive = pathname === href || pathname.startsWith(href + "/");
+    }
 
     return (
       <MenuItem
         key={item.title}
         as="link"
         href={href}
-        isActive={isActive}
-        onClick={closeSidebar}
-        className={depth ? "ml-5 text-sm" : ""}
+        isActive={!isDisabled && isActive}
+        onClick={isDisabled ? undefined : closeSidebar}
+        className={`${depth ? "ml-5 text-sm" : ""} ${
+          isDisabled ? "opacity-40 pointer-events-none" : ""
+        }`}
       >
         {item.icon && depth === 0 && <item.icon className="w-4 h-4" />}
         {item.title}
@@ -93,7 +72,10 @@ if (href === "/") {
   return (
     <>
       {isMobile && isOpen && (
-        <div className="fixed inset-0 z-40 bg-black/40" onClick={closeSidebar} />
+        <div
+          className="fixed inset-0 z-40 bg-black/40"
+          onClick={closeSidebar}
+        />
       )}
 
       <aside
@@ -119,7 +101,9 @@ if (href === "/") {
                 {group.items.map((item) => (
                   <div key={item.title}>
                     {renderItem(item)}
-                    {item.items?.map((sub: any) => renderItem(sub, 1))}
+                    {item.items?.map((sub: any) =>
+                      renderItem(sub, 1)
+                    )}
                   </div>
                 ))}
               </div>

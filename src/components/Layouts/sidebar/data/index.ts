@@ -24,25 +24,31 @@ export const NAV_DATA: NavGroup[] = [
   /* =====================================================
      GLOBAL / NON-PLAYER PAGES
   ===================================================== */
-
-  {
-    label: "MAIN MENU",
-    items: [
-      {
-        title: "Player Search",
-        icon: Icons.HomeIcon,
-        path: "", // "/" handled in Sidebar
-        as: "link",
-      },
-      {
-        title: "Matchup",
-        icon: Icons.HomeIcon,
-        path: "matchup",
-        as: "link",
-        global: true,
-      },
-    ],
-  },
+{
+  label: "MAIN MENU",
+  items: [
+    {
+      title: "Player Search",
+      icon: Icons.HomeIcon,
+      path: "",
+      as: "link",
+    },
+    {
+      title: "Matchup",
+      icon: Icons.HomeIcon,
+      path: "matchup",
+      as: "link",
+      global: true,
+    },
+    {
+      title: "Live 1v1",
+      icon: Icons.HomeIcon,
+      path: "live",
+      as: "link",
+      global: true,
+    },
+  ],
+},
 
   /* =====================================================
      PLAYER PAGES
@@ -93,7 +99,6 @@ export const NAV_DATA: NavGroup[] = [
         path: "vs-player",
         as: "link",
       },
-
       /* ---------- SoS Ladder ---------- */
 
       {
