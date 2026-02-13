@@ -38,58 +38,53 @@ export default function LiveMatchCard({ match }: Props) {
       : "text-emerald-500"
 
   return (
-    <div className="rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 py-3 shadow-sm">
+    <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-2 py-2 shadow-md">
       {/* Top meta */}
-      <div className="flex justify-between text-[12px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
-        <span className="truncate">{mapName}</span>
-        <span className="truncate">{serverName}</span>
+      <div className="flex justify-between text-sm uppercase tracking-wide text-gray-500 dark:text-gray-400">
+        <span>{mapName}</span>
+        <span>{serverName}</span>
       </div>
 
       {/* Main row */}
-      <div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-center gap-x-4">
-        {/* Player A (left) */}
-        <div className="min-w-0 text-left">
-          <div className="font-medium truncate text-gray-900 dark:text-gray-100">
+      <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-x-8">
+        {/* Player A */}
+        <div className="text-left">
+          <div className="text-xl font-semibold text-gray-900 dark:text-gray-100">
             {playerA.name}
-            <span className="ml-1 text-xs text-gray-500 dark:text-gray-400 tabular-nums">
-              ({playerA.oldMmr})
-            </span>
+          </div>
+          <div className="text-sm text-gray-500 tabular-nums">
+            {playerA.oldMmr}
           </div>
         </div>
 
-        {/* Probability center */}
-        <div className="w-24 text-center">
-          <div className="flex justify-between text-sm font-semibold tabular-nums">
+        {/* Probability */}
+        <div className="w-32 text-center">
+          <div className="flex justify-between text-xl font-bold tabular-nums">
             <span className={isAFavored ? "text-emerald-500" : "text-gray-500"}>
               {winProbA}%
             </span>
-
             <span className={!isAFavored ? "text-emerald-500" : "text-gray-500"}>
               {winProbB}%
             </span>
           </div>
-
-          <div className="mt-0.5 text-[12px] text-gray-400">
-            {isAFavored ? ">" : "<"}
-          </div>
         </div>
 
-        {/* Player B (right / outer side) */}
-        <div className="min-w-0 text-right">
-          <div className="font-medium truncate text-gray-900 dark:text-gray-100">
+        {/* Player B */}
+        <div className="text-right">
+          <div className="text-xl font-semibold text-gray-900 dark:text-gray-100">
             {playerB.name}
-            <span className="ml-1 text-xs text-gray-500 dark:text-gray-400 tabular-nums">
-              ({playerB.oldMmr})
-            </span>
+          </div>
+          <div className="text-sm text-gray-500 tabular-nums">
+            {playerB.oldMmr}
           </div>
         </div>
       </div>
 
       {/* Bottom meta */}
-      <div className="mt-2 flex justify-between text-[11px]">
+      <div className="mt-4 flex justify-between text-sm">
         <span className={pingColor}>Δ {pingDiff}ms</span>
         <span className="text-gray-500 dark:text-gray-400">
-          {startedMinutesAgo}m
+          {startedMinutesAgo}m ago
         </span>
       </div>
     </div>
