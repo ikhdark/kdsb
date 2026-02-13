@@ -7,7 +7,9 @@ type Player = {
   name: string
   battleTag: string
   oldMmr: number
-  race: number   // bitmask
+  race: number
+  mmrIfWin: number
+  mmrIfLose: number
 }
 
 type ProcessedMatch = {
@@ -25,18 +27,13 @@ type ProcessedMatch = {
 const ENDPOINT =
   "https://website-backend.w3champions.com/api/matches/ongoing?offset=0&gateway=20&pageSize=50&gameMode=1&map=Overall&sort=startTimeDescending"
 
-/* ======================
-   Normalize live enum
-   to ladder bitmask
-====================== */
-
 function liveEnumToBitmask(race: number | undefined): number {
   switch (race) {
-    case 1: return 1  // Human
-    case 2: return 2  // Orc
-    case 3: return 8  // Undead
-    case 4: return 4  // Night Elf
-    case 0: return 0  // Random
+    case 1: return 1
+    case 2: return 2
+    case 3: return 8
+    case 4: return 4
+    case 0: return 0
     default: return 0
   }
 }
@@ -106,6 +103,19 @@ export default function LiveMatches() {
 
           const winProbA = Math.round(probA * 100)
 
+          // ===== Predicted MMR Change =====
+          const K = 20
+
+          const expectedA = probA
+          const expectedB = 1 - probA
+
+          const mmrIfWinA = Math.round(K * (1 - expectedA))
+          const mmrIfLoseA = Math.round(K * (0 - expectedA))
+
+          const mmrIfWinB = Math.round(K * (1 - expectedB))
+          const mmrIfLoseB = Math.round(K * (0 - expectedB))
+          // =================================
+
           const pingDiff = Math.abs(pingA - pingB)
 
           const startedMinutesAgo = Math.floor(
@@ -121,12 +131,16 @@ export default function LiveMatches() {
               battleTag: p1.battleTag,
               oldMmr: mmrA,
               race: liveEnumToBitmask(p1.race),
+              mmrIfWin: mmrIfWinA,
+              mmrIfLose: mmrIfLoseA,
             },
             playerB: {
               name: p2.name,
               battleTag: p2.battleTag,
               oldMmr: mmrB,
               race: liveEnumToBitmask(p2.race),
+              mmrIfWin: mmrIfWinB,
+              mmrIfLose: mmrIfLoseB,
             },
             winProbA,
             pingDiff,
