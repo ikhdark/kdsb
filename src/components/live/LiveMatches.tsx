@@ -10,6 +10,7 @@ type Player = {
   race: number
   mmrIfWin: number
   mmrIfLose: number
+  ping: number
 }
 
 type ProcessedMatch = {
@@ -83,20 +84,18 @@ export default function LiveMatches() {
           const pingB =
             m.serverInfo?.playerServerInfos?.[1]?.averagePing ?? 0
 
-          const pingAdvantage = pingB - pingA
-          const pingRatingImpact = pingAdvantage * 0.5
-
+          // ===== blended rating (NO ping impact) =====
           const blendedA =
             (sosA ?? mmrA) * 0.7 +
-            mmrA * 0.3 +
-            pingRatingImpact * 0.1
+            mmrA * 0.35
 
           const blendedB =
             (sosB ?? mmrB) * 0.7 +
-            mmrB * 0.3 -
-            pingRatingImpact * 0.1
+            mmrB * 0.35
+          // ===========================================
 
-          const diff = blendedA - blendedB
+          // Elo probability from real MMR
+          const diff = mmrA - mmrB
 
           const probA =
             1 / (1 + Math.pow(10, -diff / 400))
@@ -104,7 +103,12 @@ export default function LiveMatches() {
           const winProbA = Math.round(probA * 100)
 
           // ===== Predicted MMR Change =====
-          const K = 20
+          const confidence = Math.abs(probA - 0.5)
+
+const K =
+  confidence > 0.40 ? 24 :
+  confidence > 0.25 ? 18 :
+  16
 
           const expectedA = probA
           const expectedB = 1 - probA
@@ -133,6 +137,7 @@ export default function LiveMatches() {
               race: liveEnumToBitmask(p1.race),
               mmrIfWin: mmrIfWinA,
               mmrIfLose: mmrIfLoseA,
+              ping: pingA,
             },
             playerB: {
               name: p2.name,
@@ -141,6 +146,7 @@ export default function LiveMatches() {
               race: liveEnumToBitmask(p2.race),
               mmrIfWin: mmrIfWinB,
               mmrIfLose: mmrIfLoseB,
+              ping: pingB,
             },
             winProbA,
             pingDiff,

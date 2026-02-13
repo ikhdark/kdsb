@@ -16,6 +16,7 @@ type Props = {
       race: number
       mmrIfWin: number
       mmrIfLose: number
+      ping: number
     }
     playerB: {
       name: string
@@ -23,11 +24,18 @@ type Props = {
       race: number
       mmrIfWin: number
       mmrIfLose: number
+      ping: number
     }
     winProbA: number
     pingDiff: number
     startedMinutesAgo: number
   }
+}
+
+function pingColor(ping: number) {
+  if (ping > 120) return "text-rose-500"
+  if (ping > 70) return "text-yellow-500"
+  return "text-emerald-500"
 }
 
 export default function LiveMatchCard({ match }: Props) {
@@ -37,23 +45,15 @@ export default function LiveMatchCard({ match }: Props) {
     playerA,
     playerB,
     winProbA,
-    pingDiff,
     startedMinutesAgo,
   } = match
 
   const winProbB = 100 - winProbA
   const isAFavored = winProbA >= winProbB
 
-  const pingColor =
-    pingDiff > 70
-      ? "text-rose-500"
-      : pingDiff > 30
-      ? "text-yellow-500"
-      : "text-emerald-500"
-
   return (
     <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 sm:px-6 py-4 shadow-md">
-      
+
       {/* Top Row */}
       <div className="flex justify-between text-xs sm:text-sm uppercase tracking-wide text-gray-500 dark:text-gray-400">
         <span className="truncate max-w-[45%]">{mapName}</span>
@@ -63,7 +63,7 @@ export default function LiveMatchCard({ match }: Props) {
       {/* Main Row */}
       <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-x-3 sm:gap-x-8">
 
-        {/* Player A */}
+        {/* PLAYER A */}
         <div className="min-w-0 text-left">
           <div className="truncate text-base sm:text-xl font-semibold text-gray-900 dark:text-gray-100">
             {playerA.name}
@@ -79,11 +79,15 @@ export default function LiveMatchCard({ match }: Props) {
                 {playerA.oldMmr}
               </div>
 
-              <div className="text-[12px] uppercase tracking-wide text-gray-400 mt-2">
-                Predicted MMR: If Win / If Lose
+              <div className={`text-[11px] ${pingColor(playerA.ping)}`}>
+                {playerA.ping}ms
               </div>
 
-              <div className="text-[12px] tabular-nums">
+              <div className="text-[11px] uppercase tracking-wide text-gray-400 mt-2">
+                Predicted MMR change If Win / If Lose
+              </div>
+
+              <div className="text-[11px] tabular-nums">
                 <span className="text-emerald-500">
                   {playerA.mmrIfWin > 0 ? `+${playerA.mmrIfWin}` : playerA.mmrIfWin}
                 </span>
@@ -100,9 +104,9 @@ export default function LiveMatchCard({ match }: Props) {
           )}
         </div>
 
-        {/* Probability */}
+        {/* CENTER */}
         <div className="w-24 sm:w-36 text-center">
-          <div className="text-[10px] sm:text-xs uppercase tracking-wide text-gray-400 mb-1">
+          <div className="text-[11px] sm:text-xs uppercase tracking-wide text-gray-400 mb-1">
             Win Probability
           </div>
 
@@ -116,7 +120,7 @@ export default function LiveMatchCard({ match }: Props) {
           </div>
         </div>
 
-        {/* Player B */}
+        {/* PLAYER B */}
         <div className="min-w-0 text-right">
           <div className="truncate text-base sm:text-xl font-semibold text-gray-900 dark:text-gray-100">
             {playerB.name}
@@ -132,8 +136,12 @@ export default function LiveMatchCard({ match }: Props) {
                 {playerB.oldMmr}
               </div>
 
-              <div className="text-[10px] uppercase tracking-wide text-gray-400 mt-2">
-                Predicted MMR: If Win / If Lose
+              <div className={`text-[11px] ${pingColor(playerB.ping)}`}>
+                {playerB.ping}ms
+              </div>
+
+              <div className="text-[11px] uppercase tracking-wide text-gray-400 mt-2">
+                Predicted MMR change If Win / If Lose
               </div>
 
               <div className="text-[11px] tabular-nums">
@@ -147,20 +155,17 @@ export default function LiveMatchCard({ match }: Props) {
               </div>
             </>
           ) : (
-            <div className="text-xs text-gray-500 mt-1">
+            <div className="text-sm text-gray-500 mt-1">
               Not ranked
             </div>
           )}
         </div>
       </div>
 
-      {/* Bottom Row */}
-<div className="text-[12px] uppercase tracking-wide text-gray-400">
-  Ping Difference
-</div>
-<div className={pingColor}>
-  Δ {pingDiff}ms
-</div>
+      {/* Bottom Right Time */}
+      <div className="mt-3 text-right text-xs text-gray-500">
+        {startedMinutesAgo}m ago
+      </div>
     </div>
   )
 }
