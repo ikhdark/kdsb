@@ -28,17 +28,6 @@ type ProcessedMatch = {
 const ENDPOINT =
   "https://website-backend.w3champions.com/api/matches/ongoing?offset=0&gateway=20&pageSize=50&gameMode=1&map=Overall&sort=startTimeDescending"
 
-function liveEnumToBitmask(race: number | undefined): number {
-  switch (race) {
-    case 1: return 1
-    case 2: return 2
-    case 3: return 8
-    case 4: return 4
-    case 0: return 0
-    default: return 0
-  }
-}
-
 export default function LiveMatches() {
   const [matches, setMatches] = useState<ProcessedMatch[]>([])
   const [loading, setLoading] = useState(true)
@@ -105,10 +94,10 @@ export default function LiveMatches() {
           // ===== Predicted MMR Change =====
           const confidence = Math.abs(probA - 0.5)
 
-const K =
-  confidence > 0.40 ? 24 :
-  confidence > 0.25 ? 18 :
-  16
+          const K =
+            confidence > 0.40 ? 24 :
+            confidence > 0.25 ? 18 :
+            16
 
           const expectedA = probA
           const expectedB = 1 - probA
@@ -134,7 +123,7 @@ const K =
               name: p1.name,
               battleTag: p1.battleTag,
               oldMmr: mmrA,
-              race: liveEnumToBitmask(p1.race),
+              race: typeof p1.race === "number" ? p1.race : 0,
               mmrIfWin: mmrIfWinA,
               mmrIfLose: mmrIfLoseA,
               ping: pingA,
@@ -143,7 +132,7 @@ const K =
               name: p2.name,
               battleTag: p2.battleTag,
               oldMmr: mmrB,
-              race: liveEnumToBitmask(p2.race),
+              race: typeof p2.race === "number" ? p2.race : 0,
               mmrIfWin: mmrIfWinB,
               mmrIfLose: mmrIfLoseB,
               ping: pingB,
