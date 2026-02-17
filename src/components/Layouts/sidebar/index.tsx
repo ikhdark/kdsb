@@ -57,7 +57,7 @@ const href = isSearch
         href={href}
         isActive={!isDisabled && isActive}
         onClick={isDisabled ? undefined : closeSidebar}
-        className={`${depth ? "ml-5 text-sm" : ""} ${
+        className={`${depth ? "pl-5 text-sm" : ""} ${
           isDisabled ? "opacity-40 pointer-events-none" : ""
         }`}
       >
