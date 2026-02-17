@@ -1,13 +1,15 @@
 import EmptyState from "@/components/EmptyState";
 import LadderPageUI from "@/components/LadderPage";
-
 import { getPlayerRaceLadder } from "@/services/playerRaceLadder";
 
 type Race = "human" | "orc" | "elf" | "undead" | "random";
 
 type PageProps = {
   params: Promise<{ race: string }>;
-  searchParams: Promise<{ page?: string; highlight?: string }>;
+  searchParams: Promise<{
+    page?: string;
+    highlight?: string;
+  }>;
 };
 
 const PAGE_SIZE = 50;
@@ -26,6 +28,7 @@ export default async function RaceGlobalPage({
   params,
   searchParams,
 }: PageProps) {
+  // ✅ ALWAYS await (your project rule)
   const { race: raceParam } = await params;
   const { page, highlight } = await searchParams;
 

@@ -47,7 +47,9 @@ const href = isSearch
     if (href === "/") {
       isActive = pathname === "/";
     } else {
-      isActive = pathname === href || pathname.startsWith(href + "/");
+      isActive =
+  pathname === href ||
+  (item.items && pathname.startsWith(href + "/"));
     }
 
     return (

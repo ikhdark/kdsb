@@ -6,8 +6,14 @@ import { getPlayerRaceLadder } from "@/services/playerRaceLadder";
 type Race = "human" | "orc" | "elf" | "undead" | "random";
 
 type PageProps = {
-  params: Promise<{ battletag: string; race: string }>;
-  searchParams: Promise<{ page?: string; highlight?: string }>;
+  params: Promise<{
+    battletag: string;
+    race: string;
+  }>;
+  searchParams: Promise<{
+    page?: string;
+    highlight?: string;
+  }>;
 };
 
 const PAGE_SIZE = 50;
@@ -30,6 +36,7 @@ export default async function RaceLadderPage({
   params,
   searchParams,
 }: PageProps) {
+  // ✔ required by your project setup
   const { battletag, race: raceParam } = await params;
   const { page, highlight } = await searchParams;
 
