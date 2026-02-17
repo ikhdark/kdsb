@@ -46,7 +46,7 @@ export default function LadderPage({
 
         <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
 
-          <table className="w-full table-fixed border-collapse text-sm">
+          <table className="w-full border-collapse text-sm">
 
             {/* HEADER */}
             <thead className="sticky top-0 bg-white dark:bg-zinc-900 z-10 text-xs uppercase tracking-wide text-zinc-500 font-semibold">
