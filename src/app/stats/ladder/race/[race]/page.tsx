@@ -6,13 +6,11 @@ import { getPlayerRaceLadder } from "@/services/playerRaceLadder";
 type Race = "human" | "orc" | "elf" | "undead" | "random";
 
 type PageProps = {
-  params: Promise<{ battletag: string; race: string }>;
+  params: Promise<{ race: string }>;
   searchParams: Promise<{ page?: string; highlight?: string }>;
 };
 
 const PAGE_SIZE = 50;
-
-/* helpers */
 
 function raceLabel(race: string) {
   const r = race.toLowerCase();
@@ -24,18 +22,12 @@ function raceLabel(race: string) {
   return race;
 }
 
-/* page */
-
-export default async function RaceLadderPage({
+export default async function RaceGlobalPage({
   params,
   searchParams,
 }: PageProps) {
-  const { battletag, race: raceParam } = await params;
+  const { race: raceParam } = await params;
   const { page, highlight } = await searchParams;
-
-  if (!battletag || !raceParam) {
-    return <EmptyState message="Invalid player" />;
-  }
 
   const race = raceParam.toLowerCase() as Race;
 
@@ -46,7 +38,7 @@ export default async function RaceLadderPage({
   const rawPage = Math.max(1, Number(page) || 1);
 
   const data = await getPlayerRaceLadder(
-    battletag,
+    undefined,
     race,
     rawPage,
     PAGE_SIZE
@@ -56,30 +48,23 @@ export default async function RaceLadderPage({
     return <EmptyState message="No ladder data available yet" />;
   }
 
-  const {
-    battletag: canonicalBt,
-    full: rows,
-    poolSize,
-  } = data;
+  const { full: rows, poolSize } = data;
 
   const totalPages = Math.max(1, Math.ceil(poolSize / PAGE_SIZE));
   const currentPage = Math.min(Math.max(1, rawPage), totalPages);
 
-  const base = `/stats/player/${encodeURIComponent(
-    canonicalBt
-  )}/ladder/race/${race}`;
+  const base = `/stats/ladder/race/${race}`;
 
   return (
     <LadderPageUI
-      title={canonicalBt}
-      subtitle={`${raceLabel(race)} Ladder · Season 24 · ${poolSize.toLocaleString()} players`}
+      title={`Global ${raceLabel(race)} Ladder`}
+      subtitle={`Season 24 · ${poolSize.toLocaleString()} players`}
       base={base}
       rows={rows}
       poolSize={poolSize}
       currentPage={currentPage}
       totalPages={totalPages}
       highlight={highlight}
-      me={data.me}
     />
   );
 }

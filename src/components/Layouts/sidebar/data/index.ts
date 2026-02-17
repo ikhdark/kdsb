@@ -10,7 +10,7 @@ type NavItem = {
   as: "link";
   global?: boolean;
   disabled?: boolean;
-  items?: NavItem[]; // nested items
+  items?: NavItem[];
 };
 
 type NavGroup = {
@@ -22,33 +22,52 @@ type NavGroup = {
 
 export const NAV_DATA: NavGroup[] = [
   /* =====================================================
-     GLOBAL / NON-PLAYER PAGES
+     MAIN MENU (GLOBAL)
   ===================================================== */
-{
-  label: "MAIN MENU",
-  items: [
-    {
-      title: "Player Search",
-      icon: Icons.HomeIcon,
-      path: "",
-      as: "link",
-    },
-    {
-      title: "Matchup",
-      icon: Icons.HomeIcon,
-      path: "matchup",
-      as: "link",
-      global: true,
-    },
-    {
-      title: "Live 1v1",
-      icon: Icons.HomeIcon,
-      path: "live",
-      as: "link",
-      global: true,
-    },
-  ],
-},
+
+  {
+    label: "MAIN MENU",
+    items: [
+      {
+        title: "Player Search",
+        icon: Icons.HomeIcon,
+        path: "",
+        as: "link",
+      },
+      {
+        title: "Matchup",
+        icon: Icons.HomeIcon,
+        path: "matchup",
+        as: "link",
+        global: true,
+      },
+      {
+        title: "Live 1v1",
+        icon: Icons.HomeIcon,
+        path: "live",
+        as: "link",
+        global: true,
+      },
+
+      /* ---------- SoS Ladder ---------- */
+
+      {
+        title: "SoS Ladder",
+        icon: Icons.HomeIcon,
+        path: "ladder",
+        as: "link",
+        global: true,
+        items: [
+          { title: "Global", path: "ladder", as: "link", global: true },
+          { title: "Random", path: "ladder/race/random", as: "link", global: true },
+          { title: "Undead", path: "ladder/race/undead", as: "link", global: true },
+          { title: "Orc", path: "ladder/race/orc", as: "link", global: true },
+          { title: "Human", path: "ladder/race/human", as: "link", global: true },
+          { title: "Night Elf", path: "ladder/race/elf", as: "link", global: true },
+        ],
+      },
+    ],
+  },
 
   /* =====================================================
      PLAYER PAGES
@@ -98,22 +117,6 @@ export const NAV_DATA: NavGroup[] = [
         icon: Icons.HomeIcon,
         path: "vs-player",
         as: "link",
-      },
-      /* ---------- SoS Ladder ---------- */
-
-      {
-        title: "SoS Ladder",
-        icon: Icons.HomeIcon,
-        path: "ladder",
-        as: "link",
-        items: [
-          { title: "Global", path: "ladder", as: "link" },
-          { title: "Random", path: "ladder/race/random", as: "link" },
-          { title: "Undead", path: "ladder/race/undead", as: "link" },
-          { title: "Orc", path: "ladder/race/orc", as: "link" },
-          { title: "Human", path: "ladder/race/human", as: "link" },
-          { title: "Night Elf", path: "ladder/race/elf", as: "link" },
-        ],
       },
     ],
   },
