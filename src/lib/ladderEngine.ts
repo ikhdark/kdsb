@@ -14,6 +14,7 @@ export type LadderInputRow = {
   wins: number;
   games: number;
   sos: number | null;
+  country?: string | null;
 };
 
 export type LadderRow = {
@@ -39,7 +40,7 @@ const MMR_CAP = 3000;
 /*
 Weights
 */
-const W_MMR = 0.55;
+const W_MMR = 0.60;
 const W_SOS = 0.40;
 const W_ACTIVITY = 0.05;
 
@@ -47,7 +48,7 @@ const W_ACTIVITY = 0.05;
 Confidence ramps
 Lower = faster full strength
 */
-const SOS_CONFIDENCE_K = 1;
+const SOS_CONFIDENCE_K = 1.2;
 const MMR_CONFIDENCE_K = 1;
 
 /*

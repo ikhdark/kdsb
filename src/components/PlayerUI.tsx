@@ -33,9 +33,9 @@ export function PlayerHeader({
       className={className ? cn("space-y-2", className) : "space-y-2"}
       {...props}
     >
-      <h1 className="truncate text-3xl font-semibold tracking-tight text-black dark:text-white">
-        {battletag}
-      </h1>
+     <h1 className="truncate text-3xl font-semibold tracking-tight text-black dark:text-white whitespace-pre-line">
+  {battletag}
+</h1>
 
       <p className="text-sm text-gray-500 dark:text-gray-400">
         {subtitle}

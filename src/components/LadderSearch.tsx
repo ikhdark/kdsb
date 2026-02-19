@@ -2,15 +2,13 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useCallback } from "react";
+import BattleTagInput from "@/components/BattleTagInput";
 
 const PAGE_SIZE = 50;
 
-/* stable helper (not recreated each render) */
+/* stable helper */
 const normalize = (s: string) =>
   s.replace(/\s+/g, "").toLowerCase();
-
-const INPUT_BASE =
-  "w-full max-w-xs rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 dark:border-gray-700 dark:bg-gray-800";
 
 export default function LadderSearch({
   rows,
@@ -23,11 +21,7 @@ export default function LadderSearch({
   const [q, setQ] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  /* =====================================================
-     precompute once
-     store BOTH normalized + original index
-  ===================================================== */
-
+  /* precompute once */
   const normalizedRows = useMemo(
     () =>
       rows.map((r) => ({
@@ -36,52 +30,43 @@ export default function LadderSearch({
     [rows]
   );
 
-  /* ===================================================== */
+  const runSearch = useCallback(
+    (queryRaw: string) => {
+      const query = queryRaw.trim();
+      if (!query) return;
 
-  const runSearch = useCallback(() => {
-    const query = q.trim();
-    if (!query) return;
+      const qNorm = normalize(query);
 
-    const qNorm = normalize(query);
+      const idx = normalizedRows.findIndex((r) =>
+        r.norm.includes(qNorm)
+      );
 
-    const idx = normalizedRows.findIndex((r) =>
-      r.norm.includes(qNorm)
-    );
+      if (idx === -1) {
+        setError("Player not found");
+        return;
+      }
 
-    if (idx === -1) {
-      setError("Player not found");
-      return;
-    }
+      setError(null);
 
-    setError(null);
+      const page = Math.floor(idx / PAGE_SIZE) + 1;
 
-    const page = Math.floor(idx / PAGE_SIZE) + 1;
-
-    router.push(
-      `${base}?page=${page}&highlight=${encodeURIComponent(query)}`
-    );
-
-    setQ("");
-  }, [q, normalizedRows, router, base]);
-
-  /* ===================================================== */
+      router.push(
+        `${base}?page=${page}&highlight=${encodeURIComponent(query)}`
+      );
+    },
+    [normalizedRows, router, base]
+  );
 
   return (
-    <div className="mb-4 space-y-1">
-      <input
+    <div className="mb-4 space-y-1 max-w-xs">
+      <BattleTagInput
         value={q}
-        onChange={(e) => {
-          setQ(e.target.value);
+        onChange={(v) => {
+          setQ(v);
           setError(null);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            runSearch();
-          }
+          runSearch(v); // ← jump when user selects
         }}
         placeholder="Find player in ladder..."
-        className={INPUT_BASE}
       />
 
       {error && (

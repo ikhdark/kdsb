@@ -8,6 +8,8 @@ export type FlattenedLadderRow = {
   games: number;
   wins: number;
 
+  country?: string | null; // <-- keep this
+
   battleTag?: string;
   battleTagLower?: string;
   playerIdLower?: string;
@@ -19,7 +21,6 @@ export type FlattenedLadderRow = {
 
 export function flattenCountryLadder(payload: unknown): FlattenedLadderRow[] {
   const out: FlattenedLadderRow[] = [];
-
   const seen = new Set<string>();
 
   const toNum = (v: unknown): number | null => {
@@ -35,9 +36,7 @@ export function flattenCountryLadder(payload: unknown): FlattenedLadderRow[] {
 
   const pushRow = (row: FlattenedLadderRow) => {
     const key = `${row.race}|${row.battleTagLower ?? row.playerIdLower ?? ""}`;
-
     if (!key || seen.has(key)) return;
-
     seen.add(key);
     out.push(row);
   };
@@ -64,6 +63,19 @@ export function flattenCountryLadder(payload: unknown): FlattenedLadderRow[] {
     const games = toNum(obj.games ?? player?.games);
     const winsRaw =
       toNum(obj.wins ?? player?.wins ?? obj.won ?? player?.won) ?? 0;
+
+    // ✅ country extraction (try common fields)
+const country =
+  toStr(obj.country) ??
+  toStr(obj.countryCode) ??
+  toStr(obj.location) ??
+  toStr(obj.region) ??
+  toStr(player?.country) ??
+  toStr(player?.countryCode) ??
+  toStr(player?.location) ??
+  toStr(player?.region) ??
+  toStr(player?.profileCountry) ??
+  null;
 
     const fromBattleTagFields =
       toStr(obj.battleTag) ??
@@ -103,6 +115,9 @@ export function flattenCountryLadder(payload: unknown): FlattenedLadderRow[] {
         mmr: Math.round(mmr),
         games: Math.trunc(games),
         wins: Math.trunc(winsRaw),
+
+        country, // ✅ actually store it
+
         battleTag: battleTag ?? undefined,
         battleTagLower,
         playerIdLower,
@@ -115,6 +130,5 @@ export function flattenCountryLadder(payload: unknown): FlattenedLadderRow[] {
   };
 
   visit(payload);
-
   return out;
 }

@@ -22,7 +22,7 @@ const GATEWAY = 20;
 
 const MIN_GAMES = 5;
 const MIN_LEAGUE = 0;
-const MAX_LEAGUE = 30;
+const MAX_LEAGUE = 35;
 
 const SOS_CONCURRENCY = 25;
 
@@ -72,13 +72,17 @@ export function buildInputs(rows: any[]): LadderInputRow[] {
         (r.games ?? 0) >= MIN_GAMES &&
         (r.mmr ?? 0) > 0
     )
-    .map((r) => ({
-      battletag: r.battleTag,
-      mmr: r.mmr,
-      wins: r.wins,
-      games: r.games,
-      sos: null,
-    }));
+.map((r) => ({
+  battletag: r.battleTag,
+  mmr: r.mmr,
+  wins: r.wins,
+  games: r.games,
+  sos: null,
+ country:
+  typeof r.country === "string" && r.country.length >= 2
+    ? r.country.toUpperCase()
+    : null,
+}));
 }
 
 /* =========================

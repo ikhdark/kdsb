@@ -21,10 +21,6 @@ type NavGroup = {
 /* ================= DATA ================= */
 
 export const NAV_DATA: NavGroup[] = [
-  /* =====================================================
-     MAIN MENU (GLOBAL)
-  ===================================================== */
-
   {
     label: "MAIN MENU",
     items: [
@@ -49,8 +45,6 @@ export const NAV_DATA: NavGroup[] = [
         global: true,
       },
 
-      /* ---------- SoS Ladder ---------- */
-
       {
         title: "SoS Ladder",
         icon: Icons.HomeIcon,
@@ -59,19 +53,19 @@ export const NAV_DATA: NavGroup[] = [
         global: true,
         items: [
           { title: "Global", path: "ladder", as: "link", global: true },
+
           { title: "Random", path: "ladder/race/random", as: "link", global: true },
           { title: "Undead", path: "ladder/race/undead", as: "link", global: true },
           { title: "Orc", path: "ladder/race/orc", as: "link", global: true },
           { title: "Human", path: "ladder/race/human", as: "link", global: true },
           { title: "Night Elf", path: "ladder/race/elf", as: "link", global: true },
+
+          // ✅ THIS is what was missing
+          { title: "By Country", path: "ladder/country", as: "link", global: true },
         ],
       },
     ],
   },
-
-  /* =====================================================
-     PLAYER PAGES
-  ===================================================== */
 
   {
     label: "PLAYER PAGES",
