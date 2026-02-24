@@ -25,11 +25,11 @@ export type LadderRow = {
 
 const MMR_CAP = 3000;
 
-const W_MMR = 0.60;
-const W_SOS = 0.40;
+const W_MMR = 0.65;
+const W_SOS = 0.35;
 const W_ACTIVITY = 0.05;
 
-const SOS_CONFIDENCE_K = 1.2;
+const SOS_CONFIDENCE_K = 1;
 const MMR_CONFIDENCE_K = 1;
 
 const SCORE_SCALE = 10;
@@ -58,7 +58,7 @@ function computeScore(
 ): number {
   const sosVal = sos ?? mmr;
 
-  const mmrEff = mmr * confidence(games, MMR_CONFIDENCE_K);
+  const mmrEff = mmr;
   const sosEff = sosVal * confidence(games, SOS_CONFIDENCE_K);
 
   const raw =
