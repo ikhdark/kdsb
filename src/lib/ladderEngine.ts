@@ -34,7 +34,7 @@ const W_MMR = 0.80;
 const W_SOS = 0.15;
 const W_ACTIVITY = 0.05;
 
-const SOS_CONFIDENCE_K = 15;
+const SOS_CONFIDENCE_K = 10;
 
 const SCORE_SCALE = 10;
 
