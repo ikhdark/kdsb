@@ -1,5 +1,10 @@
 import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
-import { buildInputs, buildPaged, computeSoS } from "./ladderCore";
+import {
+  fetchAllLeagues,
+  buildInputs,
+  buildPaged,
+  computeSoS,
+} from "./ladderCore";
 import { fetchCountryLadder } from "@/services/w3cApi";
 import { flattenCountryLadder } from "@/lib/ranking";
 
@@ -46,6 +51,7 @@ export async function getCountryRaceLadder(
   page = 1,
   pageSize = 50
 ): Promise<CountryRaceLadderResponse | null> {
+
   const canonicalTag = inputBattleTag
     ? await resolveBattleTagViaSearch(inputBattleTag)
     : null;
@@ -57,18 +63,16 @@ export async function getCountryRaceLadder(
 
   const payload = await fetchCountryLadder(
     countryUpper,
-    20, // gateway
-    1,  // gameMode
-    24  // season
+    20,
+    1,
+    24
   );
 
   if (!payload) return null;
 
-  /* ---------- flatten ---------- */
-
   const flattened = flattenCountryLadder(payload);
 
-  /* ---------- filter race (API already country-scoped) ---------- */
+  /* ---------- filter race ---------- */
 
   const raceRows = flattened.filter(
     (r: any) => r.race === raceId
@@ -102,20 +106,14 @@ export async function getCountryRaceLadder(
     };
   }
 
-  /* ---------- compute SoS BEFORE ranking ---------- */
+  /* ---------- build ladder FIRST (same as global) ---------- */
 
-  await computeSoS(
-    inputs as unknown as LadderRow[],
-    raceId
-  );
+  const { ladder, visible, top } =
+    buildPaged(inputs, page, pageSize);
 
-  /* ---------- build ladder AFTER SoS ---------- */
+  /* ---------- compute SoS AFTER (same as global) ---------- */
 
-  const { ladder, visible, top } = buildPaged(
-    inputs,
-    page,
-    pageSize
-  );
+  await computeSoS(visible, raceId);
 
   /* ---------- find player ---------- */
 

@@ -3,10 +3,20 @@ import { getPlayerLadder } from "@/services/playerLadder";
 
 const PAGE_SIZE = 50;
 
-export default async function Page({ searchParams }: any) {
-  const page = Number(searchParams?.page) || 1;
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const params = await searchParams;
 
-  const data = await getPlayerLadder(undefined, page, PAGE_SIZE);
+  const page = Number(params?.page) || 1;
+
+  const data = await getPlayerLadder(
+    undefined,
+    page,
+    PAGE_SIZE
+  );
 
   if (!data) return null;
 
