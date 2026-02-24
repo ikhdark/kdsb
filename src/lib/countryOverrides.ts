@@ -8,7 +8,7 @@ export const COUNTRY_OVERRIDE: Record<string, CountryOverride> = {
   "zhoolikaz#2787": { from: "US", to: "RU" },
   "SoYmaFans#1524": { from: "IM", to: "US" },
   "MangoIsNice#1230": { from: "CN", to: "US" },
-  
+  "Trir#21488": { from: "NL", to: "RU" },
 };
 
 export function effectiveCountry(battletag: string, apiCountry: string) {
