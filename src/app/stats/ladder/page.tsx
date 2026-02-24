@@ -28,7 +28,7 @@ export default async function Page({
   return (
     <LadderPageUI
       title="Global Ladder"
-      subtitle={`Season 24 · ${data.poolSize.toLocaleString()} players`}
+      subtitle={`Season 24 · ${data.poolSize.toLocaleString()} players • Rank = 80% MMR + 15% SoS (game-scaled) + 5% activity`}
       base="/stats/ladder"
       rows={data.full}
       poolSize={data.poolSize}

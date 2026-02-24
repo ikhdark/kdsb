@@ -61,7 +61,7 @@ export default async function RaceGlobalPage({
   return (
     <LadderPageUI
       title={`Global ${raceLabel(race)} Ladder`}
-      subtitle={`Season 24 · ${poolSize.toLocaleString()} players`}
+      subtitle={`Season 24 · ${poolSize.toLocaleString()} players · Rank = 80% MMR + 15% SoS (game-scaled) + 5% activity`}
       base={base}
       rows={rows}
       poolSize={poolSize}

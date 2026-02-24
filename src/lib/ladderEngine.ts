@@ -23,14 +23,18 @@ export type LadderRow = {
   games: number;
 };
 
-const MMR_CAP = 3000;
+/* =========================================
+   LADDER SCORING v2.2
+   - MMR authoritative
+   - SoS ramps slowly
+   - Activity proportional (minor stabilizer)
+   ========================================= */
 
-const W_MMR = 0.65;
-const W_SOS = 0.35;
+const W_MMR = 0.80;
+const W_SOS = 0.15;
 const W_ACTIVITY = 0.05;
 
-const SOS_CONFIDENCE_K = 1;
-const MMR_CONFIDENCE_K = 1;
+const SOS_CONFIDENCE_K = 15;
 
 const SCORE_SCALE = 10;
 
@@ -58,13 +62,18 @@ function computeScore(
 ): number {
   const sosVal = sos ?? mmr;
 
-  const mmrEff = mmr;
-  const sosEff = sosVal * confidence(games, SOS_CONFIDENCE_K);
+  // SoS ramps with sample size
+  const sosEff =
+    sosVal * confidence(games, SOS_CONFIDENCE_K);
+
+  // Activity normalized relative to rating scale
+  const activityNormalized =
+    (activityScore(games) / 200) * mmr;
 
   const raw =
-    mmrEff * W_MMR +
+    mmr * W_MMR +
     sosEff * W_SOS +
-    activityScore(games) * W_ACTIVITY;
+    activityNormalized * W_ACTIVITY;
 
   return Math.round((raw / SCORE_SCALE) * 10) / 10;
 }
@@ -72,22 +81,20 @@ function computeScore(
 export function buildLadder(
   rows: LadderInputRow[]
 ): LadderRow[] {
-  const ladder: LadderRow[] = rows
-    .filter((r) => r.mmr <= MMR_CAP)
-    .map((r) => {
-      const losses = r.games - r.wins;
+  const ladder: LadderRow[] = rows.map((r) => {
+    const losses = r.games - r.wins;
 
-      return {
-        rank: 0,
-        battletag: r.battletag,
-        mmr: r.mmr,
-        sos: r.sos,
-        score: computeScore(r.mmr, r.sos, r.games),
-        wins: r.wins,
-        losses,
-        games: r.games,
-      };
-    });
+    return {
+      rank: 0,
+      battletag: r.battletag,
+      mmr: r.mmr,
+      sos: r.sos,
+      score: computeScore(r.mmr, r.sos, r.games),
+      wins: r.wins,
+      losses,
+      games: r.games,
+    };
+  });
 
   ladder.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
