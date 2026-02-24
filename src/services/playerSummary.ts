@@ -133,10 +133,6 @@ function getBT(r: any): string {
   return r?.battletag ?? r?.battleTag ?? r?.battle_tag ?? "";
 }
 
-function getRaceId(r: any): number {
-  return Number(r?.race ?? r?.raceId ?? -1);
-}
-
 function uniqBy<T>(rows: T[], keyFn: (r: T) => string) {
   const seen = new Set<string>();
   const out: T[] = [];
@@ -233,42 +229,37 @@ export async function getW3CRank(
     });
   }
 
- // (B) Inject players overridden INTO this effective country
-const injectTargets = Object.entries(COUNTRY_OVERRIDE)
-  .filter(([, o]) => o.to.toUpperCase() === effectiveCountry);
+  // (B) Inject players overridden INTO this effective country
+  const injectTargets = Object.entries(COUNTRY_OVERRIDE)
+    .filter(([, o]) => o.to.toUpperCase() === effectiveCountry);
 
-if (injectTargets.length) {
-  const byFrom = new Map<string, string[]>();
+  if (injectTargets.length) {
+    const byFrom = new Map<string, string[]>();
 
-  for (const [bt, o] of injectTargets) {
-    const from = o.from.toUpperCase();
-    byFrom.set(from, [...(byFrom.get(from) ?? []), bt]);
-  }
-
-  for (const [fromCountry, battletags] of byFrom.entries()) {
-    const fromPayload = await fetchCountryLadder(
-      fromCountry,
-      GATEWAY,
-      GAMEMODE,
-      SEASON
-    );
-    if (!fromPayload) continue;
-
-    const fromRows = flattenCountryLadder(fromPayload);
-
-    for (const bt of battletags) {
-      // inject ALL race rows for this battletag
-      const hits = fromRows.filter((r: any) => getBT(r) === bt);
-      for (const h of hits) countryRows.push(h);
+    for (const [bt, o] of injectTargets) {
+      const from = o.from.toUpperCase();
+      byFrom.set(from, [...(byFrom.get(from) ?? []), bt]);
     }
-  }
 
-  // dedupe once, after all injections
-  countryRows = uniqBy(
-    countryRows,
-    (r: any) => `${getBT(r)}:${getRaceId(r)}`
-  );
-}
+    for (const [fromCountry, battletags] of byFrom.entries()) {
+      const fromPayload = await fetchCountryLadder(
+        fromCountry,
+        GATEWAY,
+        GAMEMODE,
+        SEASON
+      );
+      if (!fromPayload) continue;
+
+      const fromRows = flattenCountryLadder(fromPayload);
+
+      for (const bt of battletags) {
+        const hit = fromRows.find((r: any) => getBT(r) === bt);
+        if (hit) countryRows.push(hit);
+      }
+    }
+
+    countryRows = uniqBy(countryRows, (r: any) => getBT(r));
+  }
 
   /* ---------------- RANK BUILD ---------------- */
 
@@ -370,9 +361,7 @@ function getPlayerAndOpponentCI(match: any, lower: string) {
   const players = (match?.teams ?? []).flatMap((t: any) => t?.players ?? []);
   if (players.length < 2) return null;
 
-  const me = players.find((p: any) =>
-    p?.battleTag?.toLowerCase() === lower
-  );
+  const me = players.find((p: any) => p?.battleTag?.toLowerCase() === lower);
   if (!me) return null;
 
   const opp = players.find((p: any) => p !== me);
@@ -399,7 +388,7 @@ export async function getPlayerSummary(inputTag: string) {
 
   const raceGamesAllTime: Record<string, number> = {};
   const raceGamesCurrentSeason: Record<string, number> = {};
-  const lastPlayedRace: Record<string, Date> = {};
+  const lastPlayedRace: Record<string, Date | undefined> = {};
   const raceMMRCurrent: Record<string, number> = {};
   const racePeaks: Record<string, any> = {};
 
@@ -419,38 +408,42 @@ export async function getPlayerSummary(inputTag: string) {
 
     const { me } = pair;
 
-    const race = resolveEffectiveRace(me);
+    // Force this to be a plain string key (avoids TS "never" explosions)
+    const race: string = String(resolveEffectiveRace(me));
 
     raceGamesAllTime[race] = (raceGamesAllTime[race] || 0) + 1;
 
+    // last played per-race (all seasons)
+    const prevRaceDate = lastPlayedRace[race];
+    if (!prevRaceDate || date.getTime() > prevRaceDate.getTime()) {
+      lastPlayedRace[race] = date;
+    }
+
+    // last ladder game (all seasons)
+    if (!lastPlayedLadder || date.getTime() > lastPlayedLadder.getTime()) {
+      lastPlayedLadder = date;
+    }
+
+    // current-season tracking
     if (season === CURRENT_SEASON) {
       raceGamesCurrentSeason[race] =
         (raceGamesCurrentSeason[race] || 0) + 1;
 
-      raceMMRCurrent[race] = me.currentMmr;
-    }
+      if (typeof me.currentMmr === "number") {
+        raceMMRCurrent[race] = me.currentMmr;
+      }
 
-    if (!lastPlayedRace[race] || date > lastPlayedRace[race]) {
-      lastPlayedRace[race] = date;
-    }
-
-    if (!lastPlayedLadder || date > lastPlayedLadder) {
-      lastPlayedLadder = date;
-    }
-
-    if (
-      !highestCurrentRace ||
-      (raceMMRCurrent[race] ?? 0) >
-        (raceMMRCurrent[highestCurrentRace] ?? 0)
-    ) {
-      highestCurrentRace = race;
+      if (
+        !highestCurrentRace ||
+        (raceMMRCurrent[race] ?? 0) >
+          (raceMMRCurrent[highestCurrentRace] ?? 0)
+      ) {
+        highestCurrentRace = race;
+      }
     }
 
     // Track peak MMR only for last 3 seasons
-    if (
-      LAST_3_SEASONS.has(season) &&
-      typeof me.currentMmr === "number"
-    ) {
+    if (LAST_3_SEASONS.has(season) && typeof me.currentMmr === "number") {
       if (!racePeaks[race] || me.currentMmr > racePeaks[race].mmr) {
         racePeaks[race] = {
           race,
@@ -462,12 +455,12 @@ export async function getPlayerSummary(inputTag: string) {
   }
 
   const mostPlayedAllTime =
-    Object.entries(raceGamesAllTime)
-      .sort((a, b) => b[1] - a[1])[0]?.[0] ?? "Unknown";
+    Object.entries(raceGamesAllTime).sort((a, b) => b[1] - a[1])[0]?.[0] ??
+    "Unknown";
 
   const mostPlayedThisSeason =
-    Object.entries(raceGamesCurrentSeason)
-      .sort((a, b) => b[1] - a[1])[0]?.[0] ?? "Unknown";
+    Object.entries(raceGamesCurrentSeason).sort((a, b) => b[1] - a[1])[0]?.[0] ??
+    "Unknown";
 
   const top2Peaks = Object.values(racePeaks)
     .sort((a: any, b: any) => b.mmr - a.mmr)
@@ -480,13 +473,14 @@ export async function getPlayerSummary(inputTag: string) {
       mostPlayedThisSeason,
       highestCurrentRace,
       highestCurrentMMR:
-        highestCurrentRace && raceMMRCurrent[highestCurrentRace],
+        highestCurrentRace
+          ? raceMMRCurrent[highestCurrentRace] ?? null
+          : null,
       lastPlayedLadder: lastPlayedLadder?.toISOString() ?? null,
       lastPlayedRace: Object.fromEntries(
-        Object.entries(lastPlayedRace).map(([k, v]) => [
-          k,
-          v.toISOString(),
-        ])
+        Object.entries(lastPlayedRace)
+          .filter(([, v]) => !!v)
+          .map(([k, v]) => [k, (v as Date).toISOString()])
       ),
       top2Peaks,
     },
