@@ -219,39 +219,6 @@ if (!battletag) {
               <div className="text-gray-500 text-sm">No peak data available</div>
             )}
           </Section>
-
-          <Section title="Largest MMR Gains in the Last 3 Seasons">
-            {s.gainGamesToShow.length ? (
-              s.gainGamesToShow.map((g, i) => (
-                <div key={i} className="grid grid-cols-[1fr_auto] gap-x-3 rounded border p-2 text-xs md:text-sm tabular-nums"
->
-                  <span>
-                    <span className="font-semibold">{s.battletag}</span> ({myRace(g)} {g.myMMR}) vs{" "}
-                    <span className="font-semibold">{g.oppName}</span> ({g.oppRace} {g.oppMMR})
-                  </span>
-                  <span className="text-emerald-600 font-medium">+{g.gain}</span>
-                </div>
-              ))
-            ) : (
-              <div className="text-gray-500 text-sm">No significant gain games</div>
-            )}
-          </Section>
-
-          <Section title="Largest MMR Gap Win in the Last 3 Seasons">
-            {s.largestGapWin ? (
-              <div className="grid grid-cols-[1fr_auto] gap-x-3 rounded border p-3 text-xs md:text-sm tabular-nums">
-                <span>
-                  <span className="font-semibold">{s.battletag}</span> ({myRace(s.largestGapWin)} {s.largestGapWin.myMMR}) vs{" "}
-                  <span className="font-semibold">{s.largestGapWin.oppName}</span> ({s.largestGapWin.oppRace} {s.largestGapWin.oppMMR})
-                </span>
-                <span className="text-emerald-600 font-medium">
-                  +{s.largestGapWin.gap}
-                </span>
-              </div>
-            ) : (
-              <div className="text-gray-500 text-sm">No gap wins recorded</div>
-            )}
-          </Section>
         </>
       )}
     </div>

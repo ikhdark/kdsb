@@ -3,7 +3,6 @@ import {
   getPlayerAndOpponent,
   fetchJson,
 } from "@/lib/w3cUtils";
-
 import { flattenCountryLadder } from "@/lib/ranking";
 
 import {
@@ -72,17 +71,13 @@ export function buildInputs(rows: any[]): LadderInputRow[] {
         (r.games ?? 0) >= MIN_GAMES &&
         (r.mmr ?? 0) > 0
     )
-.map((r) => ({
-  battletag: r.battleTag,
-  mmr: r.mmr,
-  wins: r.wins,
-  games: r.games,
-  sos: null,
- country:
-  typeof r.country === "string" && r.country.length >= 2
-    ? r.country.toUpperCase()
-    : null,
-}));
+    .map((r) => ({
+      battletag: r.battleTag,
+      mmr: r.mmr,
+      wins: r.wins,
+      games: r.games,
+      sos: null,
+    }));
 }
 
 /* =========================
@@ -90,7 +85,7 @@ export function buildInputs(rows: any[]): LadderInputRow[] {
 ========================= */
 
 export async function computeSoS(
-  rows: LadderRow[],
+  rows: LadderInputRow[],
   raceId?: number
 ) {
   const cache = new Map<string, any[]>();
@@ -119,7 +114,8 @@ export async function computeSoS(
           const pair = getPlayerAndOpponent(m, row.battletag);
           if (!pair) continue;
 
-          if (raceId && raceId !== 0 && pair.me.race !== raceId) continue;
+          if (raceId && raceId !== 0 && pair.me.race !== raceId)
+            continue;
 
           const opp =
             pair.opp.oldMmr ??
@@ -137,7 +133,6 @@ export async function computeSoS(
     );
   }
 }
-
 /* =========================
    PAGING
 ========================= */

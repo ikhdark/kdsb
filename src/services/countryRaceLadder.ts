@@ -3,7 +3,10 @@ import { buildInputs, buildPaged, computeSoS } from "./ladderCore";
 import { fetchCountryLadder } from "@/services/w3cApi";
 import { flattenCountryLadder } from "@/lib/ranking";
 
-import type { LadderRow } from "@/lib/ladderEngine";
+import type {
+  LadderRow,
+  LadderInputRow,
+} from "@/lib/ladderEngine";
 
 /* ========================= */
 
@@ -43,50 +46,89 @@ export async function getCountryRaceLadder(
   page = 1,
   pageSize = 50
 ): Promise<CountryRaceLadderResponse | null> {
-  const battletag = inputBattleTag
+  const canonicalTag = inputBattleTag
     ? await resolveBattleTagViaSearch(inputBattleTag)
     : null;
 
   const raceId = RACE_ID[race];
+  const countryUpper = country.toUpperCase();
 
   /* ---------- fetch country ladder ---------- */
 
   const payload = await fetchCountryLadder(
-    country,
-    20,
-    1,
-    24
+    countryUpper,
+    20, // gateway
+    1,  // gameMode
+    24  // season
   );
 
-  const rows = flattenCountryLadder(payload).filter(
-    (r) => r.race === raceId
+  if (!payload) return null;
+
+  /* ---------- flatten ---------- */
+
+  const flattened = flattenCountryLadder(payload);
+
+  /* ---------- filter race (API already country-scoped) ---------- */
+
+  const raceRows = flattened.filter(
+    (r: any) => r.race === raceId
   );
 
-  /* ---------- ladder ---------- */
+  if (!raceRows.length) {
+    return {
+      country: countryUpper,
+      race,
+      me: null,
+      top: [],
+      poolSize: 0,
+      full: [],
+      updatedAtUtc: new Date().toISOString(),
+    };
+  }
 
-  const inputs = buildInputs(rows);
+  /* ---------- build inputs ---------- */
+
+  const inputs: LadderInputRow[] = buildInputs(raceRows);
+
+  if (!inputs.length) {
+    return {
+      country: countryUpper,
+      race,
+      me: null,
+      top: [],
+      poolSize: 0,
+      full: [],
+      updatedAtUtc: new Date().toISOString(),
+    };
+  }
+
+  /* ---------- compute SoS BEFORE ranking ---------- */
+
+  await computeSoS(
+    inputs as unknown as LadderRow[],
+    raceId
+  );
+
+  /* ---------- build ladder AFTER SoS ---------- */
+
   const { ladder, visible, top } = buildPaged(
     inputs,
     page,
     pageSize
   );
 
-  /* ---------- SoS ---------- */
-
-  await computeSoS(visible, raceId);
-
   /* ---------- find player ---------- */
 
-  const me = battletag
+  const me = canonicalTag
     ? ladder.find(
         (r) =>
           r.battletag.toLowerCase() ===
-          battletag.toLowerCase()
+          canonicalTag.toLowerCase()
       ) ?? null
     : null;
 
   return {
-    country,
+    country: countryUpper,
     race,
     me,
     top,

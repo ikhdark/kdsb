@@ -1,12 +1,5 @@
 // src/lib/ladderEngine.ts
 // PURE RANKING ENGINE
-// deterministic, linear weighted model
-// MMR + SoS + Activity
-// + BOTH MMR + SoS confidence
-
-/* =========================
-   TYPES
-========================= */
 
 export type LadderInputRow = {
   battletag: string;
@@ -14,7 +7,6 @@ export type LadderInputRow = {
   wins: number;
   games: number;
   sos: number | null;
-  country?: string | null;
 };
 
 export type LadderRow = {
@@ -31,34 +23,16 @@ export type LadderRow = {
   games: number;
 };
 
-/* =========================
-   CONFIG
-========================= */
-
 const MMR_CAP = 3000;
 
-/*
-Weights
-*/
 const W_MMR = 0.60;
 const W_SOS = 0.40;
 const W_ACTIVITY = 0.05;
 
-/*
-Confidence ramps
-Lower = faster full strength
-*/
 const SOS_CONFIDENCE_K = 1.2;
 const MMR_CONFIDENCE_K = 1;
 
-/*
-Score scaling (visual only)
-*/
 const SCORE_SCALE = 10;
-
-/* =========================
-   HELPERS
-========================= */
 
 function activityScore(games: number) {
   const STEP = 5;
@@ -77,10 +51,6 @@ function confidence(games: number, k: number) {
   return games / (games + k);
 }
 
-/* =========================
-   SCORE
-========================= */
-
 function computeScore(
   mmr: number,
   sos: number | null,
@@ -88,7 +58,6 @@ function computeScore(
 ): number {
   const sosVal = sos ?? mmr;
 
-  // BOTH confidences applied independently
   const mmrEff = mmr * confidence(games, MMR_CONFIDENCE_K);
   const sosEff = sosVal * confidence(games, SOS_CONFIDENCE_K);
 
@@ -100,11 +69,9 @@ function computeScore(
   return Math.round((raw / SCORE_SCALE) * 10) / 10;
 }
 
-/* =========================
-   MAIN ENGINE
-========================= */
-
-export function buildLadder(rows: LadderInputRow[]): LadderRow[] {
+export function buildLadder(
+  rows: LadderInputRow[]
+): LadderRow[] {
   const ladder: LadderRow[] = rows
     .filter((r) => r.mmr <= MMR_CAP)
     .map((r) => {
@@ -113,12 +80,9 @@ export function buildLadder(rows: LadderInputRow[]): LadderRow[] {
       return {
         rank: 0,
         battletag: r.battletag,
-
         mmr: r.mmr,
         sos: r.sos,
-
         score: computeScore(r.mmr, r.sos, r.games),
-
         wins: r.wins,
         losses,
         games: r.games,
