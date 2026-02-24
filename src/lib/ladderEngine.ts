@@ -1,6 +1,8 @@
 // src/lib/ladderEngine.ts
 // PURE RANKING ENGINE
 
+import { PLAYER_LABELS } from "@/lib/playerLabels";
+
 export type LadderInputRow = {
   battletag: string;
   mmr: number;
@@ -11,7 +13,12 @@ export type LadderInputRow = {
 
 export type LadderRow = {
   rank: number;
+
+  // Canonical identifier (do not mutate)
   battletag: string;
+
+  // UI-only display string (safe to show everywhere)
+  displayName: string;
 
   mmr: number;
   sos: number | null;
@@ -78,6 +85,11 @@ function computeScore(
   return Math.round((raw / SCORE_SCALE) * 10) / 10;
 }
 
+function formatDisplayName(battletag: string) {
+  const label = PLAYER_LABELS[battletag];
+  return label ? `${battletag} (${label})` : battletag;
+}
+
 export function buildLadder(
   rows: LadderInputRow[]
 ): LadderRow[] {
@@ -87,6 +99,7 @@ export function buildLadder(
     return {
       rank: 0,
       battletag: r.battletag,
+      displayName: formatDisplayName(r.battletag),
       mmr: r.mmr,
       sos: r.sos,
       score: computeScore(r.mmr, r.sos, r.games),

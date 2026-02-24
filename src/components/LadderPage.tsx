@@ -2,6 +2,7 @@ import EmptyState from "@/components/EmptyState";
 import Link from "next/link";
 import { PlayerHeader, Section } from "@/components/PlayerUI";
 import LadderSearch from "@/components/LadderSearch";
+import { PLAYER_LABELS } from "@/lib/playerLabels";
 
 type Props = {
   title: string;
@@ -73,16 +74,16 @@ export default function LadderPage({
                   </td>
 
                   {/* player */}
-                  <td className="px-3 py-2.5 truncate font-medium text-zinc-900 dark:text-zinc-100">
-                    <Link
-                      href={`/stats/player/${encodeURIComponent(
-                        p.battletag
-                      )}/summary`}
-                      className="hover:underline"
-                    >
-                      {p.battletag}
-                    </Link>
-                  </td>
+                 <td className="px-3 py-2.5 truncate font-medium text-zinc-900 dark:text-zinc-100">
+  <Link
+    href={`/stats/player/${encodeURIComponent(p.battletag)}/summary`}
+    className="hover:underline"
+  >
+    {PLAYER_LABELS[p.battletag] 
+      ? `${p.battletag} (${PLAYER_LABELS[p.battletag]})`
+      : p.battletag}
+  </Link>
+</td>
 
                   {/* score */}
                   <td className="px-3 py-2.5 text-right font-semibold tabular-nums tracking-tight text-zinc-700 dark:text-zinc-300">

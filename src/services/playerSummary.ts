@@ -17,6 +17,8 @@ import {
   type LadderInputRow,
 } from "@/lib/ladderEngine";
 
+import { COUNTRY_OVERRIDE } from "@/lib/countryOverrides";
+
 /* =====================================================
    GLOBAL CONSTANTS (shared)
 ===================================================== */
@@ -125,6 +127,33 @@ function inferCountryFromMatches(matches: any[], selfLower: string): string {
   return "";
 }
 
+/* ---------------- OVERRIDE HELPERS ---------------- */
+
+function getBT(r: any): string {
+  return r?.battletag ?? r?.battleTag ?? r?.battle_tag ?? "";
+}
+
+function getRaceId(r: any): number {
+  return Number(r?.race ?? r?.raceId ?? -1);
+}
+
+function uniqBy<T>(rows: T[], keyFn: (r: T) => string) {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const r of rows) {
+    const k = keyFn(r);
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    out.push(r);
+  }
+  return out;
+}
+
+function effectiveCountryForTag(canonicalTag: string, apiCountry: string) {
+  const o = COUNTRY_OVERRIDE[canonicalTag];
+  return (o?.to ?? apiCountry).toUpperCase();
+}
+
 /* =====================================================
    PUBLIC — getW3CRank
 ===================================================== */
@@ -179,13 +208,67 @@ export async function getW3CRank(
     resolveFromProfile() ||
     "";
 
-  /* ---------------- COUNTRY LADDER ---------------- */
+  /* ---------------- COUNTRY OVERRIDE (LOGIC) ---------------- */
 
-  const countryPayload = countryCode
-    ? await fetchCountryLadder(countryCode, GATEWAY, GAMEMODE, SEASON)
+  const effectiveCountry = countryCode
+    ? effectiveCountryForTag(canonicalTag, countryCode)
+    : "";
+
+  /* ---------------- COUNTRY LADDER (override-aware) ---------------- */
+
+  // Base ladder for the EFFECTIVE country (if no override, equals countryCode)
+  const basePayload = effectiveCountry
+    ? await fetchCountryLadder(effectiveCountry, GATEWAY, GAMEMODE, SEASON)
     : [];
 
-  const countryRows = flattenCountryLadder(countryPayload);
+  let countryRows = flattenCountryLadder(basePayload);
+
+  // (A) Remove players overridden OUT of this effective country
+  if (countryRows.length) {
+    countryRows = countryRows.filter((r: any) => {
+      const bt = getBT(r);
+      const o = COUNTRY_OVERRIDE[bt];
+      if (!o) return true;
+      return o.from.toUpperCase() !== effectiveCountry;
+    });
+  }
+
+ // (B) Inject players overridden INTO this effective country
+const injectTargets = Object.entries(COUNTRY_OVERRIDE)
+  .filter(([, o]) => o.to.toUpperCase() === effectiveCountry);
+
+if (injectTargets.length) {
+  const byFrom = new Map<string, string[]>();
+
+  for (const [bt, o] of injectTargets) {
+    const from = o.from.toUpperCase();
+    byFrom.set(from, [...(byFrom.get(from) ?? []), bt]);
+  }
+
+  for (const [fromCountry, battletags] of byFrom.entries()) {
+    const fromPayload = await fetchCountryLadder(
+      fromCountry,
+      GATEWAY,
+      GAMEMODE,
+      SEASON
+    );
+    if (!fromPayload) continue;
+
+    const fromRows = flattenCountryLadder(fromPayload);
+
+    for (const bt of battletags) {
+      // inject ALL race rows for this battletag
+      const hits = fromRows.filter((r: any) => getBT(r) === bt);
+      for (const h of hits) countryRows.push(h);
+    }
+  }
+
+  // dedupe once, after all injections
+  countryRows = uniqBy(
+    countryRows,
+    (r: any) => `${getBT(r)}:${getRaceId(r)}`
+  );
+}
 
   /* ---------------- RANK BUILD ---------------- */
 
@@ -199,7 +282,7 @@ export async function getW3CRank(
     for (const rawRows of rowsByPage.values()) {
       const flat = flattenCountryLadder(rawRows);
 
-      for (const r of flat) {
+      for (const r of flat as any[]) {
         if (r.games < MIN_GAMES) continue;
         if (r.race !== raceId) continue;
         if (!r.battleTag) continue;
@@ -226,15 +309,15 @@ export async function getW3CRank(
     let countryTotal: number | null = null;
 
     if (countryRows.length) {
-      const countryInputs: LadderInputRow[] = countryRows
+      const countryInputs: LadderInputRow[] = (countryRows as any[])
         .filter(
           (r) =>
             r.race === raceId &&
             r.games >= MIN_GAMES &&
-            r.battleTag
+            (r.battleTag || r.battletag)
         )
         .map((r) => ({
-          battletag: r.battleTag!,
+          battletag: r.battleTag ?? r.battletag,
           mmr: r.mmr,
           wins: r.wins,
           games: r.games,
@@ -267,7 +350,7 @@ export async function getW3CRank(
   return {
     battletag: canonicalTag,
     season: SEASON,
-    country: countryCode || "—",
+    country: effectiveCountry || countryCode || "—",
     minGames: MIN_GAMES,
     asOf: new Date().toLocaleString(),
     ranks,

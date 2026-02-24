@@ -1,6 +1,6 @@
 import type { ReactNode, HTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
-
+import { PLAYER_LABELS } from "@/lib/playerLabels";
 /* =========================================
    shared base styles (avoid re-allocations)
 ========================================= */
@@ -34,7 +34,9 @@ export function PlayerHeader({
       {...props}
     >
      <h1 className="truncate text-3xl font-semibold tracking-tight text-black dark:text-white whitespace-pre-line">
-  {battletag}
+   {PLAYER_LABELS[battletag]
+    ? `${battletag} (${PLAYER_LABELS[battletag]})`
+    : battletag}
 </h1>
 
       <p className="text-sm text-gray-500 dark:text-gray-400">
