@@ -8,10 +8,10 @@ import {
   fetchJson,
   resolveEffectiveRace,
 } from "@/lib/w3cUtils";
-
+import { getCountryRaceLadder } from "@/services/countryRaceLadder";
 import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
 import { flattenCountryLadder } from "@/lib/ranking";
-
+import type { RaceKey } from "@/services/countryRaceLadder";
 import {
   buildLadder,
   type LadderInputRow,
@@ -261,93 +261,96 @@ export async function getW3CRank(
     countryRows = uniqBy(countryRows, (r: any) => getBT(r));
   }
 
-  /* ---------------- RANK BUILD ---------------- */
+/* ---------------- RANK BUILD ---------------- */
+const ranks: RankRow[] = [];
 
-  const ranks: RankRow[] = [];
+const raceKeyMap: Record<number, RaceKey> = {
+  1: "human",
+  2: "orc",
+  4: "elf",
+  8: "undead",
+  0: "random",
+};
 
-  for (const [raceIdStr, raceName] of Object.entries(RACE_MAP)) {
-    const raceId = Number(raceIdStr);
+for (const [raceIdStr, raceName] of Object.entries(RACE_MAP)) {
+  const raceId = Number(raceIdStr);
 
-    const globalInputs: LadderInputRow[] = [];
+  const globalInputs: LadderInputRow[] = [];
 
-    for (const rawRows of rowsByPage.values()) {
-      const flat = flattenCountryLadder(rawRows);
+  for (const rawRows of rowsByPage.values()) {
+    const flat = flattenCountryLadder(rawRows);
 
-      for (const r of flat as any[]) {
-        if (r.games < MIN_GAMES) continue;
-        if (r.race !== raceId) continue;
-        if (!r.battleTag) continue;
+    for (const r of flat as any[]) {
+      if (r.games < MIN_GAMES) continue;
+      if (r.race !== raceId) continue;
+      if (!r.battleTag) continue;
 
-        globalInputs.push({
-          battletag: r.battleTag,
-          mmr: r.mmr,
-          wins: r.wins,
-          games: r.games,
-          sos: null,
-        });
-      }
+      globalInputs.push({
+        battletag: r.battleTag,
+        mmr: r.mmr,
+        wins: r.wins,
+        games: r.games,
+        sos: null,
+      });
     }
-
-    const globalLadder = buildLadder(globalInputs);
-
-    const gIdx = globalLadder.findIndex(
-      (p) => p.battletag.toLowerCase() === canonicalLower
-    );
-
-    if (gIdx === -1) continue;
-
-    let countryRank: number | null = null;
-    let countryTotal: number | null = null;
-
-    if (countryRows.length) {
-      const countryInputs: LadderInputRow[] = (countryRows as any[])
-        .filter(
-          (r) =>
-            r.race === raceId &&
-            r.games >= MIN_GAMES &&
-            (r.battleTag || r.battletag)
-        )
-        .map((r) => ({
-          battletag: r.battleTag ?? r.battletag,
-          mmr: r.mmr,
-          wins: r.wins,
-          games: r.games,
-          sos: null,
-        }));
-
-      const countryLadder = buildLadder(countryInputs);
-
-      countryTotal = countryLadder.length;
-
-      const cIdx = countryLadder.findIndex(
-        (p) => p.battletag.toLowerCase() === canonicalLower
-      );
-
-      countryRank = cIdx === -1 ? null : cIdx + 1;
-    }
-
-    ranks.push({
-      race: raceName,
-      raceId,
-      globalRank: gIdx + 1,
-      globalTotal: globalLadder.length,
-      countryRank,
-      countryTotal,
-      mmr: globalLadder[gIdx].mmr,
-      games: globalLadder[gIdx].games,
-    });
   }
 
-  return {
-    battletag: canonicalTag,
-    season: SEASON,
-    country: effectiveCountry || countryCode || "—",
-    minGames: MIN_GAMES,
-    asOf: new Date().toLocaleString(),
-    ranks,
-  };
+  const globalLadder = buildLadder(globalInputs);
+
+  const gIdx = globalLadder.findIndex(
+    (p) => p.battletag.toLowerCase() === canonicalLower
+  );
+
+  if (gIdx === -1) continue;
+
+  let countryRank: number | null = null;
+  let countryTotal: number | null = null;
+
+  if (effectiveCountry) {
+    const raceKey = raceKeyMap[raceId];
+
+    if (raceKey) {
+      const ladderData = await getCountryRaceLadder(
+        effectiveCountry,
+        raceKey,
+        undefined,
+        1,
+        9999
+      );
+
+      if (ladderData) {
+        countryTotal = ladderData.poolSize;
+
+        const cIdx = ladderData.full.findIndex(
+          (p) => p.battletag.toLowerCase() === canonicalLower
+        );
+
+        countryRank = cIdx === -1 ? null : cIdx + 1;
+      }
+    }
+  }
+
+  ranks.push({
+    race: raceName,
+    raceId,
+    globalRank: gIdx + 1,
+    globalTotal: globalLadder.length,
+    countryRank,
+    countryTotal,
+    mmr: globalLadder[gIdx].mmr,
+    games: globalLadder[gIdx].games,
+  });
 }
 
+return {
+  battletag: canonicalTag,
+  season: SEASON,
+  country: effectiveCountry || countryCode || "—",
+  minGames: MIN_GAMES,
+  asOf: new Date().toLocaleString(),
+  ranks,
+};
+}
 /* =====================================================
    SECTION B — SUMMARY SERVICE
 ===================================================== */
