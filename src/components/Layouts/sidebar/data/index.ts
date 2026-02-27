@@ -21,30 +21,37 @@ type NavGroup = {
 /* ================= DATA ================= */
 
 export const NAV_DATA: NavGroup[] = [
-  {
-    label: "MAIN MENU",
-    items: [
-      {
-        title: "Player Search",
-        icon: Icons.HomeIcon,
-        path: "",
-        as: "link",
-      },
-      {
-        title: "Matchup",
-        icon: Icons.HomeIcon,
-        path: "matchup",
-        as: "link",
-        global: true,
-      },
-      {
-        title: "Live 1v1",
-        icon: Icons.HomeIcon,
-        path: "live",
-        as: "link",
-        global: true,
-      },
+{
+  label: "MAIN MENU",
+  items: [
+    {
+      title: "Player Search",
+      icon: Icons.HomeIcon,
+      path: "",
+      as: "link",
+    },
+    {
+      title: "Live 1v1",
+      icon: Icons.HomeIcon,
+      path: "live",
+      as: "link",
+      global: true,
+    },   
+    {
+      title: "Player vs Player Stats",
+      icon: Icons.HomeIcon,
+      path: "matchup",
+      as: "link",
+      global: true,
+    },
 
+ {
+      title: "Player Match History",
+      icon: Icons.HomeIcon,
+      path: "matches",
+      as: "link",
+      global: true,
+    },
       {
         title: "SoS Ladder",
         icon: Icons.HomeIcon,

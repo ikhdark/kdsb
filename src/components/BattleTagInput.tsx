@@ -28,13 +28,12 @@ export default function BattleTagInput({
      stable handlers
   ========================= */
 
-  const handleChange = useCallback(
-    (v: string) => {
-      onChange(v);
-      clear();
-    },
-    [onChange, clear]
-  );
+const handleChange = useCallback(
+  (v: string) => {
+    onChange(v);
+  },
+  [onChange]
+);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {

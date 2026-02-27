@@ -75,7 +75,7 @@ async function globalSearchByName(
     try {
       const res = await fetch(
         `https://website-backend.w3champions.com/api/players/global-search` +
-          `?search=${encodeURIComponent(name)}&pageSize=20`
+          `?search=${encodeURIComponent(name)}&pageSize=100`
       );
 
       if (!res.ok) return null;
