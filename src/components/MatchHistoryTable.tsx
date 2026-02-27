@@ -297,98 +297,113 @@ export default function MatchHistoryTable({
 
       {/* EXTREMES */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 text-sm">
-        {/* HIGHEST WIN */}
-        <div className="rounded border p-3 md:p-4 bg-white dark:bg-gray-900">
-          <div className="text-xs uppercase text-gray-500">Highest MMR Win</div>
+      {/* HIGHEST WIN */}
+<div className="rounded border p-3 md:p-4 bg-white dark:bg-gray-900">
+  <div className="text-xs uppercase text-gray-500">Highest MMR Win</div>
 
-          <div className="mt-2">
-            {highestWin ? (
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                {/* YOU */}
-                <div className="flex items-center gap-2 min-w-0">
-                  {raceIcon(highestWin.myRace, highestWin.myRndRace) && (
-                    <img
-                      src={raceIcon(highestWin.myRace, highestWin.myRndRace)}
-                      width={18}
-                      height={18}
-                      alt=""
-                      className="shrink-0"
-                    />
-                  )}
-                  <span className="font-medium">{highestWin.oldMmr}</span>
-                </div>
+  <div className="mt-2">
+    {highestWin ? (
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        {/* YOU (MMR change) */}
+        <div className="flex items-center gap-2 min-w-0">
+          {raceIcon(highestWin.myRace, highestWin.myRndRace) && (
+            <img
+              src={raceIcon(highestWin.myRace, highestWin.myRndRace)}
+              width={18}
+              height={18}
+              alt=""
+              className="shrink-0"
+            />
+          )}
 
-                <span className="text-gray-400">vs</span>
-
-                {/* OPPONENT */}
-                <div className="flex items-center gap-2 min-w-0">
-                  {raceIcon(highestWin.oppRace, highestWin.oppRndRace) && (
-                    <img
-                      src={raceIcon(highestWin.oppRace, highestWin.oppRndRace)}
-                      width={18}
-                      height={18}
-                      alt=""
-                      className="shrink-0"
-                    />
-                  )}
-                  <span className="font-medium truncate max-w-[55vw] sm:max-w-none">
-                    {highestWin.opponentTag}
-                  </span>
-                  <span className="text-gray-500">{highestWin.oldMmr}</span>
-                </div>
-              </div>
-            ) : (
-              <span className="text-gray-500">—</span>
-            )}
+          <div className="flex items-baseline gap-2">
+            <span className="font-medium">
+              {highestWin.oldMmr} → {highestWin.newMmr}
+            </span>
+            <span className="text-emerald-600 font-medium">
+              (+{highestWin.mmrGain})
+            </span>
           </div>
         </div>
 
-        {/* LOWEST LOSS */}
-        <div className="rounded border p-3 md:p-4 bg-white dark:bg-gray-900">
-          <div className="text-xs uppercase text-gray-500">Lowest MMR Loss</div>
+        <span className="text-gray-400">vs</span>
 
-          <div className="mt-2">
-            {lowestLoss ? (
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                {/* YOU */}
-                <div className="flex items-center gap-2 min-w-0">
-                  {raceIcon(lowestLoss.myRace, lowestLoss.myRndRace) && (
-                    <img
-                      src={raceIcon(lowestLoss.myRace, lowestLoss.myRndRace)}
-                      width={18}
-                      height={18}
-                      alt=""
-                      className="shrink-0"
-                    />
-                  )}
-                  <span className="font-medium">{lowestLoss.oldMmr}</span>
-                </div>
-
-                <span className="text-gray-400">vs</span>
-
-                {/* OPPONENT */}
-                <div className="flex items-center gap-2 min-w-0">
-                  {raceIcon(lowestLoss.oppRace, lowestLoss.oppRndRace) && (
-                    <img
-                      src={raceIcon(lowestLoss.oppRace, lowestLoss.oppRndRace)}
-                      width={18}
-                      height={18}
-                      alt=""
-                      className="shrink-0"
-                    />
-                  )}
-                  <span className="font-medium truncate max-w-[55vw] sm:max-w-none">
-                    {lowestLoss.opponentTag}
-                  </span>
-                  <span className="text-gray-500">{lowestLoss.oldMmr}</span>
-                </div>
-              </div>
-            ) : (
-              <span className="text-gray-500">—</span>
-            )}
-          </div>
+        {/* OPPONENT (tag only) */}
+        <div className="flex items-center gap-2 min-w-0">
+          {raceIcon(highestWin.oppRace, highestWin.oppRndRace) && (
+            <img
+              src={raceIcon(highestWin.oppRace, highestWin.oppRndRace)}
+              width={18}
+              height={18}
+              alt=""
+              className="shrink-0"
+            />
+          )}
+          <span className="font-medium truncate max-w-[55vw] sm:max-w-none">
+            {highestWin.opponentTag}
+          </span>
         </div>
       </div>
+    ) : (
+      <span className="text-gray-500">—</span>
+    )}
+  </div>
+</div>
+
+{/* LOWEST LOSS */}
+<div className="rounded border p-3 md:p-4 bg-white dark:bg-gray-900">
+  <div className="text-xs uppercase text-gray-500">Lowest MMR Loss</div>
+
+  <div className="mt-2">
+    {lowestLoss ? (
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        {/* YOU (MMR change) */}
+        <div className="flex items-center gap-2 min-w-0">
+          {raceIcon(lowestLoss.myRace, lowestLoss.myRndRace) && (
+            <img
+              src={raceIcon(lowestLoss.myRace, lowestLoss.myRndRace)}
+              width={18}
+              height={18}
+              alt=""
+              className="shrink-0"
+            />
+          )}
+
+          <div className="flex items-baseline gap-2">
+            <span className="font-medium">
+              {lowestLoss.oldMmr} → {lowestLoss.newMmr}
+            </span>
+            <span className="text-rose-600 font-medium">
+              ({lowestLoss.mmrGain >= 0 ? "+" : ""}
+              {lowestLoss.mmrGain})
+            </span>
+          </div>
+        </div>
+
+        <span className="text-gray-400">vs</span>
+
+        {/* OPPONENT (tag only) */}
+        <div className="flex items-center gap-2 min-w-0">
+          {raceIcon(lowestLoss.oppRace, lowestLoss.oppRndRace) && (
+            <img
+              src={raceIcon(lowestLoss.oppRace, lowestLoss.oppRndRace)}
+              width={18}
+              height={18}
+              alt=""
+              className="shrink-0"
+            />
+          )}
+          <span className="font-medium truncate max-w-[55vw] sm:max-w-none">
+            {lowestLoss.opponentTag}
+          </span>
+        </div>
+      </div>
+    ) : (
+      <span className="text-gray-500">—</span>
+    )}
+  </div>
+</div>
+</div>
 
       {/* TABLE HEADER (desktop only) */}
       <div className="hidden md:grid grid-cols-7 gap-6 text-xs uppercase text-gray-500 border-b pb-2">
