@@ -39,7 +39,7 @@ export type LadderRow = {
 
 const W_MMR = 0.80;
 const W_SOS = 0.15;
-const W_ACTIVITY = 0.05;
+const W_ACTIVITY = 0.02;
 
 const SOS_CONFIDENCE_K = 10;
 
