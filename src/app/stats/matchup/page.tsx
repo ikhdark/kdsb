@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import MatchupSearch from "@/components/MatchupSearch";
 import MatchupView from "./MatchupView";
 import { getVsPlayer } from "@/services/vsPlayer";

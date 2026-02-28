@@ -1,5 +1,3 @@
-import { unstable_cache } from "next/cache";
-
 import {
   fetchAllMatches,
   getPlayerAndOpponent,
@@ -412,12 +410,7 @@ async function _getPlayerMatchAnalyticsByCanonical(canonical: string) {
    CACHED CORE
 ====================================================== */
 
-const getPlayerMatchAnalyticsByCanonical = unstable_cache(
-  async (canonical: string) => _getPlayerMatchAnalyticsByCanonical(canonical),
-  ["player-match-analytics"],
-  { revalidate: REVALIDATE_SECONDS }
-);
-
+const getPlayerMatchAnalyticsByCanonical = _getPlayerMatchAnalyticsByCanonical;
 /* ======================================================
    PUBLIC API (resolve once, then cached)
 ====================================================== */
