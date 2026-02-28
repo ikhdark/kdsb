@@ -1,5 +1,3 @@
-import { unstable_cache } from "next/cache";
-
 import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
 
 import {
@@ -42,7 +40,7 @@ async function _getPlayerLadder(
     : null;
 
   /* ---------------------------
-     fetch (cached globally)
+     fetch
   --------------------------- */
 
   const rows = await fetchAllLeagues();
@@ -89,30 +87,15 @@ async function _getPlayerLadder(
 }
 
 /* =========================
-   CACHED EXPORT
+   EXPORT (NO CACHE)
 ========================= */
-
-const _getPlayerLadderCached = unstable_cache(
-  async (
-    inputBattleTag?: string,
-    page?: number,
-    pageSize?: number
-  ) =>
-    _getPlayerLadder(
-      inputBattleTag,
-      page,
-      pageSize
-    ),
-  ["w3c-player-ladder-v1"],
-  { revalidate: 300 }
-);
 
 export async function getPlayerLadder(
   inputBattleTag?: string,
   page = 1,
   pageSize = 50
 ) {
-  return _getPlayerLadderCached(
+  return _getPlayerLadder(
     inputBattleTag,
     page,
     pageSize
