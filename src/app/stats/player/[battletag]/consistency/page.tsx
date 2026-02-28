@@ -1,5 +1,4 @@
-// src/app/stats/player/[battletag]/consistency/page.tsx
-
+export const revalidate = 300;
 import { getPlayerConsistency } from "@/services/playerConsistency";
 import { PlayerHeader, StatCard } from "@/components/PlayerUI";
 import TimeHeatmap from "@/components/TimeHeatmap";

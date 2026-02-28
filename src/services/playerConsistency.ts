@@ -1,141 +1,134 @@
 // src/services/playerConsistency.ts
 
-import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
-import { fetchAllMatches, getPlayerAndOpponent } from "@/lib/w3cUtils";
+import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver"
+import { fetchAllMatches, getPlayerAndOpponent } from "@/lib/w3cUtils"
 
-/* =========================
+/* =====================================================
    CONSTANTS
-========================= */
+===================================================== */
 
-const SESSION_GAP_MS = 30 * 60 * 1000;
-const MIN_DURATION_SECONDS = 120;
-const SEASON = 24;
+const SESSION_GAP_MS = 30 * 60 * 1000
+const MIN_DURATION_SECONDS = 120
+const SEASON = 24
+const GAME_MODE = 1
 
-/* =========================
+/* =====================================================
    HELPERS
-========================= */
+===================================================== */
 
 const wr = (w: number, g: number) =>
-  g ? +(w / g * 100).toFixed(2) : null;
+  g ? +(w / g * 100).toFixed(2) : null
 
 const countWins = (arr: boolean[]) =>
-  arr.reduce((n, v) => n + (v ? 1 : 0), 0);
+  arr.reduce((n, v) => n + (v ? 1 : 0), 0)
 
-/* =========================
+/* =====================================================
    SERVICE
-========================= */
+===================================================== */
 
 export async function getPlayerConsistency(input: string) {
   const battletag = await resolveBattleTagViaSearch(
     decodeURIComponent(input)
-  );
-  if (!battletag) return null;
+  )
 
-  /* ---------- fetch (NO LOCAL CACHE) ---------- */
+  if (!battletag) return null
 
-  const allMatches = await fetchAllMatches(battletag, [SEASON]);
-  if (!allMatches.length) return null;
-
-  /* ---------- pre-filter FIRST (faster) ---------- */
+  const allMatches = await fetchAllMatches(battletag, [SEASON])
+  if (!allMatches.length) return null
 
   const matches = allMatches
     .filter(
       (m: any) =>
-        m.gameMode === 1 &&
+        m.gameMode === GAME_MODE &&
         m.durationInSeconds >= MIN_DURATION_SECONDS
     )
     .sort(
       (a: any, b: any) =>
         Date.parse(a.startTime) - Date.parse(b.startTime)
-    );
+    )
 
-  /* ---------- accumulators ---------- */
+  if (!matches.length) return null
 
-  let wins = 0;
-  let losses = 0;
+  let wins = 0
+  let losses = 0
 
-  let longestWin = 0;
-  let longestLoss = 0;
-  let current = 0;
+  let longestWin = 0
+  let longestLoss = 0
+  let current = 0
 
-  let lastTime = 0;
+  let lastTime = 0
 
   const sessions: {
-    start: string;
-    games: number;
-    wins: number;
-  }[] = [];
+    start: string
+    games: number
+    wins: number
+  }[] = []
 
-  let session: {
-    start: string;
-    games: number;
-    wins: number;
-  } | null = null;
+  let session:
+    | {
+        start: string
+        games: number
+        wins: number
+      }
+    | null = null
 
-  const recentResults: boolean[] = [];
-  const simpleMatches: { startTime: string; didWin: boolean }[] = [];
-
-  /* ---------- single pass ---------- */
+  const recentResults: boolean[] = []
+  const simpleMatches: {
+    startTime: string
+    didWin: boolean
+  }[] = []
 
   for (const m of matches) {
-    const pair = getPlayerAndOpponent(m, battletag);
-    if (!pair) continue;
+    const pair = getPlayerAndOpponent(m, battletag)
+    if (!pair) continue
 
-    const didWin = !!pair.me?.won;
+    const didWin = !!pair.me?.won
 
     simpleMatches.push({
       startTime: m.startTime,
       didWin,
-    });
+    })
 
-    /* totals */
-    if (didWin) wins++;
-    else losses++;
+    if (didWin) wins++
+    else losses++
 
-    /* streaks */
     if (didWin) {
-      current = current >= 0 ? current + 1 : 1;
-      if (current > longestWin) longestWin = current;
+      current = current >= 0 ? current + 1 : 1
+      if (current > longestWin) longestWin = current
     } else {
-      current = current <= 0 ? current - 1 : -1;
-      const abs = Math.abs(current);
-      if (abs > longestLoss) longestLoss = abs;
+      current = current <= 0 ? current - 1 : -1
+      const abs = Math.abs(current)
+      if (abs > longestLoss) longestLoss = abs
     }
 
-    /* sessions */
-    const time = Date.parse(m.startTime);
+    const time = Date.parse(m.startTime)
 
     if (!session || time - lastTime > SESSION_GAP_MS) {
-      if (session) sessions.push(session);
+      if (session) sessions.push(session)
 
       session = {
         start: new Date(time).toISOString(),
         games: 0,
         wins: 0,
-      };
+      }
     }
 
-    session.games++;
-    if (didWin) session.wins++;
+    session.games++
+    if (didWin) session.wins++
 
-    lastTime = time;
+    lastTime = time
 
-    /* recent ring buffer (max 50) */
-    recentResults.push(didWin);
-    if (recentResults.length > 50) recentResults.shift();
+    recentResults.push(didWin)
+    if (recentResults.length > 50) recentResults.shift()
   }
 
-  if (session) sessions.push(session);
+  if (session) sessions.push(session)
 
-  /* ---------- derived ---------- */
+  const totalGames = wins + losses
 
-  const totalGames = wins + losses;
-
-  const last10 = recentResults.slice(-10);
-  const last25 = recentResults.slice(-25);
-  const last50 = recentResults.slice(-50);
-
-  /* ---------- return ---------- */
+  const last10 = recentResults.slice(-10)
+  const last25 = recentResults.slice(-25)
+  const last50 = recentResults.slice(-50)
 
   return {
     battletag,
@@ -168,7 +161,6 @@ export async function getPlayerConsistency(input: string) {
       last50: wr(countWins(last50), last50.length),
     },
 
-    // timezone-neutral, client builds heatmap
     matches: simpleMatches,
-  };
+  }
 }

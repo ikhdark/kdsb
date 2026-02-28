@@ -1,36 +1,39 @@
+// src/services/ladderCore.ts
+
 import {
   fetchAllMatches,
   getPlayerAndOpponent,
   fetchJson,
-} from "@/lib/w3cUtils";
-import { flattenCountryLadder } from "@/lib/ranking";
+} from "@/lib/w3cUtils"
+import { flattenCountryLadder } from "@/lib/ranking"
 
 import {
   buildLadder,
   type LadderRow,
   type LadderInputRow,
-} from "@/lib/ladderEngine";
+} from "@/lib/ladderEngine"
 
-/* =========================
+/* =====================================================
    CONFIG
-========================= */
+===================================================== */
 
-const SEASON = 24;
-const GAME_MODE = 1;
-const GATEWAY = 20;
+const SEASON = 24
+const GAME_MODE = 1
+const GATEWAY = 20
 
-const MIN_GAMES = 5;
-const MIN_LEAGUE = 0;
-const MAX_LEAGUE = 35;
+const MIN_GAMES = 5
+const MIN_LEAGUE = 0
+const MAX_LEAGUE = 35
 
-const SOS_CONCURRENCY = 25;
+const SOS_CONCURRENCY = 25
 
-/* =========================
+/* =====================================================
    FETCH ALL LEAGUES
-========================= */
+   (Network is cached at fetch layer)
+===================================================== */
 
 export async function fetchAllLeagues() {
-  const urls: string[] = [];
+  const urls: string[] = []
 
   for (let league = MIN_LEAGUE; league <= MAX_LEAGUE; league++) {
     urls.push(
@@ -38,30 +41,30 @@ export async function fetchAllLeagues() {
         `?gateWay=${GATEWAY}` +
         `&gameMode=${GAME_MODE}` +
         `&season=${SEASON}`
-    );
+    )
   }
 
   const results = await Promise.all(
     urls.map(async (url) => (await fetchJson<any[]>(url)) ?? [])
-  );
+  )
 
-  return flattenCountryLadder(results.flat());
+  return flattenCountryLadder(results.flat())
 }
 
-/* =========================
-   BUILD INPUTS (dedupe)
-========================= */
+/* =====================================================
+   BUILD INPUTS (dedupe + filter)
+===================================================== */
 
 export function buildInputs(rows: any[]): LadderInputRow[] {
-  const map = new Map<string, any>();
+  const map = new Map<string, any>()
 
   for (const r of rows) {
-    const key = r.battleTagLower;
-    if (!key) continue;
+    const key = r.battleTagLower
+    if (!key) continue
 
-    const existing = map.get(key);
+    const existing = map.get(key)
     if (!existing || r.mmr > existing.mmr) {
-      map.set(key, r);
+      map.set(key, r)
     }
   }
 
@@ -77,79 +80,82 @@ export function buildInputs(rows: any[]): LadderInputRow[] {
       wins: r.wins,
       games: r.games,
       sos: null,
-    }));
+    }))
 }
 
-/* =========================
-   SoS (page only)
-========================= */
+/* =====================================================
+   SoS ENGINE
+   (Heavy CPU — must be wrapped in unstable_cache
+    or used in ISR pages only)
+===================================================== */
 
 export async function computeSoS(
   rows: LadderInputRow[],
   raceId?: number
 ) {
-  const cache = new Map<string, any[]>();
+  const cache = new Map<string, any[]>()
 
   for (let i = 0; i < rows.length; i += SOS_CONCURRENCY) {
-    const chunk = rows.slice(i, i + SOS_CONCURRENCY);
+    const chunk = rows.slice(i, i + SOS_CONCURRENCY)
 
     await Promise.all(
       chunk.map(async (row) => {
-        const key = row.battletag.toLowerCase();
+        const key = row.battletag.toLowerCase()
 
-        let matches = cache.get(key);
+        let matches = cache.get(key)
 
         if (!matches) {
-          matches = await fetchAllMatches(row.battletag, [SEASON]);
-          cache.set(key, matches);
+          matches = await fetchAllMatches(row.battletag, [SEASON])
+          cache.set(key, matches)
         }
 
-        let sum = 0;
-        let n = 0;
+        let sum = 0
+        let n = 0
 
         for (const m of matches) {
-          if (m.gameMode !== GAME_MODE) continue;
-          if (m.durationInSeconds < 120) continue;
+          if (m.gameMode !== GAME_MODE) continue
+          if (m.durationInSeconds < 120) continue
 
-          const pair = getPlayerAndOpponent(m, row.battletag);
-          if (!pair) continue;
+          const pair = getPlayerAndOpponent(m, row.battletag)
+          if (!pair) continue
 
           if (raceId && raceId !== 0 && pair.me.race !== raceId)
-            continue;
+            continue
 
           const opp =
             pair.opp.oldMmr ??
             pair.opp.newMmr ??
-            pair.opp.mmr;
+            pair.opp.mmr
 
-          if (typeof opp !== "number") continue;
+          if (typeof opp !== "number") continue
 
-          sum += opp;
-          n++;
+          sum += opp
+          n++
         }
 
-        row.sos = n ? sum / n : null;
+        row.sos = n ? sum / n : null
       })
-    );
+    )
   }
 }
-/* =========================
+
+/* =====================================================
    PAGING
-========================= */
+===================================================== */
 
 export function buildPaged(
   inputs: LadderInputRow[],
   page: number,
   pageSize: number
 ) {
-  const ladder = buildLadder(inputs);
+  const ladder = buildLadder(inputs)
 
-  const start = (page - 1) * pageSize;
-  const end = start + pageSize;
+  const start = (page - 1) * pageSize
+  const end = start + pageSize
 
   return {
     ladder,
     visible: ladder.slice(start, end),
     top: ladder.slice(0, pageSize),
-  };
+  }
 }

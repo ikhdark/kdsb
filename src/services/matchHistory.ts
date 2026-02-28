@@ -1,34 +1,60 @@
+// src/services/matchHistory.ts
+
+import { unstable_cache } from "next/cache";
+
 import { fetchJson } from "@/lib/w3cUtils";
+import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
+
+/* -------------------- CONSTANTS -------------------- */
 
 const SEASON = 24;
 const GATEWAY = 20;
+const PAGE_SIZE = 50;
 
-export async function fetchMatchHistory(
-  battletag: string
+/* -------------------- CORE (UNCACHED) -------------------- */
+
+async function _fetchMatchHistory(
+  inputBattletag: string
 ) {
+  const canonical =
+    (await resolveBattleTagViaSearch(inputBattletag)) ||
+    inputBattletag;
+
   const url =
     `https://website-backend.w3champions.com/api/matches/search` +
-    `?playerId=${encodeURIComponent(battletag)}` +
+    `?playerId=${encodeURIComponent(canonical)}` +
     `&gateway=${GATEWAY}` +
-    `&offset=0&pageSize=50` +
+    `&offset=0&pageSize=${PAGE_SIZE}` +
     `&season=${SEASON}`;
 
   const json = await fetchJson<any>(url);
   if (!json?.matches) return [];
 
   return json.matches
-    .map((m: any) => extractMatch(m, battletag))
+    .map((m: any) => extractMatch(m, canonical))
     .filter(Boolean);
 }
 
+/* -------------------- CACHED EXPORT -------------------- */
+
+export const fetchMatchHistory = unstable_cache(
+  async (battletag: string) =>
+    _fetchMatchHistory(battletag),
+  ["w3c-match-history"],
+  { revalidate: 120 }
+);
+
+/* -------------------- EXTRACTOR -------------------- */
+
 function extractMatch(match: any, battletag: string) {
-  const players = match.teams.flatMap(
-    (t: any) => t.players
-  );
+  const players =
+    match.teams?.flatMap(
+      (t: any) => t.players ?? []
+    ) ?? [];
 
   const me = players.find(
     (p: any) =>
-      p.battleTag.toLowerCase() ===
+      p?.battleTag?.toLowerCase() ===
       battletag.toLowerCase()
   );
 
@@ -36,7 +62,7 @@ function extractMatch(match: any, battletag: string) {
 
   const opponent = players.find(
     (p: any) =>
-      p.battleTag.toLowerCase() !==
+      p?.battleTag?.toLowerCase() !==
       battletag.toLowerCase()
   );
 

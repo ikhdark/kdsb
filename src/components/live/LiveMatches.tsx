@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import LiveMatchCard from "./LiveMatchCard"
 
 type Player = {
@@ -31,10 +31,23 @@ const ENDPOINT =
 export default function LiveMatches() {
   const [matches, setMatches] = useState<ProcessedMatch[]>([])
   const [loading, setLoading] = useState(true)
+  const isFetchingRef = useRef(false)
 
   async function fetchMatches(currentTime: number) {
+    if (isFetchingRef.current) return
+    isFetchingRef.current = true
+
     try {
-      const res = await fetch(ENDPOINT)
+      // 🔥 Live endpoint — force no cache
+      const res = await fetch(ENDPOINT, {
+        cache: "no-store",
+      })
+
+      if (!res.ok) {
+        console.error("Live endpoint failed:", res.status)
+        return
+      }
+
       const data = await res.json()
 
       const livePlayers = new Set<string>()
@@ -46,6 +59,7 @@ export default function LiveMatches() {
         }
       })
 
+      // POST to SoS API
       const sosRes = await fetch("/api/sos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -54,7 +68,15 @@ export default function LiveMatches() {
         }),
       })
 
-      const sosData = await sosRes.json()
+      let sosData: Record<string, number> = {}
+
+if (sosRes.ok) {
+  try {
+    sosData = await sosRes.json()
+  } catch {
+    sosData = {}
+  }
+}
 
       const processed: ProcessedMatch[] = data.matches
         .filter((m: any) => m.teams?.length === 2)
@@ -73,7 +95,7 @@ export default function LiveMatches() {
           const pingB =
             m.serverInfo?.playerServerInfos?.[1]?.averagePing ?? 0
 
-          // ===== blended rating (NO ping impact) =====
+          // blended rating
           const blendedA =
             (sosA ?? mmrA) * 0.7 +
             mmrA * 0.35
@@ -81,17 +103,14 @@ export default function LiveMatches() {
           const blendedB =
             (sosB ?? mmrB) * 0.7 +
             mmrB * 0.35
-          // ===========================================
 
-          // Elo probability from real MMR
+          // Elo probability
           const diff = mmrA - mmrB
-
           const probA =
             1 / (1 + Math.pow(10, -diff / 400))
-
           const winProbA = Math.round(probA * 100)
 
-          // ===== Predicted MMR Change =====
+          // Predicted MMR change
           const confidence = Math.abs(probA - 0.5)
 
           const K =
@@ -107,7 +126,6 @@ export default function LiveMatches() {
 
           const mmrIfWinB = Math.round(K * (1 - expectedB))
           const mmrIfLoseB = Math.round(K * (0 - expectedB))
-          // =================================
 
           const pingDiff = Math.abs(pingA - pingB)
 
@@ -143,15 +161,15 @@ export default function LiveMatches() {
             blendedAvg: (blendedA + blendedB) / 2,
           }
         })
-        .sort(
-          (a: ProcessedMatch, b: ProcessedMatch) =>
-            b.blendedAvg - a.blendedAvg
-        )
-
+        .sort((a: ProcessedMatch, b: ProcessedMatch) =>
+  b.blendedAvg - a.blendedAvg
+)
       setMatches(processed)
       setLoading(false)
     } catch (err) {
       console.error(err)
+    } finally {
+      isFetchingRef.current = false
     }
   }
 

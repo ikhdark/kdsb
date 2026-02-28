@@ -1,50 +1,17 @@
 import { fetchAllMatches } from "@/lib/w3cUtils";
 import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
 import { fetchPlayerProfile } from "@/services/w3cApi";
+import { HERO_MAP } from "@/lib/heroMap";
 
 const SEASONS = [24];
-const MIN_GAMES = 1;
+const MIN_GAMES = 5;
 
-/* -------------------- HERO DISPLAY -------------------- */
-
-const HERO_DISPLAY_NAMES: Record<string, string> = {
-  archmage: "Archmage",
-  mountainking: "Mountain King",
-  paladin: "Paladin",
-  sorceror: "Blood Mage",
-
-  blademaster: "Blademaster",
-  farseer: "Farseer",
-  shadowhunter: "Shadow Hunter",
-  taurenchieftain: "Tauren Chieftain",
-
-  deathknight: "Death Knight",
-  lich: "Lich",
-  dreadlord: "Dreadlord",
-  cryptlord: "Crypt Lord",
-
-  demonhunter: "Demon Hunter",
-  keeperofthegrove: "Keeper of the Grove",
-  priestessofthemoon: "Priestess of the Moon",
-  warden: "Warden",
-
-  alchemist: "Alchemist",
-  beastmaster: "Beastmaster",
-  pitlord: "Pit Lord",
-  tinker: "Tinker",
-
-  avatarofflame: "Firelord",
-  bansheeranger: "Dark Ranger",
-  seawitch: "Naga Sea Witch",
-  pandarenbrewmaster: "Pandaren Brewmaster",
-};
+/* ---------------- HERO DISPLAY ---------------- */
 
 function heroDisplay(name?: string): string {
   if (!name) return "Unknown";
-  return HERO_DISPLAY_NAMES[name] ?? name;
+  return HERO_MAP[name] ?? name;
 }
-
-/* -------------------- TYPES -------------------- */
 
 type HeroStat = {
   games: number;
@@ -52,18 +19,27 @@ type HeroStat = {
   losses: number;
 };
 
-/* -------------------- SERVICE -------------------- */
+type Row = {
+  label: string;
+  wins: number;
+  losses: number;
+  games: number;
+  winrate: number;
+};
+
+/* ===================================================
+   SERVICE
+=================================================== */
 
 export async function getW3CHeroStats(inputTag: string) {
-  const raw = String(inputTag ?? "").trim();
-  if (!raw) return null;
+  if (!inputTag) return null;
 
-  const canonicalBattleTag = await resolveBattleTagViaSearch(raw);
-  if (!canonicalBattleTag) return null;
+  const canonical =
+    (await resolveBattleTagViaSearch(inputTag)) || inputTag;
 
   let profile: any = null;
   try {
-    profile = await fetchPlayerProfile(canonicalBattleTag);
+    profile = await fetchPlayerProfile(canonical);
   } catch {}
 
   const playerIdLower =
@@ -71,17 +47,10 @@ export async function getW3CHeroStats(inputTag: string) {
       ? profile.playerId.toLowerCase()
       : null;
 
-  const canonicalLower = canonicalBattleTag.toLowerCase();
+  const canonicalLower = canonical.toLowerCase();
 
-  const displayTag =
-    canonicalBattleTag ||
-    (typeof profile?.battleTag === "string" ? profile.battleTag : "") ||
-    raw;
-
-  const matches = await fetchAllMatches(canonicalBattleTag, SEASONS);
+  const matches = await fetchAllMatches(canonical, SEASONS);
   if (!matches.length) return null;
-
-  /* -------------------- ACCUMULATORS -------------------- */
 
   const opponentHeroStats: Record<string, HeroStat> = {};
   const opponentPrimaryHeroStats: Record<string, HeroStat> = {};
@@ -98,192 +67,120 @@ export async function getW3CHeroStats(inputTag: string) {
     3: { games: 0, wins: 0, losses: 0 },
   };
 
-/* -------------------- MATCH PROCESSING -------------------- */
+  for (const match of matches) {
+    if (match?.gameMode !== 1 || !Array.isArray(match?.teams)) continue;
 
-let totalGames = 0;
-let totalWins = 0;
+    const players = match.teams.flatMap((t: any) => t.players ?? []);
+    if (players.length !== 2) continue;
 
-for (const match of matches) {
-  if (match?.gameMode !== 1 || !Array.isArray(match?.teams)) continue;
+    const me = players.find(
+      (p: any) =>
+        p?.battleTag?.toLowerCase() === canonicalLower ||
+        (playerIdLower && p?.playerId?.toLowerCase() === playerIdLower)
+    );
 
-  const players = match.teams.flatMap((t: any) => t.players ?? []);
-  if (players.length !== 2) continue;
+    const opp = players.find((p: any) => p !== me);
 
-  const me = players.find(
-    (p: any) =>
-      p?.battleTag?.toLowerCase() === canonicalLower ||
-      (playerIdLower && p?.playerId?.toLowerCase() === playerIdLower)
-  );
+    if (!me || !opp || !Array.isArray(me.heroes) || !Array.isArray(opp.heroes))
+      continue;
 
-  const opp = players.find((p: any) => p !== me);
+    const didWin = me.won === true;
 
-  if (!me || !opp || !Array.isArray(me.heroes) || !Array.isArray(opp.heroes))
-    continue;
+    const yourCount = Math.min(Math.max(me.heroes.length, 1), 3) as 1 | 2 | 3;
+    const oppCount = Math.min(Math.max(opp.heroes.length, 1), 3) as 1 | 2 | 3;
 
-  const didWin = me.won === true;
-
-  /* ✅ baseline counters (MUST be here) */
-  totalGames++;
-  if (didWin) totalWins++;
-
-  /* hero count clamps */
-  const yourHeroCount = Math.min(Math.max(me.heroes.length, 1), 3) as 1 | 2 | 3;
-  const oppHeroCount  = Math.min(Math.max(opp.heroes.length, 1), 3) as 1 | 2 | 3;
-
-  yourHeroCountStats[yourHeroCount].games++;
-  didWin
-    ? yourHeroCountStats[yourHeroCount].wins++
-    : yourHeroCountStats[yourHeroCount].losses++;
-
-  opponentHeroCountStats[oppHeroCount].games++;
-  didWin
-    ? opponentHeroCountStats[oppHeroCount].wins++
-    : opponentHeroCountStats[oppHeroCount].losses++;
-
- const uniqueOppHeroes = new Set<string>(
-    opp.heroes.map((h: any) => h?.name).filter(Boolean)
-  );
-
-  for (const hero of uniqueOppHeroes) {
-    opponentHeroStats[hero] ??= { games: 0, wins: 0, losses: 0 };
-    opponentHeroStats[hero].games++;
+    yourHeroCountStats[yourCount].games++;
     didWin
-      ? opponentHeroStats[hero].wins++
-      : opponentHeroStats[hero].losses++;
+      ? yourHeroCountStats[yourCount].wins++
+      : yourHeroCountStats[yourCount].losses++;
+
+    opponentHeroCountStats[oppCount].games++;
+    didWin
+      ? opponentHeroCountStats[oppCount].wins++
+      : opponentHeroCountStats[oppCount].losses++;
+
+    const uniqueOppHeroes = new Set<string>(
+      opp.heroes.map((h: any) => h?.name).filter(Boolean)
+    );
+
+    for (const hero of uniqueOppHeroes) {
+      opponentHeroStats[hero] ??= { games: 0, wins: 0, losses: 0 };
+      opponentHeroStats[hero].games++;
+      didWin
+        ? opponentHeroStats[hero].wins++
+        : opponentHeroStats[hero].losses++;
+    }
+
+    const primaryHero = opp.heroes[0]?.name;
+    if (primaryHero) {
+      opponentPrimaryHeroStats[primaryHero] ??= {
+        games: 0,
+        wins: 0,
+        losses: 0,
+      };
+      opponentPrimaryHeroStats[primaryHero].games++;
+      didWin
+        ? opponentPrimaryHeroStats[primaryHero].wins++
+        : opponentPrimaryHeroStats[primaryHero].losses++;
+    }
   }
 
-  const primaryHero = opp.heroes[0]?.name;
-  if (primaryHero) {
-    opponentPrimaryHeroStats[primaryHero] ??= {
-      games: 0,
-      wins: 0,
-      losses: 0,
-    };
-
-    opponentPrimaryHeroStats[primaryHero].games++;
-    didWin
-      ? opponentPrimaryHeroStats[primaryHero].wins++
-      : opponentPrimaryHeroStats[primaryHero].losses++;
+  function sortBest(obj: Record<string, HeroStat>): Row[] {
+    return Object.entries(obj)
+      .filter(([, s]) => s.games >= MIN_GAMES)
+      .map(([hero, s]) => ({
+        label: heroDisplay(hero),
+        wins: s.wins,
+        losses: s.losses,
+        games: s.games,
+        winrate: +((s.wins / s.games) * 100).toFixed(1),
+      }))
+      .sort((a, b) => b.winrate - a.winrate)
+      .slice(0, 5);
   }
-}
 
-/* -------------------- BASELINE -------------------- */
-
-const baselineWinrate = totalGames ? totalWins / totalGames : 0;
-
-
-for (const match of matches) {
-  const players = match.teams?.flatMap((t: any) => t.players ?? []) ?? [];
-
-  const me = players.find(
-    (p: any) =>
-      p?.battleTag?.toLowerCase() === canonicalLower ||
-      (playerIdLower && p?.playerId?.toLowerCase() === playerIdLower)
-  );
-
-  if (me?.won === true) totalWins++;
-}
-
-  /* -------------------- OUTPUT (UNCHANGED) -------------------- */
-
-  const out: string[] = [];
-  const line = (t: string) => out.push(t);
-
-  line(`📊 ${displayTag} — All races S23 Hero Stats`);
-
-  line(`\nYour W/L by Your Hero Count`);
-  Object.entries(yourHeroCountStats).forEach(([k, s]) => {
-    if (!s.games) return;
-    line(
-      `${k} hero${Number(k) > 1 ? "es" : ""}: ${(
-        (100 * s.wins) /
-        s.games
-      ).toFixed(1)}% (${s.wins}-${s.losses})`
-    );
-  });
-
-  line(`\nYour W/L vs Opponent Hero Count`);
-  Object.entries(opponentHeroCountStats).forEach(([k, s]) => {
-    if (!s.games) return;
-    line(
-      `${k} hero${Number(k) > 1 ? "es" : ""}: ${(
-        (100 * s.wins) /
-        s.games
-      ).toFixed(1)}% (${s.wins}-${s.losses})`
-    );
-  });
-
-  line(`\nYour Top 5 Best Winrates vs Opponent Opening Hero`);
-  Object.entries(opponentPrimaryHeroStats)
-    .filter(([, s]) => s.games >= MIN_GAMES)
-    .sort((a, b) => b[1].wins / b[1].games - a[1].wins / a[1].games)
-    .slice(0, 5)
-    .forEach(([hero, s]) =>
-      line(
-        `${heroDisplay(hero)}: ${(
-          (100 * s.wins) /
-          s.games
-        ).toFixed(1)}% (${s.wins}-${s.losses})`
-      )
-    );
-
-  line(`\nTop 5 Worst Winrates vs Opponent Opening Hero`);
-  Object.entries(opponentPrimaryHeroStats)
-    .filter(([, s]) => s.games >= MIN_GAMES)
-    .sort((a, b) => a[1].wins / a[1].games - b[1].wins / b[1].games)
-    .slice(0, 5)
-    .forEach(([hero, s]) =>
-      line(
-        `${heroDisplay(hero)}: ${(
-          (100 * s.wins) /
-          s.games
-        ).toFixed(1)}% (${s.wins}-${s.losses})`
-      )
-    );
-
-/* ================= BEST OVERALL ================= */
-
-line(`\nYour Top 5 Best Winrates vs Opponent Heroes Overall`);
-
-const sortedByDelta = Object.entries(opponentHeroStats)
-  .filter(([, s]) => s.games >= MIN_GAMES)
-  .sort((a, b) => {
-    const aDelta = a[1].wins / a[1].games - baselineWinrate;
-    const bDelta = b[1].wins / b[1].games - baselineWinrate;
-    return bDelta - aDelta;
-  });
-
-const bestFive = sortedByDelta.slice(0, 5);
-
-bestFive.forEach(([hero, s]) => {
-const wr = Math.round((100 * s.wins) / s.games);
-line(`${heroDisplay(hero)}: ${wr}% (${s.wins}-${s.losses})`);
-});
-
-
-/* ================= WORST OVERALL ================= */
-
-line(`\nYour Top 5 Worst Winrates vs Opponent Heroes Overall`);
-
-const bestSet = new Set(bestFive.map(([h]) => h));
-
-sortedByDelta
-  .filter(([hero]) => !bestSet.has(hero)) // prevent overlap
-  .sort((a, b) => {
-    const aDelta = a[1].wins / a[1].games - baselineWinrate;
-    const bDelta = b[1].wins / b[1].games - baselineWinrate;
-    return aDelta - bDelta;
-  })
-  .slice(0, 5)
-  .forEach(([hero, s]) => {
- const wr = Math.round((100 * s.wins) / s.games);
-line(`${heroDisplay(hero)}: ${wr}% (${s.wins}-${s.losses})`);
-  });
-
+  function sortWorst(obj: Record<string, HeroStat>): Row[] {
+    return Object.entries(obj)
+      .filter(([, s]) => s.games >= MIN_GAMES)
+      .map(([hero, s]) => ({
+        label: heroDisplay(hero),
+        wins: s.wins,
+        losses: s.losses,
+        games: s.games,
+        winrate: +((s.wins / s.games) * 100).toFixed(1),
+      }))
+      .sort((a, b) => a.winrate - b.winrate)
+      .slice(0, 5);
+  }
 
   return {
-    battletag: displayTag,
+    battletag: canonical,
     seasons: SEASONS,
-    result: out.join("\n").slice(0, 1900),
+
+    byHeroCount: Object.entries(yourHeroCountStats)
+      .filter(([, s]) => s.games > 0)
+      .map(([k, s]) => ({
+        label: `${k} hero${Number(k) > 1 ? "es" : ""}`,
+        wins: s.wins,
+        losses: s.losses,
+        games: s.games,
+        winrate: +((s.wins / s.games) * 100).toFixed(1),
+      })),
+
+    vsOppHeroCount: Object.entries(opponentHeroCountStats)
+      .filter(([, s]) => s.games > 0)
+      .map(([k, s]) => ({
+        label: `${k} hero${Number(k) > 1 ? "es" : ""}`,
+        wins: s.wins,
+        losses: s.losses,
+        games: s.games,
+        winrate: +((s.wins / s.games) * 100).toFixed(1),
+      })),
+
+    bestOpeners: sortBest(opponentPrimaryHeroStats),
+    worstOpeners: sortWorst(opponentPrimaryHeroStats),
+
+    bestOverall: sortBest(opponentHeroStats),
+    worstOverall: sortWorst(opponentHeroStats),
   };
 }

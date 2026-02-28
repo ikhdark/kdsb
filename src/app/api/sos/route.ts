@@ -1,27 +1,29 @@
 import { NextResponse } from "next/server"
-import { getLiveSoS } from "@/lib/liveSoSCache"
+import { getSoSMap } from "@/lib/sosCache"
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json()
-    const players: string[] = body.players ?? []
+    const { players } = await req.json()
 
-    const result: Record<string, number | null> = {}
+    if (!Array.isArray(players)) {
+      return NextResponse.json({})
+    }
 
-    await Promise.all(
-      players.map(async (p) => {
-        const sos = await getLiveSoS(p)
-        result[p.toLowerCase()] = sos
-      })
-    )
+    const sosMap = await getSoSMap()
+
+    const result: Record<string, number> = {}
+
+    for (const tag of players) {
+      const key = String(tag).toLowerCase()
+      const value = sosMap.get(key)
+      if (value != null) {
+        result[key] = value
+      }
+    }
 
     return NextResponse.json(result)
-  } catch (error) {
-    console.error("Live SoS API error:", error)
-
-    return NextResponse.json(
-      { error: "Failed to compute SoS" },
-      { status: 500 }
-    )
+  } catch (err) {
+    console.error("SOS API error:", err)
+    return NextResponse.json({}, { status: 500 })
   }
 }

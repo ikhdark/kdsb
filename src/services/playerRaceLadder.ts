@@ -1,3 +1,5 @@
+import { unstable_cache } from "next/cache";
+
 import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
 
 import {
@@ -43,18 +45,15 @@ const RACE_ID: Record<RaceKey, number> = {
 };
 
 /* =========================
-   SERVICE
+   CORE (UNCACHED)
 ========================= */
 
-export async function getPlayerRaceLadder(
+async function _getPlayerRaceLadder(
   inputBattleTag: string | undefined,
   race: RaceKey,
   page = 1,
   pageSize = 50
 ): Promise<PlayerRaceLadderResponse | null> {
-  /* ---------------------------
-     canonical battletag
-  --------------------------- */
 
   const battletag = inputBattleTag
     ? await resolveBattleTagViaSearch(inputBattleTag)
@@ -62,32 +61,16 @@ export async function getPlayerRaceLadder(
 
   const raceId = RACE_ID[race];
 
-  /* ---------------------------
-     fetch + race filter
-  --------------------------- */
-
   const rows = (await fetchAllLeagues()).filter(
     (r) => r.race === raceId
   );
-
-  /* ---------------------------
-     build ladder
-  --------------------------- */
 
   const inputs = buildInputs(rows);
 
   const { ladder, visible, top } =
     buildPaged(inputs, page, pageSize);
 
-  /* ---------------------------
-     SoS (race-aware)
-  --------------------------- */
-
   await computeSoS(visible, raceId);
-
-  /* ---------------------------
-     find player
-  --------------------------- */
 
   const me = battletag
     ? ladder.find(
@@ -96,10 +79,6 @@ export async function getPlayerRaceLadder(
           battletag.toLowerCase()
       ) ?? null
     : null;
-
-  /* ---------------------------
-     return
-  --------------------------- */
 
   return {
     battletag: battletag ?? "",
@@ -110,4 +89,39 @@ export async function getPlayerRaceLadder(
     full: visible,
     updatedAtUtc: new Date().toISOString(),
   };
+}
+
+/* =========================
+   CACHED EXPORT
+========================= */
+
+const _getPlayerRaceLadderCached = unstable_cache(
+  async (
+    inputBattleTag: string | undefined,
+    race: RaceKey,
+    page?: number,
+    pageSize?: number
+  ) =>
+    _getPlayerRaceLadder(
+      inputBattleTag,
+      race,
+      page,
+      pageSize
+    ),
+  ["w3c-player-race-ladder-v1"],
+  { revalidate: 300 }
+);
+
+export async function getPlayerRaceLadder(
+  inputBattleTag: string | undefined,
+  race: RaceKey,
+  page = 1,
+  pageSize = 50
+) {
+  return _getPlayerRaceLadderCached(
+    inputBattleTag,
+    race,
+    page,
+    pageSize
+  );
 }

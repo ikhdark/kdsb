@@ -1,6 +1,6 @@
 // src/lib/w3cUtils.ts
 // Central W3C network + match utilities
-// SINGLE fetch layer (dedup + no-store)
+// SINGLE fetch layer (dedup + Next 5-min cache)
 
 import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
 
@@ -28,7 +28,11 @@ async function fetchWithDedup(
   let request = inFlightRequests.get(key);
 
   if (!request) {
-    request = fetchFn(url, { cache: "no-store", ...init });
+    request = fetchFn(url, {
+      next: { revalidate: 300 }, // 5-minute Next.js cache
+      ...init,
+    });
+
     inFlightRequests.set(key, request);
   }
 
@@ -64,28 +68,7 @@ const PAGE_SIZE = 50;
 const MAX_PAGES_PER_SEASON = 2000;
 
 /* =====================================================
-   RACES (KEEP THESE)
-===================================================== */
-
-export const RACE_MAP: Record<number, string> = {
-  0: "Random",
-  1: "Human",
-  2: "Orc",
-  4: "Night Elf",
-  8: "Undead",
-};
-
-
-/**
- * Race actually played (effective)
- * Used all over analytics → keep centralized
- */
-export function resolveEffectiveRace(player: any): string {
-  return RACE_MAP[player?.race] ?? "Unknown";
-}
-
-/* =====================================================
-   MATCH FETCH (CACHED + PARALLEL)
+   MATCH FETCH (Parallel + optional memory assist)
 ===================================================== */
 
 const MATCH_CACHE_TTL = 10 * 60 * 1000;
@@ -219,12 +202,12 @@ export function getPlayerAndOpponent(
    MATCH DETAIL
 ===================================================== */
 
+const MATCH_DETAIL_TTL = 10 * 60 * 1000;
+
 const matchDetailCache = new Map<
   string,
   { ts: number; data: any }
 >();
-
-const MATCH_DETAIL_TTL = 10 * 60 * 1000;
 
 export async function fetchMatchDetail(
   matchId: string

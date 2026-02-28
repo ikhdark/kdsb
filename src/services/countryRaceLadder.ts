@@ -1,39 +1,44 @@
-import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
+// src/services/countryRaceLadder.ts
+
+import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver"
 import {
-  fetchAllLeagues,
   buildInputs,
   buildPaged,
   computeSoS,
-} from "./ladderCore";
-import { fetchCountryLadder } from "@/services/w3cApi";
-import { flattenCountryLadder } from "@/lib/ranking";
-import { COUNTRY_OVERRIDE } from "@/lib/countryOverrides";
+} from "./ladderCore"
+import { fetchCountryLadder } from "@/services/w3cApi"
+import { flattenCountryLadder } from "@/lib/ranking"
+import { COUNTRY_OVERRIDE } from "@/lib/countryOverrides"
 
 import type {
   LadderRow,
   LadderInputRow,
-} from "@/lib/ladderEngine";
+} from "@/lib/ladderEngine"
 
-/* ========================= */
+/* =====================================================
+   TYPES
+===================================================== */
 
 export type RaceKey =
   | "human"
   | "orc"
   | "elf"
   | "undead"
-  | "random";
+  | "random"
 
 export type CountryRaceLadderResponse = {
-  country: string;
-  race: RaceKey;
-  me: LadderRow | null;
-  top: LadderRow[];
-  poolSize: number;
-  full: LadderRow[];
-  updatedAtUtc: string;
-};
+  country: string
+  race: RaceKey
+  me: LadderRow | null
+  top: LadderRow[]
+  poolSize: number
+  full: LadderRow[]
+  updatedAtUtc: string
+}
 
-/* ========================= */
+/* =====================================================
+   CONSTANTS
+===================================================== */
 
 const RACE_ID: Record<RaceKey, number> = {
   human: 1,
@@ -41,27 +46,37 @@ const RACE_ID: Record<RaceKey, number> = {
   elf: 4,
   undead: 8,
   random: 0,
-};
+}
 
-/* ---------- helpers ---------- */
+const SEASON = 24
+const GATEWAY = 20
+const GAME_MODE = 1
+
+/* =====================================================
+   HELPERS
+===================================================== */
 
 function getBT(r: any): string {
-  return r?.battletag ?? r?.battleTag ?? "";
+  return r?.battleTag ?? r?.battletag ?? ""
 }
 
 function uniqBy<T>(rows: T[], keyFn: (r: T) => string) {
-  const seen = new Set<string>();
-  const out: T[] = [];
+  const seen = new Set<string>()
+  const out: T[] = []
+
   for (const r of rows) {
-    const k = keyFn(r);
-    if (!k || seen.has(k)) continue;
-    seen.add(k);
-    out.push(r);
+    const k = keyFn(r)
+    if (!k || seen.has(k)) continue
+    seen.add(k)
+    out.push(r)
   }
-  return out;
+
+  return out
 }
 
-/* ========================= */
+/* =====================================================
+   MAIN
+===================================================== */
 
 export async function getCountryRaceLadder(
   country: string,
@@ -73,75 +88,84 @@ export async function getCountryRaceLadder(
 
   const canonicalTag = inputBattleTag
     ? await resolveBattleTagViaSearch(inputBattleTag)
-    : null;
+    : null
 
-  const raceId = RACE_ID[race];
-  const countryUpper = country.toUpperCase();
+  const raceId = RACE_ID[race]
+  const countryUpper = country.toUpperCase()
 
-  /* ---------- fetch country ladder ---------- */
+  /* ---------------- FETCH COUNTRY LADDER ---------------- */
 
   const payload = await fetchCountryLadder(
     countryUpper,
-    20,
-    1,
-    24
-  );
+    GATEWAY,
+    GAME_MODE,
+    SEASON
+  )
 
-  if (!payload) return null;
+  if (!payload) return null
 
-  const flattened = flattenCountryLadder(payload);
+  const flattened = flattenCountryLadder(payload)
 
-  /* ---------- filter race ---------- */
+  /* ---------------- FILTER BY RACE ---------------- */
 
   let raceRows = flattened.filter(
     (r: any) => r.race === raceId
-  );
+  )
 
-  /* ---------- APPLY COUNTRY OVERRIDES (LOGIC) ---------- */
+  /* ---------------- COUNTRY OVERRIDES ---------------- */
+
   if (raceRows.length) {
-    // (A) Remove battletags overridden OUT of this country
-    raceRows = raceRows.filter((r: any) => {
-      const bt = getBT(r);
-      const o = COUNTRY_OVERRIDE[bt];
-      if (!o) return true;
-      return o.from.toUpperCase() !== countryUpper;
-    });
 
-    // (B) Inject battletags overridden INTO this country
+    // Remove players overridden OUT of this country
+    raceRows = raceRows.filter((r: any) => {
+      const bt = getBT(r)
+      const override = COUNTRY_OVERRIDE[bt]
+      if (!override) return true
+      return override.from.toUpperCase() !== countryUpper
+    })
+
+    // Inject players overridden INTO this country
     const injectTargets = Object.entries(COUNTRY_OVERRIDE)
-      .filter(([, o]) => o.to.toUpperCase() === countryUpper);
+      .filter(([, o]) => o.to.toUpperCase() === countryUpper)
 
     if (injectTargets.length) {
-      // Group by FROM so we fetch each source country once
-      const byFrom = new Map<string, string[]>();
+
+      const byFrom = new Map<string, string[]>()
+
       for (const [bt, o] of injectTargets) {
-        const from = o.from.toUpperCase();
-        byFrom.set(from, [...(byFrom.get(from) ?? []), bt]);
+        const from = o.from.toUpperCase()
+        byFrom.set(from, [...(byFrom.get(from) ?? []), bt])
       }
 
       for (const [fromCountry, battletags] of byFrom.entries()) {
+
         const fromPayload = await fetchCountryLadder(
           fromCountry,
-          20,
-          1,
-          24
-        );
-        if (!fromPayload) continue;
+          GATEWAY,
+          GAME_MODE,
+          SEASON
+        )
 
-        const fromFlat = flattenCountryLadder(fromPayload);
-        const fromRaceRows = fromFlat.filter((r: any) => r.race === raceId);
+        if (!fromPayload) continue
+
+        const fromFlat = flattenCountryLadder(fromPayload)
+        const fromRaceRows = fromFlat.filter(
+          (r: any) => r.race === raceId
+        )
 
         for (const bt of battletags) {
-          const hit = fromRaceRows.find((r: any) => getBT(r) === bt);
-          if (hit) raceRows.push(hit);
+          const hit = fromRaceRows.find(
+            (r: any) => getBT(r) === bt
+          )
+          if (hit) raceRows.push(hit)
         }
       }
 
-      raceRows = uniqBy(raceRows, (r: any) => getBT(r));
+      raceRows = uniqBy(raceRows, (r: any) => getBT(r))
     }
   }
 
-  /* ---------- empty ---------- */
+  /* ---------------- EMPTY STATE ---------------- */
 
   if (!raceRows.length) {
     return {
@@ -152,12 +176,12 @@ export async function getCountryRaceLadder(
       poolSize: 0,
       full: [],
       updatedAtUtc: new Date().toISOString(),
-    };
+    }
   }
 
-  /* ---------- build inputs ---------- */
+  /* ---------------- BUILD INPUTS ---------------- */
 
-  const inputs: LadderInputRow[] = buildInputs(raceRows);
+  const inputs: LadderInputRow[] = buildInputs(raceRows)
 
   if (!inputs.length) {
     return {
@@ -168,19 +192,19 @@ export async function getCountryRaceLadder(
       poolSize: 0,
       full: [],
       updatedAtUtc: new Date().toISOString(),
-    };
+    }
   }
 
-  /* ---------- build ladder FIRST (same as global) ---------- */
+  /* ---------------- BUILD LADDER ---------------- */
 
   const { ladder, visible, top } =
-    buildPaged(inputs, page, pageSize);
+    buildPaged(inputs, page, pageSize)
 
-  /* ---------- compute SoS AFTER (same as global) ---------- */
+  /* ---------------- COMPUTE SOS (PAGE ONLY) ---------------- */
 
-  await computeSoS(visible, raceId);
+  await computeSoS(visible, raceId)
 
-  /* ---------- find player ---------- */
+  /* ---------------- FIND PLAYER ---------------- */
 
   const me = canonicalTag
     ? ladder.find(
@@ -188,7 +212,7 @@ export async function getCountryRaceLadder(
           r.battletag.toLowerCase() ===
           canonicalTag.toLowerCase()
       ) ?? null
-    : null;
+    : null
 
   return {
     country: countryUpper,
@@ -198,5 +222,5 @@ export async function getCountryRaceLadder(
     poolSize: ladder.length,
     full: visible,
     updatedAtUtc: new Date().toISOString(),
-  };
+  }
 }

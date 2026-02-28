@@ -2,9 +2,13 @@
 import {
   fetchAllMatches,
   getPlayerAndOpponent,
-  RACE_MAP,
 } from "@/lib/w3cUtils";
-
+import {
+  W3C_RACE_IDS,
+  W3C_RACE_LABEL,
+  W3C_RACE_KEY_MAP,
+  raceLabel,
+} from "@/lib/w3cRaces";
 import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
 
 
@@ -46,8 +50,7 @@ type OpponentAgg = {
 
 export function displayMyRace(g: Game): string {
   if (g.myRace !== "Random") return g.myRace;
-  const rolled = RACE_MAP[g.raceCode] || "Unknown";
-  return `Random (${rolled})`;
+  return `Random (${raceLabel(g.raceCode)})`;
 }
 
 /* -------------------- OUTPUT TYPE -------------------- */
@@ -187,7 +190,7 @@ export async function getPlayerVsPlayer(
     if (!pair) continue;
 
     const { me, opp } = pair;
-    const race = RACE_MAP[me.race] || "Unknown";
+    const race = raceLabel(me.race);
 
 
     if (
@@ -206,7 +209,7 @@ export async function getPlayerVsPlayer(
       myName: me.battleTag,
       oppName: opp.battleTag,
       myRace: race,
-      oppRace: RACE_MAP[opp.race] || "Unknown",
+      oppRace: raceLabel(opp.race),
       myMMR: me.oldMmr,
       oppMMR: opp.oldMmr,
       mmrChange: me.mmrGain,

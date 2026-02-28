@@ -39,11 +39,11 @@ export default async function VsPlayerPage({ params }: PageProps) {
       />
 
       {/* ================= MMR Extremes ================= */}
-      <Section title="MMR Extremes">
+      <Section title="Largest Single-Game Gain/Loss (If +15 or more, all will be added)">
         {data.extremes.gainGamesToShow.length > 0 && (
           <div className="space-y-2">
             <div className="font-medium">
-              Largest Single-Game Gain/Loss (If +15 or more, all will be added)
+             
             </div>
 
             {data.extremes.gainGamesToShow.map((g, i) => (
@@ -90,7 +90,7 @@ export default async function VsPlayerPage({ params }: PageProps) {
       </Section>
 
       {/* ================= Gap Extremes ================= */}
-      <Section title="MMR Gap Extremes">
+      <Section title="Largest MMR Gap In Win/Loss">
         {data.extremes.largestGapWin && (
           <div className="grid grid-cols-[auto_1fr_auto] gap-x-3">
             <span className="font-semibold text-emerald-600">W</span>

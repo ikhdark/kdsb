@@ -1,10 +1,3 @@
-// src/services/vsPlayer.ts
-//
-// PUBLIC HEAD-TO-HEAD LOOKUP (FULL TELEMETRY)
-// Symmetric. No "me" semantics.
-// Aggregates ALL score fields + MMR + ping + server usage.
-//
-
 import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
 import { getPlayerMatchAnalytics } from "@/services/playerMatchAnalytics";
 import type { NormalizedMatch } from "@/services/playerMatchAnalytics";

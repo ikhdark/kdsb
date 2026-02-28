@@ -1,3 +1,5 @@
+import { unstable_cache } from "next/cache";
+
 import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
 
 import {
@@ -23,10 +25,10 @@ export type PlayerLadderResponse = {
 };
 
 /* =========================
-   SERVICE
+   CORE (UNCACHED)
 ========================= */
 
-export async function getPlayerLadder(
+async function _getPlayerLadder(
   inputBattleTag?: string,
   page = 1,
   pageSize = 50
@@ -40,7 +42,7 @@ export async function getPlayerLadder(
     : null;
 
   /* ---------------------------
-     fetch
+     fetch (cached globally)
   --------------------------- */
 
   const rows = await fetchAllLeagues();
@@ -55,7 +57,7 @@ export async function getPlayerLadder(
     buildPaged(inputs, page, pageSize);
 
   /* ---------------------------
-     SoS (page only)
+     SoS (page only, always fresh)
   --------------------------- */
 
   await computeSoS(visible);
@@ -84,4 +86,35 @@ export async function getPlayerLadder(
     full: visible,
     updatedAtUtc: new Date().toISOString(),
   };
+}
+
+/* =========================
+   CACHED EXPORT
+========================= */
+
+const _getPlayerLadderCached = unstable_cache(
+  async (
+    inputBattleTag?: string,
+    page?: number,
+    pageSize?: number
+  ) =>
+    _getPlayerLadder(
+      inputBattleTag,
+      page,
+      pageSize
+    ),
+  ["w3c-player-ladder-v1"],
+  { revalidate: 300 }
+);
+
+export async function getPlayerLadder(
+  inputBattleTag?: string,
+  page = 1,
+  pageSize = 50
+) {
+  return _getPlayerLadderCached(
+    inputBattleTag,
+    page,
+    pageSize
+  );
 }

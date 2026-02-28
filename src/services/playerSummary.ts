@@ -6,8 +6,8 @@ import {
 import {
   fetchAllMatches,
   fetchJson,
-  resolveEffectiveRace,
 } from "@/lib/w3cUtils";
+import { raceLabel } from "@/lib/w3cRaces";
 import { getCountryRaceLadder } from "@/services/countryRaceLadder";
 import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
 import { flattenCountryLadder } from "@/lib/ranking";
@@ -412,7 +412,7 @@ export async function getPlayerSummary(inputTag: string) {
     const { me } = pair;
 
     // Force this to be a plain string key (avoids TS "never" explosions)
-    const race: string = String(resolveEffectiveRace(me));
+    const race = raceLabel(me?.race);
 
     raceGamesAllTime[race] = (raceGamesAllTime[race] || 0) + 1;
 

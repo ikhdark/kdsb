@@ -1,3 +1,5 @@
+import { unstable_cache } from "next/cache";
+
 import { fetchAllMatches } from "../lib/w3cUtils";
 import { resolveBattleTagViaSearch } from "../lib/w3cBattleTagResolver";
 
@@ -62,22 +64,17 @@ function bucketFloor(diff: number) {
 }
 
 /* =========================
-   SERVICE
+   CORE (UNCACHED)
 ========================= */
 
-export async function getPlayerPerformance(
+async function _getPlayerPerformance(
   inputBattleTag: string
 ): Promise<PlayerPerformanceStats | null> {
-
-  /* resolve FIRST */
   const battletag = await resolveBattleTagViaSearch(inputBattleTag);
   if (!battletag) return null;
 
-  /* fetch (already cached inside w3cUtils) */
   const matches = await fetchAllMatches(battletag, SEASONS);
   if (!matches?.length) return null;
-
-  /* ---------- compute ---------- */
 
   const myTagLower = battletag.toLowerCase();
 
@@ -111,7 +108,8 @@ export async function getPlayerPerformance(
 
     const opp = me === pA ? pB : pA;
 
-    if (typeof me.oldMmr !== "number" || typeof opp.oldMmr !== "number") continue;
+    if (typeof me.oldMmr !== "number" || typeof opp.oldMmr !== "number")
+      continue;
 
     const diff = me.oldMmr - opp.oldMmr;
     const didWin = !!me.won;
@@ -172,4 +170,21 @@ export async function getPlayerPerformance(
     evenMMR: even,
     buckets,
   };
+}
+
+/* =========================
+   CACHED EXPORT
+========================= */
+
+const _getPlayerPerformanceCached = unstable_cache(
+  async (inputBattleTag: string) =>
+    _getPlayerPerformance(inputBattleTag),
+  ["w3c-player-performance-v1"],
+  { revalidate: 300 }
+);
+
+export async function getPlayerPerformance(
+  inputBattleTag: string
+) {
+  return _getPlayerPerformanceCached(inputBattleTag);
 }

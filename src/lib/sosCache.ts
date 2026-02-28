@@ -6,63 +6,44 @@ import {
 
 import { buildLadder } from "@/lib/ladderEngine"
 import type { LadderRow } from "@/lib/ladderEngine"
+import { unstable_cache } from "next/cache"
 
 /* =========================
-   CONFIG
+   SoS (Next.js Data Cache - 5 min)
 ========================= */
 
-const CACHE_TTL = 10 * 60 * 1000 // 10 minutes
+export const getSoSMap = unstable_cache(
+  async (): Promise<Map<string, number>> => {
+    console.log("Rebuilding SoS cache (ISR 5 min)...")
+
+    const rows = await fetchAllLeagues()
+    const inputs = buildInputs(rows)
+    const ladder: LadderRow[] = buildLadder(inputs)
+
+    await computeSoS(ladder)
+
+    const map = new Map<string, number>(
+      ladder
+        .filter((r) => r.sos != null)
+        .map((r) => [
+          r.battletag.toLowerCase(),
+          r.sos as number,
+        ])
+    )
+
+    console.log(`SoS cache built with ${map.size} players`)
+
+    return map
+  },
+  ["global-sos-map"],
+  { revalidate: 300 } // 5 minutes
+)
 
 /* =========================
-   IN-MEMORY CACHE
-========================= */
-
-let lastBuild = 0
-let sosMap = new Map<string, number>()
-
-/* =========================
-   BUILD / GET
-========================= */
-
-export async function getSoSMap(): Promise<Map<string, number>> {
-  const now = Date.now()
-
-  if (now - lastBuild < CACHE_TTL && sosMap.size > 0) {
-    return sosMap
-  }
-
-  console.log("Rebuilding SoS cache...")
-
-  const rows = await fetchAllLeagues()
-  const inputs = buildInputs(rows)
-  const ladder: LadderRow[] = buildLadder(inputs)
-
-  await computeSoS(ladder)
-
-  sosMap = new Map(
-    ladder
-      .filter((r) => r.sos != null)
-      .map((r) => [
-        r.battletag.toLowerCase(),
-        r.sos as number,
-      ])
-  )
-
-  lastBuild = now
-
-  console.log(
-    `SoS cache built with ${sosMap.size} players`
-  )
-
-  return sosMap
-}
-
-/* =========================
-   FORCE REBUILD
+   FORCE REBUILD (optional)
 ========================= */
 
 export async function rebuildSoSCache(): Promise<Map<string, number>> {
-  lastBuild = 0
-  sosMap.clear()
+  // In ISR world, this simply re-calls and lets revalidate window handle it
   return getSoSMap()
 }
