@@ -4,6 +4,8 @@ import { useMemo, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import BattleTagInput from "@/components/BattleTagInput";
 
+type Hero = { name: string; level: number };
+
 type MatchRow = {
   id: string;
   won: boolean;
@@ -19,6 +21,11 @@ type MatchRow = {
   newMmr: number;
   mmrGain: number;
 
+  // Optional (if your API ever provides opponent mmr)
+  oppOldMmr?: number;
+  oppNewMmr?: number;
+  oppMmrGain?: number;
+
   leagueId: number | null;
   division: number | null;
   ladderRank: number | null;
@@ -26,14 +33,14 @@ type MatchRow = {
   myRace: number;
   myRndRace: number | null;
 
-  oppRace: number;
+  oppRace: number | null;
   oppRndRace: number | null;
 
-  opponentTag: string;
+  opponentTag: string | null;
   opponentCountry: string | null;
 
-  myHeroes: { name: string; level: number }[];
-  oppHeroes: { name: string; level: number }[];
+  myHeroes: Hero[];
+  oppHeroes: Hero[];
 };
 
 function formatDuration(seconds: number) {
@@ -42,51 +49,51 @@ function formatDuration(seconds: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-// W3C exact filenames
-function raceIcon(raceId: number, rndRace?: number | null): string | undefined {
-  const base = "https://w3champions.com/assets/raceIcons/";
+const RACE_BASE = "https://w3champions.com/assets/raceIcons/";
+const HERO_BASE = "https://w3champions.com/assets/heroes/";
+const PROVIDER_BASE = "https://w3champions.com/assets/icons/";
+const FLAG_BASE = "https://flagcdn.com/w20/";
 
-  // Random-specific
+const RACE_LABEL: Record<number, string> = {
+  1: "Human",
+  2: "Orc",
+  4: "Night Elf",
+  8: "Undead",
+  0: "Random",
+};
+
+const RACE_ICON: Record<number, string> = {
+  1: "HUMAN.png",
+  2: "ORC.png",
+  4: "NIGHT_ELF.png",
+  8: "UNDEAD.png",
+};
+
+const RANDOM_RACE_ICON: Record<number, string> = {
+  1: "HumanRandom.png",
+  2: "OrcRandom.png",
+  4: "NightElfRandom.png",
+  8: "UndeadRandom.png",
+};
+
+function raceIcon(raceId: number | null, rndRace?: number | null): string | undefined {
+  if (raceId == null) return undefined;
+
   if (raceId === 0) {
-    if (rndRace) {
-      const randomMap: Record<number, string> = {
-        1: "HumanRandom.png",
-        2: "OrcRandom.png",
-        4: "NightElfRandom.png",
-        8: "UndeadRandom.png",
-      };
-
-      const file = randomMap[rndRace];
-      return file ? base + file : undefined;
-    }
-
-    return undefined;
+    const file = rndRace ? RANDOM_RACE_ICON[rndRace] : undefined;
+    return file ? RACE_BASE + file : undefined;
   }
-
-  const map: Record<number, string> = {
-    1: "HUMAN.png",
-    2: "ORC.png",
-    4: "NIGHT_ELF.png",
-    8: "UNDEAD.png",
-  };
-
-  const file = map[raceId];
-  return file ? base + file : undefined;
+  const file = RACE_ICON[raceId];
+  return file ? RACE_BASE + file : undefined;
 }
 
 function heroIcon(name: string) {
-  return `https://w3champions.com/assets/heroes/${name.toLowerCase()}.png`;
+  return `${HERO_BASE}${name.toLowerCase()}.png`;
 }
 
-function raceLabel(id: number) {
-  const map: Record<number, string> = {
-    1: "Human",
-    2: "Orc",
-    4: "Night Elf",
-    8: "Undead",
-    0: "Random",
-  };
-  return map[id] ?? "Unknown";
+function raceLabel(id: number | null) {
+  if (id == null) return "Unknown";
+  return RACE_LABEL[id] ?? "Unknown";
 }
 
 function winrate(w: number, l: number) {
@@ -94,10 +101,12 @@ function winrate(w: number, l: number) {
   return t ? Math.round((w / t) * 100) : 0;
 }
 
-function barClass(pct: number) {
-  if (pct >= 55) return "bg-emerald-500";
-  if (pct >= 48) return "bg-yellow-500";
-  return "bg-rose-500";
+function mmrDeltaClass(delta: number) {
+  return delta >= 0 ? "text-emerald-600" : "text-rose-600";
+}
+
+function mmrDeltaText(delta: number) {
+  return `${delta >= 0 ? "+" : ""}${delta}`;
 }
 
 export default function MatchHistoryTable({
@@ -148,16 +157,13 @@ export default function MatchHistoryTable({
   const vsRaceBreakdown = useMemo(() => {
     const out: Record<number, Record<number, { wins: number; losses: number }>> =
       {};
-
     for (const m of filtered) {
       if (!out[m.myRace]) out[m.myRace] = {};
-      if (!out[m.myRace][m.oppRace])
-        out[m.myRace][m.oppRace] = { wins: 0, losses: 0 };
-
-      if (m.won) out[m.myRace][m.oppRace].wins++;
-      else out[m.myRace][m.oppRace].losses++;
+      const oppRaceKey = typeof m.oppRace === "number" ? m.oppRace : -1;
+      if (!out[m.myRace][oppRaceKey]) out[m.myRace][oppRaceKey] = { wins: 0, losses: 0 };
+      if (m.won) out[m.myRace][oppRaceKey].wins++;
+      else out[m.myRace][oppRaceKey].losses++;
     }
-
     return out;
   }, [filtered]);
 
@@ -264,7 +270,7 @@ export default function MatchHistoryTable({
 
                     return (
                       <div
-                        key={oppRace}
+                        key={oppRaceStr}
                         className="rounded border bg-white/60 dark:bg-gray-900/60 p-2 sm:p-3 space-y-1"
                       >
                         <div className="flex items-center gap-2 min-w-0">
@@ -278,7 +284,7 @@ export default function MatchHistoryTable({
                             />
                           )}
                           <span className="text-sm truncate">
-                            vs {raceLabel(oppRace)}
+                            vs {raceLabel(oppRace === -1 ? null : oppRace)}
                           </span>
                         </div>
 
@@ -297,144 +303,166 @@ export default function MatchHistoryTable({
 
       {/* EXTREMES */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 text-sm">
-      {/* HIGHEST WIN */}
-<div className="rounded border p-3 md:p-4 bg-white dark:bg-gray-900">
-  <div className="text-xs uppercase text-gray-500">Highest MMR Win</div>
+        {/* HIGHEST WIN */}
+        <div className="rounded border p-3 md:p-4 bg-white dark:bg-gray-900">
+          <div className="text-xs uppercase text-gray-500">Highest MMR Win</div>
 
-  <div className="mt-2">
-    {highestWin ? (
-      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-        {/* YOU (MMR change) */}
-        <div className="flex items-center gap-2 min-w-0">
-          {raceIcon(highestWin.myRace, highestWin.myRndRace) && (
-            <img
-              src={raceIcon(highestWin.myRace, highestWin.myRndRace)}
-              width={18}
-              height={18}
-              alt=""
-              className="shrink-0"
-            />
-          )}
+          <div className="mt-2">
+            {highestWin ? (
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                {/* YOU */}
+                <div className="flex items-center gap-2 min-w-0">
+                  {raceIcon(highestWin.myRace, highestWin.myRndRace) && (
+                    <img
+                      src={raceIcon(highestWin.myRace, highestWin.myRndRace)}
+                      width={18}
+                      height={18}
+                      alt=""
+                      className="shrink-0"
+                    />
+                  )}
 
-          <div className="flex items-baseline gap-2">
-            <span className="font-medium">
-              {highestWin.oldMmr} → {highestWin.newMmr}
-            </span>
-            <span className="text-emerald-600 font-medium">
-              (+{highestWin.mmrGain})
-            </span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-medium">{player}</span>
+                    <span className="text-gray-500">
+                      {highestWin.oldMmr} → {highestWin.newMmr}
+                    </span>
+                    <span
+                      className={`${mmrDeltaClass(
+                        highestWin.mmrGain
+                      )} font-medium`}
+                    >
+                      ({mmrDeltaText(highestWin.mmrGain)})
+                    </span>
+                  </div>
+                </div>
+
+                <span className="text-gray-400">vs</span>
+
+                {/* OPPONENT */}
+                <div className="flex items-center gap-2 min-w-0">
+                  {raceIcon(highestWin.oppRace, highestWin.oppRndRace) && (
+                    <img
+                      src={raceIcon(highestWin.oppRace, highestWin.oppRndRace)}
+                      width={18}
+                      height={18}
+                      alt=""
+                      className="shrink-0"
+                    />
+                  )}
+                  <div className="flex items-baseline gap-2 min-w-0">
+                    <span className="font-medium truncate max-w-[55vw] sm:max-w-none">
+                      {highestWin.opponentTag}
+                    </span>
+
+                    {typeof highestWin.oppOldMmr === "number" ? (
+                      <span className="text-gray-500">
+                        {highestWin.oppOldMmr}
+                        {typeof highestWin.oppNewMmr === "number"
+                          ? ` → ${highestWin.oppNewMmr}`
+                          : ""}
+                      </span>
+                    ) : null}
+
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <span className="text-gray-500">—</span>
+            )}
           </div>
         </div>
 
-        <span className="text-gray-400">vs</span>
+        {/* LOWEST LOSS */}
+        <div className="rounded border p-3 md:p-4 bg-white dark:bg-gray-900">
+          <div className="text-xs uppercase text-gray-500">Lowest MMR Loss</div>
 
-        {/* OPPONENT (tag only) */}
-        <div className="flex items-center gap-2 min-w-0">
-          {raceIcon(highestWin.oppRace, highestWin.oppRndRace) && (
-            <img
-              src={raceIcon(highestWin.oppRace, highestWin.oppRndRace)}
-              width={18}
-              height={18}
-              alt=""
-              className="shrink-0"
-            />
-          )}
-          <span className="font-medium truncate max-w-[55vw] sm:max-w-none">
-            {highestWin.opponentTag}
-          </span>
-        </div>
-      </div>
-    ) : (
-      <span className="text-gray-500">—</span>
-    )}
-  </div>
-</div>
+          <div className="mt-2">
+            {lowestLoss ? (
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                {/* YOU */}
+                <div className="flex items-center gap-2 min-w-0">
+                  {raceIcon(lowestLoss.myRace, lowestLoss.myRndRace) && (
+                    <img
+                      src={raceIcon(lowestLoss.myRace, lowestLoss.myRndRace)}
+                      width={18}
+                      height={18}
+                      alt=""
+                      className="shrink-0"
+                    />
+                  )}
 
-{/* LOWEST LOSS */}
-<div className="rounded border p-3 md:p-4 bg-white dark:bg-gray-900">
-  <div className="text-xs uppercase text-gray-500">Lowest MMR Loss</div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-medium">{player}</span>
+                    <span className="text-gray-500">
+                      {lowestLoss.oldMmr} → {lowestLoss.newMmr}
+                    </span>
+                    <span
+                      className={`${mmrDeltaClass(
+                        lowestLoss.mmrGain
+                      )} font-medium`}
+                    >
+                      ({mmrDeltaText(lowestLoss.mmrGain)})
+                    </span>
+                  </div>
+                </div>
 
-  <div className="mt-2">
-    {lowestLoss ? (
-      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-        {/* YOU (MMR change) */}
-        <div className="flex items-center gap-2 min-w-0">
-          {raceIcon(lowestLoss.myRace, lowestLoss.myRndRace) && (
-            <img
-              src={raceIcon(lowestLoss.myRace, lowestLoss.myRndRace)}
-              width={18}
-              height={18}
-              alt=""
-              className="shrink-0"
-            />
-          )}
+                <span className="text-gray-400">vs</span>
 
-          <div className="flex items-baseline gap-2">
-            <span className="font-medium">
-              {lowestLoss.oldMmr} → {lowestLoss.newMmr}
-            </span>
-            <span className="text-rose-600 font-medium">
-              ({lowestLoss.mmrGain >= 0 ? "+" : ""}
-              {lowestLoss.mmrGain})
-            </span>
+                {/* OPPONENT */}
+                <div className="flex items-center gap-2 min-w-0">
+                  {raceIcon(lowestLoss.oppRace, lowestLoss.oppRndRace) && (
+                    <img
+                      src={raceIcon(lowestLoss.oppRace, lowestLoss.oppRndRace)}
+                      width={18}
+                      height={18}
+                      alt=""
+                      className="shrink-0"
+                    />
+                  )}
+                  <div className="flex items-baseline gap-2 min-w-0">
+                    <span className="font-medium truncate max-w-[55vw] sm:max-w-none">
+                      {lowestLoss.opponentTag}
+                    </span>
+
+                    {typeof lowestLoss.oppOldMmr === "number" ? (
+                      <span className="text-gray-500">
+                        {lowestLoss.oppOldMmr}
+                        {typeof lowestLoss.oppNewMmr === "number"
+                          ? ` → ${lowestLoss.oppNewMmr}`
+                          : ""}
+                      </span>
+                    ) : null}
+
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <span className="text-gray-500">—</span>
+            )}
           </div>
         </div>
-
-        <span className="text-gray-400">vs</span>
-
-        {/* OPPONENT (tag only) */}
-        <div className="flex items-center gap-2 min-w-0">
-          {raceIcon(lowestLoss.oppRace, lowestLoss.oppRndRace) && (
-            <img
-              src={raceIcon(lowestLoss.oppRace, lowestLoss.oppRndRace)}
-              width={18}
-              height={18}
-              alt=""
-              className="shrink-0"
-            />
-          )}
-          <span className="font-medium truncate max-w-[55vw] sm:max-w-none">
-            {lowestLoss.opponentTag}
-          </span>
-        </div>
-      </div>
-    ) : (
-      <span className="text-gray-500">—</span>
-    )}
-  </div>
-</div>
-</div>
-
-      {/* TABLE HEADER (desktop only) */}
-      <div className="hidden md:grid grid-cols-7 gap-6 text-xs uppercase text-gray-500 border-b pb-2">
-        <div>Result</div>
-        <div>Players</div>
-        <div>Map</div>
-        <div>Date</div>
-        <div>Length</div>
-        <div>Server</div>
-        <div>MMR</div>
       </div>
 
-      {/* ROWS */}
+      {/* ROWS (unified; mobile-first layout) */}
       <div className="space-y-3">
         {filtered.map((m) => {
           const oppRaceSrc = raceIcon(m.oppRace, m.oppRndRace);
           const myRaceSrc = raceIcon(m.myRace, m.myRndRace);
+          const start = new Date(m.startTime).toLocaleString();
+          const resultClass = m.won ? "text-emerald-600" : "text-rose-600";
+          const resultText = m.won ? "Win" : "Loss";
+
+          const myDelta = m.mmrGain;
+          const oppDelta =
+            typeof m.oppMmrGain === "number" ? m.oppMmrGain : -m.mmrGain;
 
           return (
-            <div
-              key={m.id}
-              className="border rounded bg-white dark:bg-gray-900"
-            >
-              {/* MOBILE SUMMARY STRIP */}
-              <div className="flex items-center justify-between gap-3 p-3 md:hidden border-b">
-                <div
-                  className={`text-sm font-semibold ${
-                    m.won ? "text-emerald-600" : "text-rose-600"
-                  }`}
-                >
-                  {m.won ? "Win" : "Loss"}
+            <div key={m.id} className="border rounded bg-white dark:bg-gray-900">
+              {/* TOP STRIP (now used on all sizes) */}
+              <div className="flex items-center justify-between gap-3 p-3 border-b">
+                <div className={`text-sm font-semibold ${resultClass}`}>
+                  {resultText}
                 </div>
 
                 <div className="text-xs text-gray-500 shrink-0">
@@ -446,193 +474,140 @@ export default function MatchHistoryTable({
                 </div>
               </div>
 
-              {/* CONTENT */}
-              <div className="p-3 md:p-4">
-                <div className="flex flex-col md:grid md:grid-cols-7 gap-4 md:gap-6">
-                  {/* RESULT (desktop) */}
-                  <div
-                    className={`hidden md:block self-start font-medium ${
-                      m.won ? "text-emerald-600" : "text-rose-600"
-                    }`}
-                  >
-                    {m.won ? "Win" : "Loss"}
-                  </div>
+              {/* CONTENT (single layout, scales up naturally) */}
+              <div className="p-3 md:p-4 space-y-4">
+                {/* Players block */}
+                <div className="flex flex-col gap-3">
+                  {/* OPPONENT */}
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {oppRaceSrc && (
+                        <img
+                          src={oppRaceSrc}
+                          width={18}
+                          height={18}
+                          alt=""
+                          className="shrink-0"
+                        />
+                      )}
 
-                  {/* PLAYERS */}
-                  <div className="md:col-span-1 md:col-start-2 md:col-end-3">
-                    <div className="flex flex-col gap-3 md:gap-4">
-                      {/* OPPONENT */}
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2 min-w-0">
-                          {oppRaceSrc && (
-                            <img
-                              src={oppRaceSrc}
-                              width={18}
-                              height={18}
-                              alt=""
-                              className="shrink-0"
-                            />
-                          )}
+                      {m.opponentCountry && (
+                        <img
+                          src={`${FLAG_BASE}${m.opponentCountry.toLowerCase()}.png`}
+                          width={18}
+                          height={14}
+                          alt=""
+                          className="shrink-0"
+                        />
+                      )}
 
-                          {m.opponentCountry && (
-                            <img
-                              src={`https://flagcdn.com/w20/${m.opponentCountry.toLowerCase()}.png`}
-                              width={18}
-                              height={14}
-                              alt=""
-                              className="shrink-0"
-                            />
-                          )}
+                      <span className="font-medium truncate">
+                        {m.opponentTag}
+                      </span>
 
-                          <span className="font-medium truncate">
-                            {m.opponentTag}
-                          </span>
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 ml-6">
-                          {m.oppHeroes?.map((h, i) => (
-                            <div key={i} className="flex items-center gap-1">
-                              <img
-                                src={heroIcon(h.name)}
-                                width={16}
-                                height={16}
-                                alt=""
-                                className="shrink-0"
-                              />
-                              Lv{h.level}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* YOU */}
-                      <div className="flex flex-col gap-1 border-t pt-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          {myRaceSrc && (
-                            <img
-                              src={myRaceSrc}
-                              width={18}
-                              height={18}
-                              alt=""
-                              className="shrink-0"
-                            />
-                          )}
-                          <span className="font-medium truncate">{player}</span>
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 ml-6">
-                          {m.myHeroes?.map((h, i) => (
-                            <div key={i} className="flex items-center gap-1">
-                              <img
-                                src={heroIcon(h.name)}
-                                width={16}
-                                height={16}
-                                alt=""
-                                className="shrink-0"
-                              />
-                              Lv{h.level}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* MOBILE DETAILS GRID */}
-                  <div className="grid grid-cols-2 gap-3 md:hidden">
-                    <div className="space-y-1">
-                      <div className="text-[11px] uppercase text-gray-500">
-                        Date
-                      </div>
-                      <div className="text-sm">
-                        {new Date(m.startTime).toLocaleString()}
-                      </div>
                     </div>
 
-                    <div className="space-y-1">
-                      <div className="text-[11px] uppercase text-gray-500">
-                        Server
+                    {/* Opp MMR numbers (show if we have old OR new) */}
+                    {typeof m.oppOldMmr === "number" ? (
+                      <div className="text-xs text-gray-500 ml-6">
+                        {m.oppOldMmr}
+                        {typeof m.oppNewMmr === "number" ? ` → ${m.oppNewMmr}` : ""}
                       </div>
-                      <div className="flex items-center gap-2 min-w-0">
-                        {m.provider && (
+                    ) : typeof m.oppNewMmr === "number" ? (
+                      <div className="text-xs text-gray-500 ml-6">
+                        {m.oppNewMmr}
+                      </div>
+                    ) : null}
+
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 ml-6">
+                      {m.oppHeroes?.map((h, i) => (
+                        <div key={i} className="flex items-center gap-1">
                           <img
-                            src={`https://w3champions.com/assets/icons/${m.provider}.png`}
+                            src={heroIcon(h.name)}
                             width={16}
                             height={16}
                             alt=""
                             className="shrink-0"
                           />
-                        )}
-                        <span className="truncate text-sm">{m.server}</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1 col-span-2">
-                      <div className="text-[11px] uppercase text-gray-500">
-                        MMR
-                      </div>
-                      <div className="flex items-baseline gap-3 flex-wrap">
-                        <div className="text-sm">
-                          {m.oldMmr} → {m.newMmr}
+                          Lv{h.level}
                         </div>
-                        <div
-                          className={`text-sm font-medium ${
-                            m.mmrGain >= 0
-                              ? "text-emerald-600"
-                              : "text-rose-600"
-                          }`}
-                        >
-                          ({m.mmrGain >= 0 ? "+" : ""}
-                          {m.mmrGain})
-                        </div>
-                      </div>
+                      ))}
                     </div>
                   </div>
 
-                  {/* MAP (desktop) */}
-                  <div className="hidden md:block self-start truncate">
-                    {m.map}
-                  </div>
+                  {/* YOU */}
+                  <div className="flex flex-col gap-1 border-t pt-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {myRaceSrc && (
+                        <img
+                          src={myRaceSrc}
+                          width={18}
+                          height={18}
+                          alt=""
+                          className="shrink-0"
+                        />
+                      )}
+                      <span className="font-medium truncate">{player}</span>
 
-                  {/* DATE (desktop) */}
-                  <div className="hidden md:block self-start text-sm">
-                    {new Date(m.startTime).toLocaleString()}
-                  </div>
+                      <span
+                        className={`${mmrDeltaClass(
+                          myDelta
+                        )} text-xs font-medium shrink-0`}
+                      >
+                        ({mmrDeltaText(myDelta)})
+                      </span>
+                    </div>
 
-                  {/* LENGTH (desktop) */}
-                  <div className="hidden md:block self-start text-sm">
-                    {formatDuration(m.duration)}
-                  </div>
-
-                  {/* SERVER (desktop) */}
-                  <div className="hidden md:flex self-start items-center gap-2 min-w-0">
-                    {m.provider && (
-                      <img
-                        src={`https://w3champions.com/assets/icons/${m.provider}.png`}
-                        width={16}
-                        height={16}
-                        alt=""
-                        className="shrink-0"
-                      />
-                    )}
-                    <span className="truncate">{m.server}</span>
-                  </div>
-
-                  {/* MMR (desktop) */}
-                  <div className="hidden md:block self-start text-sm">
-                    <div>
+                    <div className="text-xs text-gray-500 ml-6">
                       {m.oldMmr} → {m.newMmr}
                     </div>
-                    <div
-                      className={
-                        m.mmrGain >= 0 ? "text-emerald-600" : "text-rose-600"
-                      }
-                    >
-                      ({m.mmrGain >= 0 ? "+" : ""}
-                      {m.mmrGain})
+
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 ml-6">
+                      {m.myHeroes?.map((h, i) => (
+                        <div key={i} className="flex items-center gap-1">
+                          <img
+                            src={heroIcon(h.name)}
+                            width={16}
+                            height={16}
+                            alt=""
+                            className="shrink-0"
+                          />
+                          Lv{h.level}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
+
+                {/* Details grid (now used on all sizes) */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <div className="text-[11px] uppercase text-gray-500">
+                      Date
+                    </div>
+                    <div className="text-sm">{start}</div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="text-[11px] uppercase text-gray-500">
+                      Server
+                    </div>
+                    <div className="flex items-center gap-2 min-w-0">
+                      {m.provider && (
+                        <img
+                          src={`${PROVIDER_BASE}${m.provider}.png`}
+                          width={16}
+                          height={16}
+                          alt=""
+                          className="shrink-0"
+                        />
+                      )}
+                      <span className="truncate text-sm">{m.server}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Desktop-only columns removed; MMR column still intentionally not shown separately */}
               </div>
             </div>
           );

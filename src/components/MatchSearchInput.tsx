@@ -1,26 +1,61 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import BattleTagInput from "@/components/BattleTagInput";
 
-export default function MatchSearchInput({
-  error,
-}: {
-  error?: string;
-}) {
+const RECENT_KEY = "w3c_recent_searches";
+
+/* ================= STORAGE HELPERS ================= */
+
+function readRecent(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return JSON.parse(localStorage.getItem(RECENT_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function writeRecent(tag: string) {
+  try {
+    const prev = readRecent();
+    const next = [tag, ...prev.filter((t) => t !== tag)].slice(0, 3);
+    localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+  } catch {}
+}
+
+function normalizeBattleTagInput(value: string) {
+  return value.trim();
+}
+
+/* ================================================== */
+
+export default function MatchSearchInput({ error }: { error?: string }) {
   const [value, setValue] = useState("");
+  const [recent, setRecent] = useState<string[]>([]);
   const router = useRouter();
+
+  useEffect(() => {
+    setRecent(readRecent());
+  }, []);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!value.trim()) return;
+    const v = normalizeBattleTagInput(value);
+    if (!v) return;
 
-    router.push(
-      `/stats/matches?player=${encodeURIComponent(
-        value.trim()
-      )}`
-    );
+    // keep exact user casing here; server page resolves canonical later
+    writeRecent(v);
+    setRecent(readRecent());
+
+    router.push(`/stats/matches?player=${encodeURIComponent(v)}`);
+  }
+
+  function quickGo(tag: string) {
+    writeRecent(tag);
+    setRecent(readRecent());
+    router.push(`/stats/matches?player=${encodeURIComponent(tag)}`);
   }
 
   return (
@@ -30,10 +65,7 @@ export default function MatchSearchInput({
           Match History
         </h1>
 
-        <form
-          onSubmit={handleSubmit}
-          className="space-y-4"
-        >
+        <form onSubmit={handleSubmit} className="space-y-4">
           <BattleTagInput
             value={value}
             onChange={setValue}
@@ -48,10 +80,23 @@ export default function MatchSearchInput({
           </button>
         </form>
 
-        {error && (
-          <div className="text-red-500 text-sm text-center">
-            {error}
+        {recent.length > 0 && (
+          <div className="text-sm text-gray-500 dark:text-gray-400 space-x-3 text-center">
+            <span>Last 3 Battletags Searched:</span>
+            {recent.map((tag) => (
+              <button
+                key={tag}
+                onClick={() => quickGo(tag)}
+                className="underline hover:text-black dark:hover:text-white"
+              >
+                {tag}
+              </button>
+            ))}
           </div>
+        )}
+
+        {error && (
+          <div className="text-red-500 text-sm text-center">{error}</div>
         )}
       </div>
     </div>

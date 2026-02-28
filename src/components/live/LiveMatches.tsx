@@ -50,34 +50,6 @@ export default function LiveMatches() {
 
       const data = await res.json()
 
-      const livePlayers = new Set<string>()
-
-      data.matches.forEach((m: any) => {
-        if (m.teams?.length === 2) {
-          livePlayers.add(m.teams[0].players[0].battleTag)
-          livePlayers.add(m.teams[1].players[0].battleTag)
-        }
-      })
-
-      // Safe SoS fetch
-      let sosData: Record<string, number> = {}
-
-      try {
-        const sosRes = await fetch("/api/sos", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            players: Array.from(livePlayers),
-          }),
-        })
-
-        if (sosRes.ok) {
-          sosData = await sosRes.json()
-        }
-      } catch (err) {
-        console.error("SoS fetch failed:", err)
-      }
-
       const processed: ProcessedMatch[] = data.matches
         .filter((m: any) => m.teams?.length === 2)
         .map((m: any) => {
@@ -87,21 +59,14 @@ export default function LiveMatches() {
           const mmrA = p1.oldMmr ?? 0
           const mmrB = p2.oldMmr ?? 0
 
-          const sosA = sosData[p1.battleTag.toLowerCase()]
-          const sosB = sosData[p2.battleTag.toLowerCase()]
-
           const pingA =
             m.serverInfo?.playerServerInfos?.[0]?.averagePing ?? 0
           const pingB =
             m.serverInfo?.playerServerInfos?.[1]?.averagePing ?? 0
 
-          const blendedA =
-            (sosA ?? mmrA) * 0.7 +
-            mmrA * 0.35
-
-          const blendedB =
-            (sosB ?? mmrB) * 0.7 +
-            mmrB * 0.35
+          // SoS removed: keep sort stable using MMR only
+          const blendedA = mmrA
+          const blendedB = mmrB
 
           const diff = mmrA - mmrB
           const probA =
@@ -159,8 +124,8 @@ export default function LiveMatches() {
           }
         })
         .sort((a: ProcessedMatch, b: ProcessedMatch) =>
-  b.blendedAvg - a.blendedAvg
-)
+          b.blendedAvg - a.blendedAvg
+        )
 
       setMatches(processed)
       setLoading(false)
