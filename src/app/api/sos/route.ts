@@ -15,7 +15,15 @@ export async function POST(req: Request) {
 
     for (const tag of players) {
       const key = String(tag).toLowerCase()
-      const value = sosMap.get(key)
+
+      let value: number | undefined
+
+      if (sosMap instanceof Map) {
+        value = sosMap.get(key)
+      } else if (sosMap && typeof sosMap === "object") {
+        value = (sosMap as Record<string, number>)[key]
+      }
+
       if (value != null) {
         result[key] = value
       }

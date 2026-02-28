@@ -38,13 +38,13 @@ export default function LiveMatches() {
     isFetchingRef.current = true
 
     try {
-      // 🔥 Live endpoint — force no cache
       const res = await fetch(ENDPOINT, {
         cache: "no-store",
       })
 
       if (!res.ok) {
         console.error("Live endpoint failed:", res.status)
+        setLoading(false)
         return
       }
 
@@ -59,24 +59,24 @@ export default function LiveMatches() {
         }
       })
 
-      // POST to SoS API
-      const sosRes = await fetch("/api/sos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          players: Array.from(livePlayers),
-        }),
-      })
-
+      // Safe SoS fetch
       let sosData: Record<string, number> = {}
 
-if (sosRes.ok) {
-  try {
-    sosData = await sosRes.json()
-  } catch {
-    sosData = {}
-  }
-}
+      try {
+        const sosRes = await fetch("/api/sos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            players: Array.from(livePlayers),
+          }),
+        })
+
+        if (sosRes.ok) {
+          sosData = await sosRes.json()
+        }
+      } catch (err) {
+        console.error("SoS fetch failed:", err)
+      }
 
       const processed: ProcessedMatch[] = data.matches
         .filter((m: any) => m.teams?.length === 2)
@@ -95,7 +95,6 @@ if (sosRes.ok) {
           const pingB =
             m.serverInfo?.playerServerInfos?.[1]?.averagePing ?? 0
 
-          // blended rating
           const blendedA =
             (sosA ?? mmrA) * 0.7 +
             mmrA * 0.35
@@ -104,13 +103,11 @@ if (sosRes.ok) {
             (sosB ?? mmrB) * 0.7 +
             mmrB * 0.35
 
-          // Elo probability
           const diff = mmrA - mmrB
           const probA =
             1 / (1 + Math.pow(10, -diff / 400))
           const winProbA = Math.round(probA * 100)
 
-          // Predicted MMR change
           const confidence = Math.abs(probA - 0.5)
 
           const K =
@@ -164,10 +161,12 @@ if (sosRes.ok) {
         .sort((a: ProcessedMatch, b: ProcessedMatch) =>
   b.blendedAvg - a.blendedAvg
 )
+
       setMatches(processed)
       setLoading(false)
     } catch (err) {
       console.error(err)
+      setLoading(false)
     } finally {
       isFetchingRef.current = false
     }
