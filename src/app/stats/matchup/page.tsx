@@ -1,10 +1,8 @@
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
 import MatchupSearch from "@/components/MatchupSearch";
 import MatchupView from "./MatchupView";
 import { getVsPlayer } from "@/services/vsPlayer";
 import EmptyState from "@/components/EmptyState";
+import { Section } from "@/components/PlayerUI";
 
 export default async function Page({
   searchParams,
@@ -21,39 +19,28 @@ export default async function Page({
 
   return (
     <div className="max-w-6xl mx-auto px-3 md:px-0 space-y-6">
-
-      {/* ================= HEADER / INSTRUCTIONS ================= */}
-      <div className="rounded-xl border bg-white dark:bg-gray-900 p-4 md:p-5">
-        <h1 className="text-base md:text-lg font-semibold">
-          Player vs Player Matchup
-        </h1>
-
-        <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-          Compare two players across head-to-head games.
-          Enter both battletags below to see overall results,
-          race matchups, economy, army, hero stats, and maps.
-        </p>
-      </div>
-
-      {/* ================= SEARCH ================= */}
-      <div className="rounded-xl border bg-white dark:bg-gray-900 p-4 md:p-5">
-        <MatchupSearch initialA={a} initialB={b} />
-      </div>
-
-      {/* ================= STATES ================= */}
-
-      {/* nothing searched yet */}
-      {!a || !b ? (
-        <div className="rounded-xl border bg-white dark:bg-gray-900 p-6 text-center">
-          <p className="text-sm text-gray-500">
-            Select two players and press <span className="font-medium">Compare</span> to view matchup stats.
-          </p>
+      <Section title="Player vs Player Matchup">
+        <div className="text-sm text-gray-600 dark:text-gray-300">
+          Compare two players across head-to-head games. Enter both battletags
+          below to see overall results, race matchups, economy, army, hero stats,
+          and maps.
         </div>
+      </Section>
+
+      <Section title="Search">
+        <MatchupSearch initialA={a} initialB={b} />
+      </Section>
+
+      {!a || !b ? (
+        <Section title="Ready">
+          <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-2">
+            Select two players and press{" "}
+            <span className="font-medium">Compare</span> to view matchup stats.
+          </div>
+        </Section>
       ) : !stats ? (
-        /* searched but no games */
         <EmptyState message="No head-to-head games found." />
       ) : (
-        /* normal */
         <MatchupView stats={stats} />
       )}
     </div>

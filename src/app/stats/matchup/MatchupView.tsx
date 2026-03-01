@@ -1,5 +1,6 @@
 import { Section } from "@/components/PlayerUI";
 import type { RaceBreakdownRow } from "@/services/vsPlayer";
+
 /* ========================================= */
 
 function pct(n: number) {
@@ -27,20 +28,19 @@ function Board({
   rows: { label: string; a: number | string; b: number | string }[];
 }) {
   return (
-    <div className="rounded-xl border bg-white dark:bg-gray-900 overflow-hidden">
+    <div className="rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
       <div className="grid grid-cols-[1fr_auto_1fr] text-xs font-semibold uppercase px-3 py-2 bg-gray-100 dark:bg-gray-800">
-
         <div className="text-left">{aLabel}</div>
-        <div className="text-center text-gray-600 dark:text-gray-300">Stat</div>
+        <div className="text-center text-gray-600 dark:text-gray-300">
+          Stat
+        </div>
         <div className="text-right">{bLabel}</div>
       </div>
 
       {rows.map((r) => (
         <div
           key={r.label}
-          className="grid grid-cols-[1fr_auto_1fr] px-3 py-2 border-t text-xs md:text-sm items-center"
-
-
+          className="grid grid-cols-[1fr_auto_1fr] px-3 py-2 border-t border-gray-200 dark:border-gray-800 text-xs md:text-sm items-center"
         >
           <div className="text-left font-medium">{r.a}</div>
           <div className="text-center text-xs uppercase text-gray-600 dark:text-gray-300">
@@ -55,46 +55,46 @@ function Board({
 
 /* ========================================= */
 
-export default function MatchupView({ stats }: { stats: any }) {
-  if (!stats) {
+function EmptyState() {
   return (
-    <div className="text-center text-sm text-gray-500 py-10">
-      No head-to-head games found.
-    </div>
+    <Section title="Head-to-head">
+      <div className="text-center text-sm text-gray-500 dark:text-gray-400 py-10">
+        No head-to-head games found.
+      </div>
+    </Section>
   );
 }
+
+/* ========================================= */
+
+export default function MatchupView({ stats }: { stats: any }) {
+  if (!stats) return <EmptyState />;
+
   const aGain = stats.statsA.mmr.totalMmrGain;
   const bGain = stats.statsB.mmr.totalMmrGain;
 
   const winner = aGain >= bGain ? stats.playerA : stats.playerB;
   const value = Math.max(aGain, bGain);
 
+  const RACE_LABEL: Record<string, string> = {
+    "0": "Human",
+    "1": "Undead",
+    "2": "Random",
+    "3": "Night Elf",
+    "4": "Orc",
+  };
+
+  const raceRows = stats.raceBreakdown
+    .filter((r: RaceBreakdownRow) => r.aGames > 0 || r.bGames > 0)
+    .map((r: RaceBreakdownRow) => ({
+      label: RACE_LABEL[r.race] ?? r.race,
+      a: r.aGames ? `${r.aWins}-${r.aLosses} (${pct(r.aWinrate)})` : "-",
+      b: r.bGames ? `${r.bWins}-${r.bLosses} (${pct(r.bWinrate)})` : "-",
+    }));
+
   return (
     <>
-      {/* ========================================= */}
-      {/* Overview */}
-      {/* ========================================= */}
-
-<Section title="Overview for the last 2 seasons (Season 22-24)">
-  {(() => {
-const RACE_LABEL: Record<string, string> = {
-  "0": "Human",
-  "1": "Undead",
-  "2": "Random",
-  "3": "Night Elf",
-  "4": "Orc",
-};
-
-const raceRows = stats.raceBreakdown
-  .filter((r: RaceBreakdownRow) => r.aGames > 0 || r.bGames > 0)
-  .map((r: RaceBreakdownRow) => ({
-    label: RACE_LABEL[r.race] ?? r.race,
-    a: r.aGames ? `${r.aWins}-${r.aLosses} (${pct(r.aWinrate)})` : "-",
-    b: r.bGames ? `${r.bWins}-${r.bLosses} (${pct(r.bWinrate)})` : "-",
-}));
-
-    return (
-      <>
+      <Section title="Overview for the last 2 seasons (Season 22-24)">
         <Board
           aLabel={stats.playerA}
           bLabel={stats.playerB}
@@ -109,33 +109,20 @@ const raceRows = stats.raceBreakdown
               a: pct(stats.statsA.overall.winrate),
               b: pct(stats.statsB.overall.winrate),
             },
-
-            // race rows
             ...raceRows,
           ]}
         />
 
-        <div className="rounded-xl border bg-white dark:bg-gray-900 px-4 py-3 text-center font-medium mt-4">
+        <div className="rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-center font-medium">
           Avg Duration • {mins(stats.statsA.avgDurationSec)}
-        </div>
-      </>
-    );
-  })()}
-</Section>
-
-      {/* ========================================= */}
-      {/* Rating Edge */}
-      {/* ========================================= */}
-
-      <Section title="Player with the higher total MMR Change From Games vs Each Other">
-        <div className="rounded-xl border bg-white dark:bg-gray-900 px-4 py-4 text-center font-semibold">
-          {winner} +{num(value)}
         </div>
       </Section>
 
-      {/* ========================================= */}
-      {/* Economy */}
-      {/* ========================================= */}
+      <Section title="Player with the higher total MMR Change From Games vs Each Other">
+        <div className="rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-4 text-center font-semibold">
+          {winner} +{num(value)}
+        </div>
+      </Section>
 
       <Section title="Economy">
         <Board
@@ -161,10 +148,6 @@ const raceRows = stats.raceBreakdown
         />
       </Section>
 
-      {/* ========================================= */}
-      {/* Army */}
-      {/* ========================================= */}
-
       <Section title="Army">
         <Board
           aLabel={stats.playerA}
@@ -188,10 +171,6 @@ const raceRows = stats.raceBreakdown
           ]}
         />
       </Section>
-
-      {/* ========================================= */}
-      {/* Heroes */}
-      {/* ========================================= */}
 
       <Section title="Heroes">
         <Board
@@ -222,98 +201,105 @@ const raceRows = stats.raceBreakdown
         />
       </Section>
 
-<Section title="Hero Usage, Record & Winrate">
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <Section title="Hero Usage, Record & Winrate">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
+            <div className="font-semibold mb-3">{stats.playerA}</div>
 
-    {/* Player A */}
-    <div className="rounded-xl border bg-white dark:bg-gray-900 p-4">
-      <div className="font-semibold mb-3">{stats.playerA}</div>
+            <div className="grid grid-cols-4 text-xs uppercase text-gray-500 dark:text-gray-400 mb-2">
+              <span>Hero</span>
+              <span className="text-center">Use</span>
+              <span className="text-center">W-L</span>
+              <span className="text-right">WR</span>
+            </div>
 
-      {/* header */}
-      <div className="grid grid-cols-4 text-xs uppercase text-gray-500 mb-2">
-        <span>Hero</span>
-        <span className="text-center">Use</span>
-        <span className="text-center">W-L</span>
-        <span className="text-right">WR</span>
-      </div>
+            {Object.entries(
+              stats.statsA.heroUsage as Record<string, { games: number; wins: number }>
+            )
+              .map(([hero, v]) => {
+                const usage = stats.statsA.overall.games
+                  ? v.games / stats.statsA.overall.games
+                  : 0;
+                const losses = v.games - v.wins;
+                const wr = v.games ? v.wins / v.games : 0;
 
-      {Object.entries(stats.statsA.heroUsage as Record<string, { games: number; wins: number }>)
-        .map(([hero, v]) => {
-          const usage = stats.statsA.overall.games ? v.games / stats.statsA.overall.games : 0;
-          const losses = v.games - v.wins;
-          const wr = v.games ? v.wins / v.games : 0;
-
-          return { hero, usage, wins: v.wins, losses, wr };
-        })
-        .filter(h => h.usage > 0)
-        .sort((a, b) => b.usage - a.usage)
-        .map(h => (
-          <div key={h.hero} className="grid grid-cols-4 text-xs md:text-sm py-1">
-            <span>{h.hero}</span>
-            <span className="text-center">{pct(h.usage)}</span>
-            <span className="text-center">{h.wins}-{h.losses}</span>
-            <span className="text-right text-gray-500">{pct(h.wr)}</span>
+                return { hero, usage, wins: v.wins, losses, wr };
+              })
+              .filter((h) => h.usage > 0)
+              .sort((a, b) => b.usage - a.usage)
+              .map((h) => (
+                <div key={h.hero} className="grid grid-cols-4 text-xs md:text-sm py-1">
+                  <span>{h.hero}</span>
+                  <span className="text-center">{pct(h.usage)}</span>
+                  <span className="text-center">
+                    {h.wins}-{h.losses}
+                  </span>
+                  <span className="text-right text-gray-500 dark:text-gray-400">
+                    {pct(h.wr)}
+                  </span>
+                </div>
+              ))}
           </div>
-        ))}
-    </div>
 
-    {/* Player B */}
-    <div className="rounded-xl border bg-white dark:bg-gray-900 p-4">
-      <div className="font-semibold mb-3">{stats.playerB}</div>
+          <div className="rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
+            <div className="font-semibold mb-3">{stats.playerB}</div>
 
-      {/* header */}
-      <div className="grid grid-cols-4 text-xs uppercase text-gray-500 mb-2">
-        <span>Hero</span>
-        <span className="text-center">Use</span>
-        <span className="text-center">W-L</span>
-        <span className="text-right">WR</span>
-      </div>
+            <div className="grid grid-cols-4 text-xs uppercase text-gray-500 dark:text-gray-400 mb-2">
+              <span>Hero</span>
+              <span className="text-center">Use</span>
+              <span className="text-center">W-L</span>
+              <span className="text-right">WR</span>
+            </div>
 
-      {Object.entries(stats.statsB.heroUsage as Record<string, { games: number; wins: number }>)
-        .map(([hero, v]) => {
-          const usage = stats.statsB.overall.games ? v.games / stats.statsB.overall.games : 0;
+            {Object.entries(
+              stats.statsB.heroUsage as Record<string, { games: number; wins: number }>
+            )
+              .map(([hero, v]) => {
+                const usage = stats.statsB.overall.games
+                  ? v.games / stats.statsB.overall.games
+                  : 0;
 
-          const losses = v.games - v.wins;
-          const wr = v.games ? v.wins / v.games : 0;
+                const losses = v.games - v.wins;
+                const wr = v.games ? v.wins / v.games : 0;
 
-          return { hero, usage, wins: v.wins, losses, wr };
-        })
-        .filter(h => h.usage > 0)
-        .sort((a, b) => b.usage - a.usage)
-        .map(h => (
-          <div key={h.hero} className="grid grid-cols-4 text-xs md:text-sm py-1">
-
-            <span>{h.hero}</span>
-            <span className="text-center">{pct(h.usage)}</span>
-            <span className="text-center">{h.wins}-{h.losses}</span>
-            <span className="text-right text-gray-500">{pct(h.wr)}</span>
+                return { hero, usage, wins: v.wins, losses, wr };
+              })
+              .filter((h) => h.usage > 0)
+              .sort((a, b) => b.usage - a.usage)
+              .map((h) => (
+                <div key={h.hero} className="grid grid-cols-4 text-xs md:text-sm py-1">
+                  <span>{h.hero}</span>
+                  <span className="text-center">{pct(h.usage)}</span>
+                  <span className="text-center">
+                    {h.wins}-{h.losses}
+                  </span>
+                  <span className="text-right text-gray-500 dark:text-gray-400">
+                    {pct(h.wr)}
+                  </span>
+                </div>
+              ))}
           </div>
-        ))}
-    </div>
+        </div>
+      </Section>
 
-  </div>
-</Section>
-
-
-<Section title="Map Winrates">
-  <div className="overflow-x-auto">
-  <Board
-    aLabel={stats.playerA}
-    bLabel={stats.playerB}
-    rows={stats.maps
-      .sort((a: typeof stats.maps[number], b: typeof stats.maps[number]) => b.games - a.games)
-      .map((m: typeof stats.maps[number]) => ({
-        label: `${m.map} (${m.games})`,
-        a: pct(m.winrateA),
-        b: pct(m.winrateB),
-      }))}
-   />
-  </div>
-</Section>
-
-      {/* ========================================= */}
-      {/* Network */}
-      {/* ========================================= */}
+      <Section title="Map Winrates">
+        <div className="overflow-x-auto">
+          <Board
+            aLabel={stats.playerA}
+            bLabel={stats.playerB}
+            rows={stats.maps
+              .sort(
+                (a: typeof stats.maps[number], b: typeof stats.maps[number]) =>
+                  b.games - a.games
+              )
+              .map((m: typeof stats.maps[number]) => ({
+                label: `${m.map} (${m.games})`,
+                a: pct(m.winrateA),
+                b: pct(m.winrateB),
+              }))}
+          />
+        </div>
+      </Section>
 
       <Section title="Network">
         <Board
