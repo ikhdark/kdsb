@@ -43,7 +43,7 @@ const RACE_MAP: Record<number, string> = {
   0: "Random",
 };
 
-const MAX_LEAGUE_PAGE = 30;
+const MAX_LEAGUE_PAGE = 50;
 
 /* ---------------- TYPES ---------------- */
 
