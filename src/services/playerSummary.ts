@@ -20,7 +20,7 @@ import {
 import { COUNTRY_OVERRIDE } from "@/lib/countryOverrides";
 
 /* =====================================================
-   GLOBAL CONSTANTS (shared)
+   GLOBAL CONSTANTS
 ===================================================== */
 
 const GATEWAY = 20;
@@ -31,13 +31,9 @@ const SEASONS = [21, 22, 23, 24];
 
 const MIN_GAMES = 5;
 
-const GLOBAL_CACHE_TTL = 5 * 60 * 1000;
-
 /* =====================================================
-   =====================================================
-        SECTION A — RANK SERVICE
-   =====================================================
-   ===================================================== */
+   SECTION A — RANK SERVICE
+===================================================== */
 
 const RACE_MAP: Record<number, string> = {
   1: "Human",
@@ -71,18 +67,9 @@ export type W3CRankResponse = {
   ranks: RankRow[];
 };
 
-/* ---------------- GLOBAL LADDER CACHE ---------------- */
-
-let cachedRowsByPage: Map<number, any[]> | null = null;
-let lastFetchTime = 0;
+/* ---------------- GLOBAL LADDER FETCH (NO CACHE) ---------------- */
 
 async function fetchGlobalRowsByPage(): Promise<Map<number, any[]>> {
-  const now = Date.now();
-
-  if (cachedRowsByPage && now - lastFetchTime < GLOBAL_CACHE_TTL) {
-    return cachedRowsByPage;
-  }
-
   const requests: Promise<any[]>[] = [];
 
   for (let page = 0; page <= MAX_LEAGUE_PAGE; page++) {
@@ -98,9 +85,6 @@ async function fetchGlobalRowsByPage(): Promise<Map<number, any[]>> {
   const map = new Map<number, any[]>();
   pages.forEach((rows, page) => map.set(page, rows));
 
-  cachedRowsByPage = map;
-  lastFetchTime = now;
-
   return map;
 }
 
@@ -110,24 +94,6 @@ function iso2(code: unknown): string {
   const c = String(code ?? "").toUpperCase();
   return c.length === 2 ? c : "";
 }
-
-function inferCountryFromMatches(matches: any[], selfLower: string): string {
-  for (const m of matches) {
-    if (!Array.isArray(m?.teams)) continue;
-
-    for (const t of m.teams) {
-      for (const p of t.players ?? []) {
-        if (String(p?.battleTag).toLowerCase() === selfLower) {
-          const cc = iso2(p?.countryCode);
-          if (cc) return cc;
-        }
-      }
-    }
-  }
-  return "";
-}
-
-/* ---------------- OVERRIDE HELPERS ---------------- */
 
 function getBT(r: any): string {
   return r?.battletag ?? r?.battleTag ?? r?.battle_tag ?? "";
@@ -170,8 +136,6 @@ export async function getW3CRank(
 
   const canonicalLower = canonicalTag.toLowerCase();
 
-  /* ---------------- COUNTRY RESOLUTION ---------------- */
-
   function resolveFromProfile(): string {
     return (
       iso2(profile?.countryCode) ||
@@ -190,7 +154,6 @@ export async function getW3CRank(
             const cc =
               iso2(p?.countryCode) ||
               iso2(p?.location);
-
             if (cc) return cc;
           }
         }
@@ -204,22 +167,16 @@ export async function getW3CRank(
     resolveFromProfile() ||
     "";
 
-  /* ---------------- COUNTRY OVERRIDE (LOGIC) ---------------- */
-
   const effectiveCountry = countryCode
     ? effectiveCountryForTag(canonicalTag, countryCode)
     : "";
 
-  /* ---------------- COUNTRY LADDER (override-aware) ---------------- */
-
-  // Base ladder for the EFFECTIVE country (if no override, equals countryCode)
   const basePayload = effectiveCountry
     ? await fetchCountryLadder(effectiveCountry, GATEWAY, GAMEMODE, SEASON)
     : [];
 
   let countryRows = flattenCountryLadder(basePayload);
 
-  // (A) Remove players overridden OUT of this effective country
   if (countryRows.length) {
     countryRows = countryRows.filter((r: any) => {
       const bt = getBT(r);
@@ -229,7 +186,6 @@ export async function getW3CRank(
     });
   }
 
-  // (B) Inject players overridden INTO this effective country
   const injectTargets = Object.entries(COUNTRY_OVERRIDE)
     .filter(([, o]) => o.to.toUpperCase() === effectiveCountry);
 
@@ -261,231 +217,92 @@ export async function getW3CRank(
     countryRows = uniqBy(countryRows, (r: any) => getBT(r));
   }
 
-/* ---------------- RANK BUILD ---------------- */
-const ranks: RankRow[] = [];
+  const ranks: RankRow[] = [];
 
-const raceKeyMap: Record<number, RaceKey> = {
-  1: "human",
-  2: "orc",
-  4: "elf",
-  8: "undead",
-  0: "random",
-};
+  const raceKeyMap: Record<number, RaceKey> = {
+    1: "human",
+    2: "orc",
+    4: "elf",
+    8: "undead",
+    0: "random",
+  };
 
-for (const [raceIdStr, raceName] of Object.entries(RACE_MAP)) {
-  const raceId = Number(raceIdStr);
+  for (const [raceIdStr, raceName] of Object.entries(RACE_MAP)) {
+    const raceId = Number(raceIdStr);
 
-  const globalInputs: LadderInputRow[] = [];
+    const globalInputs: LadderInputRow[] = [];
 
-  for (const rawRows of rowsByPage.values()) {
-    const flat = flattenCountryLadder(rawRows);
+    for (const rawRows of rowsByPage.values()) {
+      const flat = flattenCountryLadder(rawRows);
 
-    for (const r of flat as any[]) {
-      if (r.games < MIN_GAMES) continue;
-      if (r.race !== raceId) continue;
-      if (!r.battleTag) continue;
+      for (const r of flat as any[]) {
+        if (r.games < MIN_GAMES) continue;
+        if (r.race !== raceId) continue;
+        if (!r.battleTag) continue;
 
-      globalInputs.push({
-        battletag: r.battleTag,
-        mmr: r.mmr,
-        wins: r.wins,
-        games: r.games,
-        sos: null,
-      });
+        globalInputs.push({
+          battletag: r.battleTag,
+          mmr: r.mmr,
+          wins: r.wins,
+          games: r.games,
+          sos: null,
+        });
+      }
     }
-  }
 
-  const globalLadder = buildLadder(globalInputs);
+    const globalLadder = buildLadder(globalInputs);
 
-  const gIdx = globalLadder.findIndex(
-    (p) => p.battletag.toLowerCase() === canonicalLower
-  );
+    const gIdx = globalLadder.findIndex(
+      (p) => p.battletag.toLowerCase() === canonicalLower
+    );
 
-  if (gIdx === -1) continue;
+    if (gIdx === -1) continue;
 
-  let countryRank: number | null = null;
-  let countryTotal: number | null = null;
+    let countryRank: number | null = null;
+    let countryTotal: number | null = null;
 
-  if (effectiveCountry) {
-    const raceKey = raceKeyMap[raceId];
+    if (effectiveCountry) {
+      const raceKey = raceKeyMap[raceId];
 
-    if (raceKey) {
-      const ladderData = await getCountryRaceLadder(
-        effectiveCountry,
-        raceKey,
-        undefined,
-        1,
-        9999
-      );
-
-      if (ladderData) {
-        countryTotal = ladderData.poolSize;
-
-        const cIdx = ladderData.full.findIndex(
-          (p) => p.battletag.toLowerCase() === canonicalLower
+      if (raceKey) {
+        const ladderData = await getCountryRaceLadder(
+          effectiveCountry,
+          raceKey,
+          undefined,
+          1,
+          9999
         );
 
-        countryRank = cIdx === -1 ? null : cIdx + 1;
+        if (ladderData) {
+          countryTotal = ladderData.poolSize;
+
+          const cIdx = ladderData.full.findIndex(
+            (p) => p.battletag.toLowerCase() === canonicalLower
+          );
+
+          countryRank = cIdx === -1 ? null : cIdx + 1;
+        }
       }
     }
+
+    ranks.push({
+      race: raceName,
+      raceId,
+      globalRank: gIdx + 1,
+      globalTotal: globalLadder.length,
+      countryRank,
+      countryTotal,
+      mmr: globalLadder[gIdx].mmr,
+      games: globalLadder[gIdx].games,
+    });
   }
-
-  ranks.push({
-    race: raceName,
-    raceId,
-    globalRank: gIdx + 1,
-    globalTotal: globalLadder.length,
-    countryRank,
-    countryTotal,
-    mmr: globalLadder[gIdx].mmr,
-    games: globalLadder[gIdx].games,
-  });
-}
-
-return {
-  battletag: canonicalTag,
-  season: SEASON,
-  country: effectiveCountry || countryCode || "—",
-  minGames: MIN_GAMES,
-  asOf: new Date().toLocaleString(),
-  ranks,
-};
-}
-/* =====================================================
-   SECTION B — SUMMARY SERVICE
-===================================================== */
-
-const CURRENT_SEASON = 24;
-const LAST_3_SEASONS = new Set([22, 23, 24]);
-
-const MIN_DURATION_SECONDS = 120;
-
-function getPlayerAndOpponentCI(match: any, lower: string) {
-  const players = (match?.teams ?? []).flatMap((t: any) => t?.players ?? []);
-  if (players.length < 2) return null;
-
-  const me = players.find((p: any) => p?.battleTag?.toLowerCase() === lower);
-  if (!me) return null;
-
-  const opp = players.find((p: any) => p !== me);
-  if (!opp) return null;
-
-  return { me, opp };
-}
-
-/* =====================================================
-   PUBLIC — getPlayerSummary (CLEAN + FILTERED)
-===================================================== */
-
-export async function getPlayerSummary(inputTag: string) {
-  const raw = String(inputTag ?? "").trim();
-  if (!raw) return null;
-
-  const canonicalBattleTag = await resolveBattleTagViaSearch(raw);
-  if (!canonicalBattleTag) return null;
-
-  const matches = await fetchAllMatches(canonicalBattleTag, SEASONS);
-  if (!matches.length) return null;
-
-  const lower = canonicalBattleTag.toLowerCase();
-
-  const raceGamesAllTime: Record<string, number> = {};
-  const raceGamesCurrentSeason: Record<string, number> = {};
-  const lastPlayedRace: Record<string, Date | undefined> = {};
-  const raceMMRCurrent: Record<string, number> = {};
-  const racePeaks: Record<string, any> = {};
-
-  let highestCurrentRace: string | null = null;
-  let lastPlayedLadder: Date | null = null;
-
-  for (const match of matches) {
-    if (match.gameMode !== 1) continue;
-
-    const date = new Date(match.startTime);
-    const season = match.season;
-
-    if (match.durationInSeconds < MIN_DURATION_SECONDS) continue;
-
-    const pair = getPlayerAndOpponentCI(match, lower);
-    if (!pair) continue;
-
-    const { me } = pair;
-
-    // Force this to be a plain string key (avoids TS "never" explosions)
-    const race = raceLabel(me?.race);
-
-    raceGamesAllTime[race] = (raceGamesAllTime[race] || 0) + 1;
-
-    // last played per-race (all seasons)
-    const prevRaceDate = lastPlayedRace[race];
-    if (!prevRaceDate || date.getTime() > prevRaceDate.getTime()) {
-      lastPlayedRace[race] = date;
-    }
-
-    // last ladder game (all seasons)
-    if (!lastPlayedLadder || date.getTime() > lastPlayedLadder.getTime()) {
-      lastPlayedLadder = date;
-    }
-
-    // current-season tracking
-    if (season === CURRENT_SEASON) {
-      raceGamesCurrentSeason[race] =
-        (raceGamesCurrentSeason[race] || 0) + 1;
-
-      if (typeof me.currentMmr === "number") {
-        raceMMRCurrent[race] = me.currentMmr;
-      }
-
-      if (
-        !highestCurrentRace ||
-        (raceMMRCurrent[race] ?? 0) >
-          (raceMMRCurrent[highestCurrentRace] ?? 0)
-      ) {
-        highestCurrentRace = race;
-      }
-    }
-
-    // Track peak MMR only for last 3 seasons
-    if (LAST_3_SEASONS.has(season) && typeof me.currentMmr === "number") {
-      if (!racePeaks[race] || me.currentMmr > racePeaks[race].mmr) {
-        racePeaks[race] = {
-          race,
-          mmr: me.currentMmr,
-          season,
-        };
-      }
-    }
-  }
-
-  const mostPlayedAllTime =
-    Object.entries(raceGamesAllTime).sort((a, b) => b[1] - a[1])[0]?.[0] ??
-    "Unknown";
-
-  const mostPlayedThisSeason =
-    Object.entries(raceGamesCurrentSeason).sort((a, b) => b[1] - a[1])[0]?.[0] ??
-    "Unknown";
-
-  const top2Peaks = Object.values(racePeaks)
-    .sort((a: any, b: any) => b.mmr - a.mmr)
-    .slice(0, 2);
 
   return {
-    summary: {
-      battletag: canonicalBattleTag,
-      mostPlayedAllTime,
-      mostPlayedThisSeason,
-      highestCurrentRace,
-      highestCurrentMMR:
-        highestCurrentRace
-          ? raceMMRCurrent[highestCurrentRace] ?? null
-          : null,
-      lastPlayedLadder: lastPlayedLadder?.toISOString() ?? null,
-      lastPlayedRace: Object.fromEntries(
-        Object.entries(lastPlayedRace)
-          .filter(([, v]) => !!v)
-          .map(([k, v]) => [k, (v as Date).toISOString()])
-      ),
-      top2Peaks,
-    },
+    battletag: canonicalTag,
+    season: SEASON,
+    country: effectiveCountry || countryCode || "—",
+    minGames: MIN_GAMES,
+    asOf: new Date().toLocaleString(),
+    ranks,
   };
 }
