@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 const OPTIONS = [
-  "Average opponent MMR (All games)",
+  "Weighted by opponent MMR difference",
   "Unique opponent MMR (each opponent counts once)",
   "Average opponent MMR (last 50 games)",
   "Average opponent MMR (All games)",

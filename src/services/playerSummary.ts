@@ -77,7 +77,11 @@ async function fetchGlobalRowsByPage(): Promise<Map<number, any[]>> {
       `https://website-backend.w3champions.com/api/ladder/${page}` +
       `?gateWay=${GATEWAY}&gameMode=${GAMEMODE}&season=${SEASON}`;
 
-    requests.push(fetchJson<any[]>(url).then((json) => json ?? []));
+    requests.push(
+  fetch(url, { next: { revalidate: 300 } })
+    .then((r) => r.json())
+    .catch(() => [])
+);
   }
 
   const pages = await Promise.all(requests);
@@ -304,5 +308,169 @@ export async function getW3CRank(
     minGames: MIN_GAMES,
     asOf: new Date().toLocaleString(),
     ranks,
+  };
+}
+
+function getPlayerAndOpponentCI(match: any, lowerTag: string) {
+  if (!Array.isArray(match?.teams)) return null;
+
+  for (const team of match.teams) {
+    for (const player of team.players ?? []) {
+      if (String(player?.battleTag).toLowerCase() === lowerTag) {
+        const opponent =
+          match.teams
+            .flatMap((t: any) => t.players ?? [])
+            .find(
+              (p: any) =>
+                String(p?.battleTag).toLowerCase() !== lowerTag
+            ) ?? null;
+
+        return {
+          me: player,
+          opponent,
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
+/* =====================================================
+   PLAYER SUMMARY SERVICE
+===================================================== */
+
+const CURRENT_SEASON = SEASON;
+const LAST_3_SEASONS = new Set([22, 23, 24]);
+const MIN_DURATION_SECONDS = 120;
+
+export async function getPlayerSummary(inputTag: string) {
+  const raw = String(inputTag ?? "").trim();
+  if (!raw) return null;
+
+  const canonicalBattleTag = await resolveBattleTagViaSearch(raw);
+  if (!canonicalBattleTag) return null;
+
+ const matches = await fetchAllMatches(canonicalBattleTag, SEASONS);
+
+if (!matches.length) {
+  return {
+    summary: {
+      battletag: canonicalBattleTag,
+      mostPlayedAllTime: "Unknown",
+      mostPlayedThisSeason: "Unknown",
+      highestCurrentRace: null,
+      highestCurrentMMR: null,
+      lastPlayedLadder: null,
+      lastPlayedRace: {},
+      top2Peaks: [],
+    },
+  };
+}
+  const lower = canonicalBattleTag.toLowerCase();
+
+  const raceGamesAllTime: Record<string, number> = {};
+  const raceGamesCurrentSeason: Record<string, number> = {};
+  const lastPlayedRace: Record<string, Date | undefined> = {};
+  const raceMMRCurrent: Record<string, number> = {};
+  const racePeaks: Record<string, any> = {};
+
+  let highestCurrentRace: string | null = null;
+  let lastPlayedLadder: Date | null = null;
+
+  const toDate = (v: any) => {
+    if (!v) return null;
+    const n = Number(v);
+    if (Number.isFinite(n)) {
+      return new Date(n < 1e12 ? n * 1000 : n);
+    }
+    return new Date(v);
+  };
+
+  for (const match of matches) {
+    if (match.gameMode !== 1) continue;
+    if (match.durationInSeconds < MIN_DURATION_SECONDS) continue;
+
+    const date = toDate(match.startTime);
+    if (!date) continue;
+
+    const season = match.season;
+
+    const pair = getPlayerAndOpponentCI(match, lower);
+    if (!pair) continue;
+
+    const { me } = pair;
+
+    const race = raceLabel(me?.race) ?? "Unknown";
+
+    raceGamesAllTime[race] = (raceGamesAllTime[race] || 0) + 1;
+
+    const prevRaceDate = lastPlayedRace[race];
+    if (!prevRaceDate || date.getTime() > prevRaceDate.getTime()) {
+      lastPlayedRace[race] = date;
+    }
+
+    if (!lastPlayedLadder || date.getTime() > lastPlayedLadder.getTime()) {
+      lastPlayedLadder = date;
+    }
+
+    if (season === CURRENT_SEASON) {
+      raceGamesCurrentSeason[race] =
+        (raceGamesCurrentSeason[race] || 0) + 1;
+
+      if (typeof me.currentMmr === "number") {
+        raceMMRCurrent[race] = me.currentMmr;
+      }
+
+      if (
+        !highestCurrentRace ||
+        (raceMMRCurrent[race] ?? 0) >
+          (raceMMRCurrent[highestCurrentRace] ?? 0)
+      ) {
+        highestCurrentRace = race;
+      }
+    }
+
+    if (LAST_3_SEASONS.has(season) && typeof me.currentMmr === "number") {
+      if (!racePeaks[race] || me.currentMmr > racePeaks[race].mmr) {
+        racePeaks[race] = {
+          race,
+          mmr: me.currentMmr,
+          season,
+        };
+      }
+    }
+  }
+
+  const mostPlayedAllTime =
+    Object.entries(raceGamesAllTime)
+      .sort((a, b) => b[1] - a[1])[0]?.[0] ?? "Unknown";
+
+  const mostPlayedThisSeason =
+    Object.entries(raceGamesCurrentSeason)
+      .sort((a, b) => b[1] - a[1])[0]?.[0] ?? "Unknown";
+
+  const top2Peaks = Object.values(racePeaks)
+    .sort((a: any, b: any) => b.mmr - a.mmr)
+    .slice(0, 2);
+
+  return {
+    summary: {
+      battletag: canonicalBattleTag,
+      mostPlayedAllTime,
+      mostPlayedThisSeason,
+      highestCurrentRace,
+      highestCurrentMMR:
+        highestCurrentRace
+          ? raceMMRCurrent[highestCurrentRace] ?? null
+          : null,
+      lastPlayedLadder: lastPlayedLadder?.toISOString() ?? null,
+      lastPlayedRace: Object.fromEntries(
+        Object.entries(lastPlayedRace)
+          .filter(([, v]) => !!v)
+          .map(([k, v]) => [k, (v as Date).toISOString()])
+      ),
+      top2Peaks,
+    },
   };
 }

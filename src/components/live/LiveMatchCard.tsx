@@ -1,3 +1,5 @@
+import Link from "next/link"
+
 const RACE_MAP: Record<number, string> = {
   1: "Human",
   2: "Orc",
@@ -63,9 +65,12 @@ export default function LiveMatchCard({ match }: Props) {
       <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-x-4 sm:gap-x-8">
         {/* PLAYER A */}
         <div className="min-w-0 text-left space-y-1">
-          <div className="truncate text-base sm:text-xl font-semibold text-black dark:text-white">
+          <Link
+            href={`/stats/player/${encodeURIComponent(playerA.name)}/summary`}
+            className="block truncate text-base sm:text-xl font-semibold text-black dark:text-white hover:underline"
+          >
             {playerA.name}
-          </div>
+          </Link>
 
           <div className="text-xs text-gray-500 dark:text-gray-400">
             {RACE_MAP[playerA.race] ?? "Unknown"}
@@ -132,9 +137,12 @@ export default function LiveMatchCard({ match }: Props) {
 
         {/* PLAYER B */}
         <div className="min-w-0 text-right space-y-1">
-          <div className="truncate text-base sm:text-xl font-semibold text-black dark:text-white">
+          <Link
+            href={`/stats/player/${encodeURIComponent(playerB.name)}/summary`}
+            className="block truncate text-base sm:text-xl font-semibold text-black dark:text-white hover:underline text-right"
+          >
             {playerB.name}
-          </div>
+          </Link>
 
           <div className="text-xs text-gray-500 dark:text-gray-400">
             {RACE_MAP[playerB.race] ?? "Unknown"}

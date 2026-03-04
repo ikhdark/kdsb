@@ -64,8 +64,6 @@ if (!battletag) {
 
   /* helpers */
 
-  const myRace = (g: any) => g.myRace ?? displayMyRace(g) ?? "Unknown";
-
   const lastPlayedAny = s?.lastPlayedLadder
     ? new Date(s.lastPlayedLadder).toLocaleDateString()
     : "N/A";
@@ -106,8 +104,8 @@ if (!battletag) {
                   : "N/A"
               }
             />
-            <StatCard label="Most Played (All Time)" value={s.mostPlayedAllTime} />
-            <StatCard label="Most Played (Current Season)" value={s.mostPlayedThisSeason} />
+            <StatCard label="Most Played (All Time)" value={s.mostPlayedAllTime ?? "N/A"} />
+<StatCard label="Most Played (Current Season)" value={s.mostPlayedThisSeason ?? "N/A"} />
           </section>
 
           <section className="grid gap-4 sm:grid-cols-2">

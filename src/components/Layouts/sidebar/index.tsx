@@ -37,11 +37,12 @@ export default function Sidebar() {
 
 const href = isSearch
   ? "/"
- : item.global
-? `/stats/${item.path}`
-  : battletag
+  : battletag && !item.global
   ? `/stats/player/${battletag}/${item.path}`
-  : "#";
+  : battletag && item.path === "matches"
+  ? `/stats/player/${battletag}/matches`
+  : `/stats/${item.path}`;
+  
     let isActive: boolean;
 
     if (href === "/") {

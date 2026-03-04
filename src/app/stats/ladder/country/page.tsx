@@ -4,45 +4,87 @@ import { flattenCountryLadder } from "@/lib/ranking";
 import { PlayerHeader, Section } from "@/components/PlayerUI";
 
 const KNOWN_COUNTRIES = [
-  "US","DE","FR","SE","NO","DK","FI","PL","CZ","RU",
-  "UA","BR","CN","KR","AT","NL","BE","GB","ES","IT",
-  "CA","MX","AU","IN","TR"
+"AF","AL","DZ","AS","AD","AO","AI","AQ","AG","AR","AM","AW","AU","AT","AZ",
+"BS","BH","BD","BB","BY","BE","BZ","BJ","BM","BT","BO","BA","BW","BV","BR",
+"IO","BN","BG","BF","BI","KH","CM","CA","CV","KY","CF","TD","CL","CN","CX",
+"CC","CO","KM","CG","CD","CK","CR","CI","HR","CU","CY","CZ",
+"DK","DJ","DM","DO",
+"EC","EG","SV","GQ","ER","EE","ET",
+"FK","FO","FJ","FI","FR",
+"GF","PF","TF","GA","GM","GE","DE","GH","GI","GR","GL","GD","GP","GU","GT",
+"GN","GW","GY",
+"HT","HM","VA","HN","HK","HU",
+"IS","IN","ID","IR","IQ","IE","IL","IT",
+"JM","JP","JO",
+"KZ","KE","KI","KP","KR","KW","KG",
+"LA","LV","LB","LS","LR","LY","LI","LT","LU",
+"MO","MK","MG","MW","MY","MV","ML","MT","MH","MQ","MR","MU","YT","MX","FM",
+"MD","MC","MN","MS","MA","MZ","MM",
+"NA","NR","NP","NL","NC","NZ","NI","NE","NG","NU","NF","MP","NO",
+"OM",
+"PK","PW","PS","PA","PG","PY","PE","PH","PN","PL","PT","PR",
+"QA",
+"RE","RO","RU","RW",
+"BL","SH","KN","LC","MF","PM","VC","WS","SM","ST","SA","SN","RS","SC","SL",
+"SG","SX","SK","SI","SB","SO","ZA","GS","ES","LK","SD","SR","SJ","SZ","SE",
+"CH","SY",
+"TW","TJ","TZ","TH","TL","TG","TK","TO","TT","TN","TR","TM","TC","TV",
+"UG","UA","AE","GB","US","UM","UY","UZ",
+"VU","VE","VN","VG","VI",
+"WF","EH",
+"YE",
+"ZM","ZW"
 ];
 
 const COUNTRY_NAMES: Record<string, string> = {
-  US: "United States",
-  DE: "Germany",
-  FR: "France",
-  SE: "Sweden",
-  NO: "Norway",
-  DK: "Denmark",
-  FI: "Finland",
-  PL: "Poland",
-  CZ: "Czech Republic",
-  RU: "Russia",
-  UA: "Ukraine",
-  BR: "Brazil",
-  CN: "China",
-  KR: "South Korea",
-  AT: "Austria",
-  NL: "Netherlands",
-  BE: "Belgium",
-  GB: "United Kingdom",
-  ES: "Spain",
-  IT: "Italy",
-  CA: "Canada",
-  MX: "Mexico",
-  AU: "Australia",
-  IN: "India",
-  TR: "Turkey",
+AF:"Afghanistan",AL:"Albania",DZ:"Algeria",AS:"American Samoa",AD:"Andorra",AO:"Angola",AI:"Anguilla",
+AQ:"Antarctica",AG:"Antigua and Barbuda",AR:"Argentina",AM:"Armenia",AW:"Aruba",AU:"Australia",
+AT:"Austria",AZ:"Azerbaijan",BS:"Bahamas",BH:"Bahrain",BD:"Bangladesh",BB:"Barbados",BY:"Belarus",
+BE:"Belgium",BZ:"Belize",BJ:"Benin",BM:"Bermuda",BT:"Bhutan",BO:"Bolivia",BA:"Bosnia and Herzegovina",
+BW:"Botswana",BV:"Bouvet Island",BR:"Brazil",IO:"British Indian Ocean Territory",BN:"Brunei",
+BG:"Bulgaria",BF:"Burkina Faso",BI:"Burundi",KH:"Cambodia",CM:"Cameroon",CA:"Canada",CV:"Cape Verde",
+KY:"Cayman Islands",CF:"Central African Republic",TD:"Chad",CL:"Chile",CN:"China",CX:"Christmas Island",
+CC:"Cocos Islands",CO:"Colombia",KM:"Comoros",CG:"Congo",CD:"Congo (DRC)",CK:"Cook Islands",
+CR:"Costa Rica",CI:"Ivory Coast",HR:"Croatia",CU:"Cuba",CY:"Cyprus",CZ:"Czech Republic",
+DK:"Denmark",DJ:"Djibouti",DM:"Dominica",DO:"Dominican Republic",EC:"Ecuador",EG:"Egypt",
+SV:"El Salvador",GQ:"Equatorial Guinea",ER:"Eritrea",EE:"Estonia",ET:"Ethiopia",FK:"Falkland Islands",
+FO:"Faroe Islands",FJ:"Fiji",FI:"Finland",FR:"France",GF:"French Guiana",PF:"French Polynesia",
+TF:"French Southern Territories",GA:"Gabon",GM:"Gambia",GE:"Georgia",DE:"Germany",GH:"Ghana",
+GI:"Gibraltar",GR:"Greece",GL:"Greenland",GD:"Grenada",GP:"Guadeloupe",GU:"Guam",GT:"Guatemala",
+GN:"Guinea",GW:"Guinea-Bissau",GY:"Guyana",HT:"Haiti",HM:"Heard Island",VA:"Vatican City",
+HN:"Honduras",HK:"Hong Kong",HU:"Hungary",IS:"Iceland",IN:"India",ID:"Indonesia",IR:"Iran",
+IQ:"Iraq",IE:"Ireland",IL:"Israel",IT:"Italy",JM:"Jamaica",JP:"Japan",JO:"Jordan",
+KZ:"Kazakhstan",KE:"Kenya",KI:"Kiribati",KP:"North Korea",KR:"South Korea",KW:"Kuwait",KG:"Kyrgyzstan",
+LA:"Laos",LV:"Latvia",LB:"Lebanon",LS:"Lesotho",LR:"Liberia",LY:"Libya",LI:"Liechtenstein",
+LT:"Lithuania",LU:"Luxembourg",MO:"Macau",MK:"North Macedonia",MG:"Madagascar",MW:"Malawi",
+MY:"Malaysia",MV:"Maldives",ML:"Mali",MT:"Malta",MH:"Marshall Islands",MQ:"Martinique",
+MR:"Mauritania",MU:"Mauritius",YT:"Mayotte",MX:"Mexico",FM:"Micronesia",MD:"Moldova",
+MC:"Monaco",MN:"Mongolia",MS:"Montserrat",MA:"Morocco",MZ:"Mozambique",MM:"Myanmar",
+NA:"Namibia",NR:"Nauru",NP:"Nepal",NL:"Netherlands",NC:"New Caledonia",NZ:"New Zealand",
+NI:"Nicaragua",NE:"Niger",NG:"Nigeria",NU:"Niue",NF:"Norfolk Island",MP:"Northern Mariana Islands",
+NO:"Norway",OM:"Oman",PK:"Pakistan",PW:"Palau",PS:"Palestine",PA:"Panama",PG:"Papua New Guinea",
+PY:"Paraguay",PE:"Peru",PH:"Philippines",PN:"Pitcairn",PL:"Poland",PT:"Portugal",PR:"Puerto Rico",
+QA:"Qatar",RE:"Réunion",RO:"Romania",RU:"Russia",RW:"Rwanda",BL:"Saint Barthélemy",
+SH:"Saint Helena",KN:"Saint Kitts and Nevis",LC:"Saint Lucia",MF:"Saint Martin",
+PM:"Saint Pierre and Miquelon",VC:"Saint Vincent and the Grenadines",WS:"Samoa",
+SM:"San Marino",ST:"São Tomé and Príncipe",SA:"Saudi Arabia",SN:"Senegal",RS:"Serbia",
+SC:"Seychelles",SL:"Sierra Leone",SG:"Singapore",SX:"Sint Maarten",SK:"Slovakia",
+SI:"Slovenia",SB:"Solomon Islands",SO:"Somalia",ZA:"South Africa",GS:"South Georgia",
+ES:"Spain",LK:"Sri Lanka",SD:"Sudan",SR:"Suriname",SJ:"Svalbard and Jan Mayen",
+SZ:"Eswatini",SE:"Sweden",CH:"Switzerland",SY:"Syria",TW:"Taiwan",TJ:"Tajikistan",
+TZ:"Tanzania",TH:"Thailand",TL:"Timor-Leste",TG:"Togo",TK:"Tokelau",TO:"Tonga",
+TT:"Trinidad and Tobago",TN:"Tunisia",TR:"Turkey",TM:"Turkmenistan",TC:"Turks and Caicos",
+TV:"Tuvalu",UG:"Uganda",UA:"Ukraine",AE:"United Arab Emirates",GB:"United Kingdom",
+US:"United States",UM:"US Minor Outlying Islands",UY:"Uruguay",UZ:"Uzbekistan",
+VU:"Vanuatu",VE:"Venezuela",VN:"Vietnam",VG:"British Virgin Islands",VI:"US Virgin Islands",
+WF:"Wallis and Futuna",EH:"Western Sahara",YE:"Yemen",ZM:"Zambia",ZW:"Zimbabwe"
 };
 
 export default async function CountryHubPage() {
   const found = new Set<string>();
 
-  // probe a subset to build list quickly
   await Promise.all(
-    KNOWN_COUNTRIES.slice(0, 50).map(async (code) => {
+    KNOWN_COUNTRIES.map(async (code) => {
       try {
         const payload = await fetchCountryLadder(code, 20, 1, 24);
         const rows = flattenCountryLadder(payload);
@@ -50,19 +92,16 @@ export default async function CountryHubPage() {
         if (rows.length > 0) {
           found.add(code);
         }
-      } catch {
-        // ignore probe failures
-      }
+      } catch {}
     })
   );
 
   const countries = Array.from(found).sort();
-  console.log("countries found:", countries.length);
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto px-3 md:px-0">
+    <div className="space-y-6 max-w-6xl mx-auto px-3 sm:px-4 md:px-0">
       <PlayerHeader
-        battletag="SoS Country Ladder"
+        battletag="Country Ladder"
         subtitle="Select Country (If you do not see your country, try again later as the database is updated)"
       />
 
@@ -72,13 +111,22 @@ export default async function CountryHubPage() {
             No countries available.
           </div>
         ) : (
-          <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-8 gap-2">
+          <div
+            className="
+              grid
+              grid-cols-2
+              sm:grid-cols-3
+              md:grid-cols-5
+              lg:grid-cols-8
+              gap-2
+            "
+          >
             {countries.map((code) => (
               <Link
                 key={code}
                 href={`/stats/ladder/country/${code}`}
                 className="
-                  h-10
+                  h-11
                   rounded-md
                   border border-zinc-400 dark:border-zinc-800
                   bg-white dark:bg-zinc-900
@@ -89,6 +137,8 @@ export default async function CountryHubPage() {
                   hover:border-emerald-500
                   dark:hover:border-emerald-500
                   transition-colors
+                  text-center
+                  px-2
                 "
               >
                 {COUNTRY_NAMES[code] ?? code}
