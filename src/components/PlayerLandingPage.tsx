@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import WhatsNew from "@/components/WhatsNew";
+import LandingPoll from "@/components/LandingPoll";
 import { useBattleTagAutocomplete } from "@/hooks/useBattleTagAutocomplete";
 
 const RECENT_KEY = "w3c_recent_searches";
@@ -135,7 +136,7 @@ export default function PlayerLandingPage() {
   /* ================= UI ================= */
 
   return (
-    <div className="min-h-dvh bg-gray-50 dark:bg-gray-900 flex justify-center px-6 py-16">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex justify-center px-6 pt-16 pb-32">
       <div className="w-full max-w-xl space-y-10 text-center">
 
         <div className="space-y-2">
@@ -144,9 +145,9 @@ export default function PlayerLandingPage() {
           </h1>
 
           <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-          Strength of Schedule Ladder<br />
-          Detailed Player Stats
-         </p>
+            Strength of Schedule Ladder<br />
+            Detailed Player Stats
+          </p>
         </div>
 
         <div className="space-y-6 rounded-2xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-md p-6">
@@ -221,6 +222,8 @@ export default function PlayerLandingPage() {
             ⭐ Install / Bookmark W3CStats
           </button>
         </div>
+
+        <LandingPoll />
 
         <WhatsNew />
       </div>
