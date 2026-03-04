@@ -1,4 +1,5 @@
 export const revalidate = 300;
+
 import { getPlayerConsistency } from "@/services/playerConsistency";
 import { PlayerHeader, StatCard } from "@/components/PlayerUI";
 import TimeHeatmap from "@/components/TimeHeatmap";
@@ -30,8 +31,9 @@ export default async function ConsistencyPage({ params }: PageProps) {
   for (const m of data.matches) {
     const d = new Date(m.startTime);
 
-    const day = d.getUTCDay();
-    const hour = d.getUTCHours();
+    /* LOCAL TIME instead of UTC */
+    const day = d.getDay();
+    const hour = d.getHours();
 
     const bucket =
       hour < 8 ? 0 :
@@ -76,7 +78,7 @@ export default async function ConsistencyPage({ params }: PageProps) {
 
       <PlayerHeader
         battletag={data.battletag}
-        subtitle="Consistency · Day/Time Performance (UTC) · Season 24 (All Races) (Games under 120 seconds excluded)"
+        subtitle="Consistency · Day/Time Performance (Local Time) · Season 24 (All Races) (Games under 120 seconds excluded)"
       />
 
       <section className="grid gap-4 sm:grid-cols-4">

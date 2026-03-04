@@ -12,7 +12,9 @@ type Cell = {
 };
 
 const DAY_NAMES = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-const BUCKET_LABELS = ["0–8 UTC","8–16 UTC","16–24 UTC"];
+
+/* local time labels */
+const BUCKET_LABELS = ["00–08","08–16","16–24"];
 
 function textColor(wr: number | null) {
   if (wr == null) return "text-gray-400";
@@ -102,10 +104,7 @@ export default function TimeHeatmap({ data }: { data: Cell[] }) {
   return (
     <div className="space-y-6">
 
-      {/* TABLE */}
-      <div className="grid grid-cols-[70px_repeat(4,1fr)] gap-2 text-xs tabular-nums whitespace-nowrap">
-
-
+      <div className="grid grid-cols-[55px_repeat(4,1fr)] gap-2 text-xs tabular-nums">
 
         {/* header */}
         <div />
@@ -135,20 +134,17 @@ export default function TimeHeatmap({ data }: { data: Cell[] }) {
                   <div
                     key={`${day}-${bucket}`}
                     className="h-10 px-2 rounded border border-gray-200 bg-white flex items-center justify-center whitespace-nowrap text-[11px] font-semibold"
-
                   >
-                   {cell?.winrate != null ? (
-  <span className={textColor(cell.winrate)}>
-    {cell.winrate}% ({cell.wins}-{cell.games - cell.wins})
-  </span>
-) : "—"}
+                    {cell?.winrate != null ? (
+                      <span className={textColor(cell.winrate)}>
+                        {cell.winrate}% ({cell.wins}-{cell.games - cell.wins})
+                      </span>
+                    ) : "—"}
                   </div>
                 );
               })}
 
-              {/* row total */}
-              <div className="h-10 px-2 rounded border border-gray-300 bg-gray-50 flex items-center justify-center whitespace-nowrap text-[11px] font-semibold
-">
+              <div className="h-10 px-2 rounded border border-gray-300 bg-gray-50 flex items-center justify-center whitespace-nowrap text-[11px] font-semibold">
                 {rt.winrate != null ? (
                   <span className={textColor(rt.winrate)}>
                     {rt.winrate}% ({rt.wins}-{rt.losses})
@@ -177,7 +173,6 @@ export default function TimeHeatmap({ data }: { data: Cell[] }) {
           </div>
         ))}
 
-        {/* grand */}
         <div className="h-10 rounded border border-gray-300 bg-gray-50 flex items-center justify-center border-t font-semibold">
           {grandWR != null ? (
             <span className={textColor(grandWR)}>
@@ -187,7 +182,7 @@ export default function TimeHeatmap({ data }: { data: Cell[] }) {
         </div>
       </div>
 
-      {/* BEST */}
+      {/* best */}
       <div className="flex gap-10 text-sm">
         <div>
           <div className="text-gray-500">Best Day</div>
