@@ -1,3 +1,5 @@
+// src/services/playerSummary.ts
+
 import {
   fetchCountryLadder,
   fetchPlayerProfile,
@@ -7,11 +9,13 @@ import {
   fetchAllMatches,
   fetchJson,
 } from "@/lib/w3cUtils";
+
 import { raceLabel } from "@/lib/w3cRaces";
 import { getCountryRaceLadder } from "@/services/countryRaceLadder";
 import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
 import { flattenCountryLadder } from "@/lib/ranking";
 import type { RaceKey } from "@/services/countryRaceLadder";
+
 import {
   buildLadder,
   type LadderInputRow,
@@ -20,16 +24,18 @@ import {
 import { COUNTRY_OVERRIDE } from "@/lib/countryOverrides";
 
 /* =====================================================
-   GLOBAL CONSTANTS
+   GLOBAL CONSTANTS (shared)
 ===================================================== */
 
 const GATEWAY = 20;
 const GAMEMODE = 1;
 
 const SEASON = 24;
-const SEASONS = [21, 22, 23, 24];
+const SEASONS = [22, 23, 24];
 
 const MIN_GAMES = 5;
+
+const GLOBAL_CACHE_TTL = 5 * 60 * 1000;
 
 /* =====================================================
    SECTION A — RANK SERVICE
@@ -43,7 +49,7 @@ const RACE_MAP: Record<number, string> = {
   0: "Random",
 };
 
-const MAX_LEAGUE_PAGE = 50;
+const MAX_LEAGUE_PAGE = 30;
 
 /* ---------------- TYPES ---------------- */
 
@@ -67,9 +73,18 @@ export type W3CRankResponse = {
   ranks: RankRow[];
 };
 
-/* ---------------- GLOBAL LADDER FETCH (NO CACHE) ---------------- */
+/* ---------------- GLOBAL LADDER CACHE ---------------- */
+
+let cachedRowsByPage: Map<number, any[]> | null = null;
+let lastFetchTime = 0;
 
 async function fetchGlobalRowsByPage(): Promise<Map<number, any[]>> {
+  const now = Date.now();
+
+  if (cachedRowsByPage && now - lastFetchTime < GLOBAL_CACHE_TTL) {
+    return cachedRowsByPage;
+  }
+
   const requests: Promise<any[]>[] = [];
 
   for (let page = 0; page <= MAX_LEAGUE_PAGE; page++) {
@@ -77,17 +92,16 @@ async function fetchGlobalRowsByPage(): Promise<Map<number, any[]>> {
       `https://website-backend.w3champions.com/api/ladder/${page}` +
       `?gateWay=${GATEWAY}&gameMode=${GAMEMODE}&season=${SEASON}`;
 
-    requests.push(
-  fetch(url, { next: { revalidate: 300 } })
-    .then((r) => r.json())
-    .catch(() => [])
-);
+    requests.push(fetchJson<any[]>(url).then((json) => json ?? []));
   }
 
   const pages = await Promise.all(requests);
 
   const map = new Map<number, any[]>();
   pages.forEach((rows, page) => map.set(page, rows));
+
+  cachedRowsByPage = map;
+  lastFetchTime = now;
 
   return map;
 }
@@ -106,12 +120,14 @@ function getBT(r: any): string {
 function uniqBy<T>(rows: T[], keyFn: (r: T) => string) {
   const seen = new Set<string>();
   const out: T[] = [];
+
   for (const r of rows) {
     const k = keyFn(r);
     if (!k || seen.has(k)) continue;
     seen.add(k);
     out.push(r);
   }
+
   return out;
 }
 
@@ -158,6 +174,7 @@ export async function getW3CRank(
             const cc =
               iso2(p?.countryCode) ||
               iso2(p?.location);
+
             if (cc) return cc;
           }
         }
@@ -176,11 +193,17 @@ export async function getW3CRank(
     : "";
 
   const basePayload = effectiveCountry
-    ? await fetchCountryLadder(effectiveCountry, GATEWAY, GAMEMODE, SEASON)
+    ? await fetchCountryLadder(
+        effectiveCountry,
+        GATEWAY,
+        GAMEMODE,
+        SEASON
+      )
     : [];
 
   let countryRows = flattenCountryLadder(basePayload);
 
+  // (A) Remove players overridden OUT of this effective country
   if (countryRows.length) {
     countryRows = countryRows.filter((r: any) => {
       const bt = getBT(r);
@@ -190,6 +213,7 @@ export async function getW3CRank(
     });
   }
 
+  // (B) Inject players overridden INTO this effective country
   const injectTargets = Object.entries(COUNTRY_OVERRIDE)
     .filter(([, o]) => o.to.toUpperCase() === effectiveCountry);
 
@@ -311,7 +335,15 @@ export async function getW3CRank(
   };
 }
 
-function getPlayerAndOpponentCI(match: any, lowerTag: string) {
+/* =====================================================
+   SECTION B — SUMMARY SERVICE
+===================================================== */
+
+const CURRENT_SEASON = 24;
+const LAST_3_SEASONS = new Set([22, 23, 24]);
+const MIN_DURATION_SECONDS = 120;
+
+function getPlayerAndOpponentCI2(match: any, lowerTag: string) {
   if (!Array.isArray(match?.teams)) return null;
 
   for (const team of match.teams) {
@@ -325,10 +357,7 @@ function getPlayerAndOpponentCI(match: any, lowerTag: string) {
                 String(p?.battleTag).toLowerCase() !== lowerTag
             ) ?? null;
 
-        return {
-          me: player,
-          opponent,
-        };
+        return { me: player, opponent };
       }
     }
   }
@@ -336,56 +365,66 @@ function getPlayerAndOpponentCI(match: any, lowerTag: string) {
   return null;
 }
 
-/* =====================================================
-   PLAYER SUMMARY SERVICE
-===================================================== */
+function toDate(v: any): Date | null {
+  if (!v) return null;
+  const n = Number(v);
+  if (Number.isFinite(n)) return new Date(n < 1e12 ? n * 1000 : n);
+  const d = new Date(v);
+  return Number.isFinite(d.getTime()) ? d : null;
+}
 
-const CURRENT_SEASON = SEASON;
-const LAST_3_SEASONS = new Set([22, 23, 24]);
-const MIN_DURATION_SECONDS = 120;
+function toNumber(v: any): number | null {
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  if (typeof v === "string") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
 
-export async function getPlayerSummary(inputTag: string) {
+async function _getPlayerSummary(inputTag: string) {
   const raw = String(inputTag ?? "").trim();
   if (!raw) return null;
 
   const canonicalBattleTag = await resolveBattleTagViaSearch(raw);
   if (!canonicalBattleTag) return null;
 
- const matches = await fetchAllMatches(canonicalBattleTag, SEASONS);
+  let matches = await fetchAllMatches(canonicalBattleTag, SEASONS);
 
-if (!matches.length) {
-  return {
-    summary: {
-      battletag: canonicalBattleTag,
-      mostPlayedAllTime: "Unknown",
-      mostPlayedThisSeason: "Unknown",
-      highestCurrentRace: null,
-      highestCurrentMMR: null,
-      lastPlayedLadder: null,
-      lastPlayedRace: {},
-      top2Peaks: [],
-    },
-  };
-}
+  if (!matches.length) {
+    return {
+      summary: {
+        battletag: canonicalBattleTag,
+        mostPlayedAllTime: "Unknown",
+        mostPlayedThisSeason: "Unknown",
+        highestCurrentRace: null,
+        highestCurrentMMR: null,
+        lastPlayedLadder: null,
+        lastPlayedRace: {},
+        top2Peaks: [],
+      },
+    };
+  }
+
   const lower = canonicalBattleTag.toLowerCase();
+
+  // deterministic "latest per race" logic
+  matches = [...matches].sort((a, b) => {
+    const ta = toDate(a?.startTime)?.getTime() ?? 0;
+    const tb = toDate(b?.startTime)?.getTime() ?? 0;
+    return ta - tb; // oldest -> newest
+  });
 
   const raceGamesAllTime: Record<string, number> = {};
   const raceGamesCurrentSeason: Record<string, number> = {};
   const lastPlayedRace: Record<string, Date | undefined> = {};
+
   const raceMMRCurrent: Record<string, number> = {};
+  const raceMMRCurrentAt: Record<string, number> = {};
+
   const racePeaks: Record<string, any> = {};
 
-  let highestCurrentRace: string | null = null;
   let lastPlayedLadder: Date | null = null;
-
-  const toDate = (v: any) => {
-    if (!v) return null;
-    const n = Number(v);
-    if (Number.isFinite(n)) {
-      return new Date(n < 1e12 ? n * 1000 : n);
-    }
-    return new Date(v);
-  };
 
   for (const match of matches) {
     if (match.gameMode !== 1) continue;
@@ -396,7 +435,7 @@ if (!matches.length) {
 
     const season = match.season;
 
-    const pair = getPlayerAndOpponentCI(match, lower);
+    const pair = getPlayerAndOpponentCI2(match, lower);
     if (!pair) continue;
 
     const { me } = pair;
@@ -418,19 +457,23 @@ if (!matches.length) {
       raceGamesCurrentSeason[race] =
         (raceGamesCurrentSeason[race] || 0) + 1;
 
-      if (typeof me.currentMmr === "number") {
-        raceMMRCurrent[race] = me.currentMmr;
-      }
+      const mmrAfter =
+        toNumber(me?.newMmr) ??
+        toNumber(me?.currentMmr) ??
+        toNumber(me?.oldMmr);
 
-      if (
-        !highestCurrentRace ||
-        (raceMMRCurrent[race] ?? 0) >
-          (raceMMRCurrent[highestCurrentRace] ?? 0)
-      ) {
-        highestCurrentRace = race;
+      if (mmrAfter != null) {
+        const t = date.getTime();
+        const prevT = raceMMRCurrentAt[race] ?? -1;
+
+        if (t >= prevT) {
+          raceMMRCurrentAt[race] = t;
+          raceMMRCurrent[race] = mmrAfter;
+        }
       }
     }
 
+    // keep your old peak logic (last 3 seasons)
     if (LAST_3_SEASONS.has(season) && typeof me.currentMmr === "number") {
       if (!racePeaks[race] || me.currentMmr > racePeaks[race].mmr) {
         racePeaks[race] = {
@@ -443,12 +486,15 @@ if (!matches.length) {
   }
 
   const mostPlayedAllTime =
-    Object.entries(raceGamesAllTime)
-      .sort((a, b) => b[1] - a[1])[0]?.[0] ?? "Unknown";
+    Object.entries(raceGamesAllTime).sort((a, b) => b[1] - a[1])[0]?.[0] ??
+    "Unknown";
 
   const mostPlayedThisSeason =
-    Object.entries(raceGamesCurrentSeason)
-      .sort((a, b) => b[1] - a[1])[0]?.[0] ?? "Unknown";
+    Object.entries(raceGamesCurrentSeason).sort((a, b) => b[1] - a[1])[0]?.[0] ??
+    "Unknown";
+
+  const highest = Object.entries(raceMMRCurrent).sort((a, b) => b[1] - a[1])[0];
+  const highestCurrentRace = highest?.[0] ?? null;
 
   const top2Peaks = Object.values(racePeaks)
     .sort((a: any, b: any) => b.mmr - a.mmr)
@@ -460,10 +506,9 @@ if (!matches.length) {
       mostPlayedAllTime,
       mostPlayedThisSeason,
       highestCurrentRace,
-      highestCurrentMMR:
-        highestCurrentRace
-          ? raceMMRCurrent[highestCurrentRace] ?? null
-          : null,
+      highestCurrentMMR: highestCurrentRace
+        ? raceMMRCurrent[highestCurrentRace] ?? null
+        : null,
       lastPlayedLadder: lastPlayedLadder?.toISOString() ?? null,
       lastPlayedRace: Object.fromEntries(
         Object.entries(lastPlayedRace)
@@ -473,4 +518,12 @@ if (!matches.length) {
       top2Peaks,
     },
   };
+}
+
+/* =====================================================
+   PUBLIC EXPORT (no next/cache here)
+===================================================== */
+
+export async function getPlayerSummary(inputTag: string) {
+  return _getPlayerSummary(inputTag);
 }

@@ -9,7 +9,10 @@ import {
   computeSoS,
 } from "./ladderCore";
 
-import type { LadderRow } from "@/lib/ladderEngine";
+import {
+  buildLadder,
+  type LadderRow,
+} from "@/lib/ladderEngine";
 
 /* =========================
    TYPES
@@ -67,10 +70,15 @@ async function _getPlayerRaceLadder(
 
   const inputs = buildInputs(rows);
 
-  const { ladder, visible, top } =
-    buildPaged(inputs, page, pageSize);
+  /* compute SoS BEFORE ranking */
+  await computeSoS(inputs, raceId);
 
-  await computeSoS(visible, raceId);
+  /* build ladder after SoS exists */
+  const ladder = buildLadder(inputs);
+
+  /* paginate ladder */
+  const { visible, top } =
+    buildPaged(ladder, page, pageSize);
 
   const me = battletag
     ? ladder.find(

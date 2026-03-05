@@ -7,7 +7,10 @@ import {
   computeSoS,
 } from "./ladderCore";
 
-import type { LadderRow } from "@/lib/ladderEngine";
+import {
+  buildLadder,
+  type LadderRow,
+} from "@/lib/ladderEngine";
 
 /* =========================
    TYPES
@@ -31,38 +34,34 @@ async function _getPlayerLadder(
   page = 1,
   pageSize = 50
 ): Promise<PlayerLadderResponse | null> {
-  /* ---------------------------
-     canonical battletag
-  --------------------------- */
 
   const battletag = inputBattleTag
     ? await resolveBattleTagViaSearch(inputBattleTag)
     : null;
 
-  /* ---------------------------
-     fetch
-  --------------------------- */
-
   const rows = await fetchAllLeagues();
-
-  /* ---------------------------
-     build ladder
-  --------------------------- */
 
   const inputs = buildInputs(rows);
 
-  const { ladder, visible, top } =
-    buildPaged(inputs, page, pageSize);
+  /* baseline ladder (MMR only) */
+  const ladder = buildLadder(inputs);
 
-  /* ---------------------------
-     SoS (page only, always fresh)
-  --------------------------- */
+  const { visible, top } =
+    buildPaged(ladder, page, pageSize);
 
-  await computeSoS(visible);
+  /* compute SoS only for visible players */
+  await computeSoS(visible as any);
 
-  /* ---------------------------
-     find player
-  --------------------------- */
+  /* rebuild visible rows with SoS */
+  const updatedVisible = buildLadder(
+    visible.map((p) => ({
+      battletag: p.battletag,
+      mmr: p.mmr,
+      wins: p.wins,
+      games: p.games,
+      sos: p.sos,
+    }))
+  );
 
   const me = battletag
     ? ladder.find(
@@ -72,22 +71,18 @@ async function _getPlayerLadder(
       ) ?? null
     : null;
 
-  /* ---------------------------
-     return
-  --------------------------- */
-
   return {
     battletag: battletag ?? "",
     me,
     top,
     poolSize: ladder.length,
-    full: visible,
+    full: updatedVisible,
     updatedAtUtc: new Date().toISOString(),
   };
 }
 
 /* =========================
-   EXPORT (NO CACHE)
+   EXPORT
 ========================= */
 
 export async function getPlayerLadder(

@@ -4,36 +4,35 @@ import {
   fetchAllMatches,
   getPlayerAndOpponent,
   fetchJson,
-} from "@/lib/w3cUtils"
-import { flattenCountryLadder } from "@/lib/ranking"
+} from "@/lib/w3cUtils";
+
+import { flattenCountryLadder } from "@/lib/ranking";
 
 import {
-  buildLadder,
   type LadderRow,
   type LadderInputRow,
-} from "@/lib/ladderEngine"
+} from "@/lib/ladderEngine";
 
 /* =====================================================
    CONFIG
 ===================================================== */
 
-const SEASON = 24
-const GAME_MODE = 1
-const GATEWAY = 20
+const SEASON = 24;
+const GAME_MODE = 1;
+const GATEWAY = 20;
 
-const MIN_GAMES = 5
-const MIN_LEAGUE = 0
-const MAX_LEAGUE = 50
+const MIN_GAMES = 5;
+const MIN_LEAGUE = 0;
+const MAX_LEAGUE = 50;
 
-const SOS_CONCURRENCY = 25
+const SOS_CONCURRENCY = 25;
 
 /* =====================================================
    FETCH ALL LEAGUES
-   (Network is cached at fetch layer)
 ===================================================== */
 
 export async function fetchAllLeagues() {
-  const urls: string[] = []
+  const urls: string[] = [];
 
   for (let league = MIN_LEAGUE; league <= MAX_LEAGUE; league++) {
     urls.push(
@@ -41,30 +40,31 @@ export async function fetchAllLeagues() {
         `?gateWay=${GATEWAY}` +
         `&gameMode=${GAME_MODE}` +
         `&season=${SEASON}`
-    )
+    );
   }
 
   const results = await Promise.all(
     urls.map(async (url) => (await fetchJson<any[]>(url)) ?? [])
-  )
+  );
 
-  return flattenCountryLadder(results.flat())
+  return flattenCountryLadder(results.flat());
 }
 
 /* =====================================================
-   BUILD INPUTS (dedupe + filter)
+   BUILD INPUTS
 ===================================================== */
 
 export function buildInputs(rows: any[]): LadderInputRow[] {
-  const map = new Map<string, any>()
+  const map = new Map<string, any>();
 
   for (const r of rows) {
-    const key = r.battleTagLower
-    if (!key) continue
+    const key = r.battleTagLower;
+    if (!key) continue;
 
-    const existing = map.get(key)
+    const existing = map.get(key);
+
     if (!existing || r.mmr > existing.mmr) {
-      map.set(key, r)
+      map.set(key, r);
     }
   }
 
@@ -79,63 +79,85 @@ export function buildInputs(rows: any[]): LadderInputRow[] {
       mmr: r.mmr,
       wins: r.wins,
       games: r.games,
-      sos: null,
-    }))
+      sos: null, // NOTE: now interpreted as "SoS delta" (+/- relative to player MMR)
+    }));
 }
 
 /* =====================================================
    SoS ENGINE
-   (Heavy CPU — must be wrapped in unstable_cache
-    or used in ISR pages only)
+   SoS = weighted average of (oppMMR - playerMMR)
+
+   Per match:
+     diff = oppMMR - playerMMR
+     w    = 1 / (1 + abs(diff) / S)   (Option A)
+
+   Per player:
+     SoS_delta = sum(diff * w) / sum(w)
+
+   Meaning:
+     +120 => opponents ~120 MMR higher on average
+     -80  => opponents ~80 MMR lower on average
 ===================================================== */
+
+const SOS_DIFF_SCALE = 300; // S (tune 200–400)
+
+function weightByDiffAbs(diffAbs: number) {
+  return 1 / (1 + diffAbs / SOS_DIFF_SCALE);
+}
 
 export async function computeSoS(
   rows: LadderInputRow[],
   raceId?: number
 ) {
-  const cache = new Map<string, any[]>()
+  const cache = new Map<string, any[]>();
 
   for (let i = 0; i < rows.length; i += SOS_CONCURRENCY) {
-    const chunk = rows.slice(i, i + SOS_CONCURRENCY)
+    const chunk = rows.slice(i, i + SOS_CONCURRENCY);
 
     await Promise.all(
       chunk.map(async (row) => {
-        const key = row.battletag.toLowerCase()
+        const key = row.battletag.toLowerCase();
 
-        let matches = cache.get(key)
+        let matches = cache.get(key);
 
         if (!matches) {
-          matches = await fetchAllMatches(row.battletag, [SEASON])
-          cache.set(key, matches)
+          matches = await fetchAllMatches(row.battletag, [SEASON]);
+          cache.set(key, matches);
         }
 
-        let sum = 0
-        let n = 0
+        let weightedSum = 0;
+        let weightSum = 0;
 
         for (const m of matches) {
-          if (m.gameMode !== GAME_MODE) continue
-          if (m.durationInSeconds < 120) continue
+          if (m.gameMode !== GAME_MODE) continue;
+          if (m.durationInSeconds < 120) continue;
 
-          const pair = getPlayerAndOpponent(m, row.battletag)
-          if (!pair) continue
+          const pair = getPlayerAndOpponent(m, row.battletag);
+          if (!pair) continue;
 
-          if (raceId && raceId !== 0 && pair.me.race !== raceId)
-            continue
+          if (raceId && raceId !== 0 && pair.me.race !== raceId) continue;
 
-          const opp =
+          const oppRaw =
             pair.opp.oldMmr ??
             pair.opp.newMmr ??
-            pair.opp.mmr
+            pair.opp.mmr ??
+            (pair.opp as any).oldMmrValue ??
+            (pair.opp as any).rating ??
+            (pair.opp as any).mmrValue;
 
-          if (typeof opp !== "number") continue
+          const opp = typeof oppRaw === "string" ? Number(oppRaw) : oppRaw;
+          if (!Number.isFinite(opp)) continue;
 
-          sum += opp
-          n++
+          const diff = opp - row.mmr;
+          const w = weightByDiffAbs(Math.abs(diff));
+
+          weightedSum += diff * w;
+          weightSum += w;
         }
 
-        row.sos = n ? sum / n : null
+        row.sos = weightSum ? weightedSum / weightSum : null;
       })
-    )
+    );
   }
 }
 
@@ -144,18 +166,16 @@ export async function computeSoS(
 ===================================================== */
 
 export function buildPaged(
-  inputs: LadderInputRow[],
+  ladder: LadderRow[],
   page: number,
   pageSize: number
 ) {
-  const ladder = buildLadder(inputs)
-
-  const start = (page - 1) * pageSize
-  const end = start + pageSize
+  const start = (page - 1) * pageSize;
+  const end = start + pageSize;
 
   return {
     ladder,
     visible: ladder.slice(start, end),
     top: ladder.slice(0, pageSize),
-  }
+  };
 }
