@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import WhatsNew from "@/components/WhatsNew";
-import LandingPoll from "@/components/LandingPoll";
 import { useBattleTagAutocomplete } from "@/hooks/useBattleTagAutocomplete";
 
 const RECENT_KEY = "w3c_recent_searches";
@@ -138,7 +137,6 @@ export default function PlayerLandingPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex justify-center px-6 pt-16 pb-32">
       <div className="w-full max-w-xl space-y-10 text-center">
-
         <div className="space-y-2">
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-black dark:text-white">
             KD's W3Champions Stats
@@ -151,9 +149,7 @@ export default function PlayerLandingPage() {
         </div>
 
         <div className="space-y-6 rounded-2xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-md p-6">
-
           <form onSubmit={onSubmit} className="space-y-4">
-
             <div className="relative">
               <input
                 value={query}
@@ -186,9 +182,7 @@ export default function PlayerLandingPage() {
             </div>
 
             {error && (
-              <p className="text-sm text-rose-500 text-left -mt-2">
-                {error}
-              </p>
+              <p className="text-sm text-rose-500 text-left -mt-2">{error}</p>
             )}
 
             <button
@@ -222,8 +216,6 @@ export default function PlayerLandingPage() {
             ⭐ Install / Bookmark W3CStats
           </button>
         </div>
-
-        <LandingPoll />
 
         <WhatsNew />
       </div>
