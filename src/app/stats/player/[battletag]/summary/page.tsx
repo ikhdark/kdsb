@@ -76,7 +76,7 @@ export default async function PlayerPage({ params }: PageProps) {
 
       <PlayerHeader
         battletag={rankData?.battletag ?? s?.battletag ?? tag}
-        subtitle="Player Stats · Seasons 21-24"
+        subtitle="Player Stats · Seasons 23-24"
       />
 
       {s && (
@@ -172,7 +172,7 @@ export default async function PlayerPage({ params }: PageProps) {
       )}
 
       {s && (
-        <Section title="Top 2 Race Peak MMRs (Last 3 Seasons)">
+        <Section title="Top 2 Race Peak MMRs (Last 2 Seasons)">
           {s.top2Peaks.length ? (
             s.top2Peaks.map((p) => (
               <div key={p.race} className="flex justify-between text-sm tabular-nums">
