@@ -1,9 +1,6 @@
 // src/services/playerSummary.ts
 
-import {
-  fetchCountryLadder,
-  fetchPlayerProfile,
-} from "@/services/w3cApi";
+import { fetchPlayerProfile } from "@/services/w3cApi";
 
 import {
   fetchAllMatches,
@@ -34,6 +31,7 @@ const SEASON = 24;
 const SEASONS = [22, 23, 24];
 
 const MIN_GAMES = 5;
+const MIN_DURATION_SECONDS = 120;
 
 const GLOBAL_CACHE_TTL = 5 * 60 * 1000;
 
@@ -47,6 +45,14 @@ const RACE_MAP: Record<number, string> = {
   4: "Night Elf",
   8: "Undead",
   0: "Random",
+};
+
+const RACE_KEY_MAP: Record<number, RaceKey> = {
+  1: "human",
+  2: "orc",
+  4: "elf",
+  8: "undead",
+  0: "random",
 };
 
 const MAX_LEAGUE_PAGE = 30;
@@ -113,27 +119,9 @@ function iso2(code: unknown): string {
   return c.length === 2 ? c : "";
 }
 
-function getBT(r: any): string {
-  return r?.battletag ?? r?.battleTag ?? r?.battle_tag ?? "";
-}
-
-function uniqBy<T>(rows: T[], keyFn: (r: T) => string) {
-  const seen = new Set<string>();
-  const out: T[] = [];
-
-  for (const r of rows) {
-    const k = keyFn(r);
-    if (!k || seen.has(k)) continue;
-    seen.add(k);
-    out.push(r);
-  }
-
-  return out;
-}
-
 function effectiveCountryForTag(canonicalTag: string, apiCountry: string) {
-  const o = COUNTRY_OVERRIDE[canonicalTag];
-  return (o?.to ?? apiCountry).toUpperCase();
+  const override = COUNTRY_OVERRIDE[canonicalTag];
+  return (override?.to ?? apiCountry).toUpperCase();
 }
 
 /* =====================================================
@@ -157,122 +145,70 @@ export async function getW3CRank(
   const canonicalLower = canonicalTag.toLowerCase();
 
   function resolveFromProfile(): string {
-    return (
-      iso2(profile?.countryCode) ||
-      iso2(profile?.location) ||
-      ""
-    );
+    return iso2(profile?.countryCode) || iso2(profile?.location) || "";
   }
 
   function resolveFromMatches(): string {
-    for (const m of matches) {
-      if (!Array.isArray(m?.teams)) continue;
+    for (const match of matches) {
+      if (!Array.isArray(match?.teams)) continue;
 
-      for (const t of m.teams) {
-        for (const p of t.players ?? []) {
-          if (String(p?.battleTag).toLowerCase() === canonicalLower) {
-            const cc =
-              iso2(p?.countryCode) ||
-              iso2(p?.location);
+      for (const team of match.teams) {
+        for (const player of team.players ?? []) {
+          if (String(player?.battleTag).toLowerCase() !== canonicalLower) continue;
 
-            if (cc) return cc;
-          }
+          const cc = iso2(player?.countryCode) || iso2(player?.location);
+          if (cc) return cc;
         }
       }
     }
+
     return "";
   }
 
-  const countryCode =
-    resolveFromMatches() ||
-    resolveFromProfile() ||
-    "";
-
+  const countryCode = resolveFromMatches() || resolveFromProfile() || "";
   const effectiveCountry = countryCode
     ? effectiveCountryForTag(canonicalTag, countryCode)
     : "";
 
-  const basePayload = effectiveCountry
-    ? await fetchCountryLadder(
-        effectiveCountry,
-        GATEWAY,
-        GAMEMODE,
-        SEASON
-      )
-    : [];
-
-  let countryRows = flattenCountryLadder(basePayload);
-
-  // (A) Remove players overridden OUT of this effective country
-  if (countryRows.length) {
-    countryRows = countryRows.filter((r: any) => {
-      const bt = getBT(r);
-      const o = COUNTRY_OVERRIDE[bt];
-      if (!o) return true;
-      return o.from.toUpperCase() !== effectiveCountry;
-    });
-  }
-
-  // (B) Inject players overridden INTO this effective country
-  const injectTargets = Object.entries(COUNTRY_OVERRIDE)
-    .filter(([, o]) => o.to.toUpperCase() === effectiveCountry);
-
-  if (injectTargets.length) {
-    const byFrom = new Map<string, string[]>();
-
-    for (const [bt, o] of injectTargets) {
-      const from = o.from.toUpperCase();
-      byFrom.set(from, [...(byFrom.get(from) ?? []), bt]);
-    }
-
-    for (const [fromCountry, battletags] of byFrom.entries()) {
-      const fromPayload = await fetchCountryLadder(
-        fromCountry,
-        GATEWAY,
-        GAMEMODE,
-        SEASON
-      );
-      if (!fromPayload) continue;
-
-      const fromRows = flattenCountryLadder(fromPayload);
-
-      for (const bt of battletags) {
-        const hit = fromRows.find((r: any) => getBT(r) === bt);
-        if (hit) countryRows.push(hit);
-      }
-    }
-
-    countryRows = uniqBy(countryRows, (r: any) => getBT(r));
-  }
-
   const ranks: RankRow[] = [];
+  const countryRaceLadderPromises = new Map<RaceKey, Promise<any>>();
 
-  const raceKeyMap: Record<number, RaceKey> = {
-    1: "human",
-    2: "orc",
-    4: "elf",
-    8: "undead",
-    0: "random",
-  };
+  if (effectiveCountry) {
+    for (const raceKey of Object.values(RACE_KEY_MAP)) {
+      if (countryRaceLadderPromises.has(raceKey)) continue;
+
+      countryRaceLadderPromises.set(
+        raceKey,
+        getCountryRaceLadder(
+          effectiveCountry,
+          raceKey,
+          undefined,
+          GAMEMODE,
+          9999
+        )
+      );
+    }
+  }
 
   for (const [raceIdStr, raceName] of Object.entries(RACE_MAP)) {
     const raceId = Number(raceIdStr);
+    const raceKey = RACE_KEY_MAP[raceId];
 
     const globalInputs: LadderInputRow[] = [];
 
     for (const rawRows of rowsByPage.values()) {
-      const flat = flattenCountryLadder(rawRows);
+      const flatRows = flattenCountryLadder(rawRows);
 
-      for (const r of flat as any[]) {
-        if (r.games < MIN_GAMES) continue;
-        if (r.race !== raceId) continue;
-        if (!r.battleTag) continue;
+      for (const row of flatRows as any[]) {
+        if (row.games < MIN_GAMES) continue;
+        if (row.race !== raceId) continue;
+        if (!row.battleTag) continue;
 
         globalInputs.push({
-          battletag: r.battleTag,
-          mmr: r.mmr,
-          wins: r.wins,
-          games: r.games,
+          battletag: row.battleTag,
+          mmr: row.mmr,
+          wins: row.wins,
+          games: row.games,
           sos: null,
         });
       }
@@ -280,48 +216,38 @@ export async function getW3CRank(
 
     const globalLadder = buildLadder(globalInputs);
 
-    const gIdx = globalLadder.findIndex(
-      (p) => p.battletag.toLowerCase() === canonicalLower
+    const globalIndex = globalLadder.findIndex(
+      (player: any) => player.battletag.toLowerCase() === canonicalLower
     );
 
-    if (gIdx === -1) continue;
+    if (globalIndex === -1) continue;
 
     let countryRank: number | null = null;
     let countryTotal: number | null = null;
 
     if (effectiveCountry) {
-      const raceKey = raceKeyMap[raceId];
+      const ladderData = await countryRaceLadderPromises.get(raceKey);
 
-      if (raceKey) {
-        const ladderData = await getCountryRaceLadder(
-          effectiveCountry,
-          raceKey,
-          undefined,
-          1,
-          9999
+      if (ladderData) {
+        countryTotal = ladderData.poolSize;
+
+        const countryIndex = ladderData.full.findIndex(
+          (player: any) => player.battletag.toLowerCase() === canonicalLower
         );
 
-        if (ladderData) {
-          countryTotal = ladderData.poolSize;
-
-          const cIdx = ladderData.full.findIndex(
-            (p) => p.battletag.toLowerCase() === canonicalLower
-          );
-
-          countryRank = cIdx === -1 ? null : cIdx + 1;
-        }
+        countryRank = countryIndex === -1 ? null : countryIndex + 1;
       }
     }
 
     ranks.push({
       race: raceName,
       raceId,
-      globalRank: gIdx + 1,
+      globalRank: globalIndex + 1,
       globalTotal: globalLadder.length,
       countryRank,
       countryTotal,
-      mmr: globalLadder[gIdx].mmr,
-      games: globalLadder[gIdx].games,
+      mmr: globalLadder[globalIndex].mmr,
+      games: globalLadder[globalIndex].games,
     });
   }
 
@@ -339,9 +265,8 @@ export async function getW3CRank(
    SECTION B — SUMMARY SERVICE
 ===================================================== */
 
-const CURRENT_SEASON = 24;
-const LAST_3_SEASONS = new Set([22, 23, 24]);
-const MIN_DURATION_SECONDS = 120;
+const CURRENT_SEASON = SEASON;
+const LAST_3_SEASONS = new Set(SEASONS);
 
 function getPlayerAndOpponentCI2(match: any, lowerTag: string) {
   if (!Array.isArray(match?.teams)) return null;
@@ -353,8 +278,7 @@ function getPlayerAndOpponentCI2(match: any, lowerTag: string) {
           match.teams
             .flatMap((t: any) => t.players ?? [])
             .find(
-              (p: any) =>
-                String(p?.battleTag).toLowerCase() !== lowerTag
+              (p: any) => String(p?.battleTag).toLowerCase() !== lowerTag
             ) ?? null;
 
         return { me: player, opponent };
@@ -367,18 +291,24 @@ function getPlayerAndOpponentCI2(match: any, lowerTag: string) {
 
 function toDate(v: any): Date | null {
   if (!v) return null;
+
   const n = Number(v);
-  if (Number.isFinite(n)) return new Date(n < 1e12 ? n * 1000 : n);
+  if (Number.isFinite(n)) {
+    return new Date(n < 1e12 ? n * 1000 : n);
+  }
+
   const d = new Date(v);
   return Number.isFinite(d.getTime()) ? d : null;
 }
 
 function toNumber(v: any): number | null {
   if (typeof v === "number") return Number.isFinite(v) ? v : null;
+
   if (typeof v === "string") {
     const n = Number(v);
     return Number.isFinite(n) ? n : null;
   }
+
   return null;
 }
 
@@ -408,11 +338,10 @@ async function _getPlayerSummary(inputTag: string) {
 
   const lower = canonicalBattleTag.toLowerCase();
 
-  // deterministic "latest per race" logic
   matches = [...matches].sort((a, b) => {
     const ta = toDate(a?.startTime)?.getTime() ?? 0;
     const tb = toDate(b?.startTime)?.getTime() ?? 0;
-    return ta - tb; // oldest -> newest
+    return ta - tb;
   });
 
   const raceGamesAllTime: Record<string, number> = {};
@@ -421,25 +350,21 @@ async function _getPlayerSummary(inputTag: string) {
 
   const raceMMRCurrent: Record<string, number> = {};
   const raceMMRCurrentAt: Record<string, number> = {};
-
   const racePeaks: Record<string, any> = {};
 
   let lastPlayedLadder: Date | null = null;
 
   for (const match of matches) {
-    if (match.gameMode !== 1) continue;
+    if (match.gameMode !== GAMEMODE) continue;
     if (match.durationInSeconds < MIN_DURATION_SECONDS) continue;
 
     const date = toDate(match.startTime);
     if (!date) continue;
 
-    const season = match.season;
-
     const pair = getPlayerAndOpponentCI2(match, lower);
     if (!pair) continue;
 
     const { me } = pair;
-
     const race = raceLabel(me?.race) ?? "Unknown";
 
     raceGamesAllTime[race] = (raceGamesAllTime[race] || 0) + 1;
@@ -453,7 +378,7 @@ async function _getPlayerSummary(inputTag: string) {
       lastPlayedLadder = date;
     }
 
-    if (season === CURRENT_SEASON) {
+    if (match.season === CURRENT_SEASON) {
       raceGamesCurrentSeason[race] =
         (raceGamesCurrentSeason[race] || 0) + 1;
 
@@ -463,23 +388,22 @@ async function _getPlayerSummary(inputTag: string) {
         toNumber(me?.oldMmr);
 
       if (mmrAfter != null) {
-        const t = date.getTime();
-        const prevT = raceMMRCurrentAt[race] ?? -1;
+        const time = date.getTime();
+        const prevTime = raceMMRCurrentAt[race] ?? -1;
 
-        if (t >= prevT) {
-          raceMMRCurrentAt[race] = t;
+        if (time >= prevTime) {
+          raceMMRCurrentAt[race] = time;
           raceMMRCurrent[race] = mmrAfter;
         }
       }
     }
 
-    // keep your old peak logic (last 3 seasons)
-    if (LAST_3_SEASONS.has(season) && typeof me.currentMmr === "number") {
+    if (LAST_3_SEASONS.has(match.season) && typeof me.currentMmr === "number") {
       if (!racePeaks[race] || me.currentMmr > racePeaks[race].mmr) {
         racePeaks[race] = {
           race,
           mmr: me.currentMmr,
-          season,
+          season: match.season,
         };
       }
     }
