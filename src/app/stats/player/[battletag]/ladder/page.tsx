@@ -34,7 +34,10 @@ export default async function Page({
       title={data.battletag}
       subtitle={`SoS Ladder · ${data.poolSize.toLocaleString()} players`}
       base={base}
-      rows={data.full}
+     rows={data.full.map(r => ({
+  ...r,
+  sos: r.sos ?? 0,
+}))}
       poolSize={data.poolSize}
       currentPage={rawPage}
       totalPages={totalPages}

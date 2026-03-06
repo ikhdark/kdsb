@@ -45,7 +45,10 @@ export default async function CountryRacePage({ params }: PageProps) {
       title={`${countryCode} ${raceKey.toUpperCase()} Ladder`}
       subtitle={`Players: ${data.poolSize} • Rank = 80% MMR + 15% SoS (game-scaled) + 5% activity`}
       base={`/stats/ladder/country/${countryCode}/${raceKey}`}
-      rows={data.full}
+      rows={data.full.map(r => ({
+  ...r,
+  sos: r.sos ?? 0,
+}))}
       poolSize={data.poolSize}
       currentPage={1}
       totalPages={1}

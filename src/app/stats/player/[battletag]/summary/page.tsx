@@ -180,7 +180,7 @@ export default async function PlayerPage({ params }: PageProps) {
                 <span className="font-semibold">
                   {p.mmr}{" "}
                   <span className="text-xs font-normal">
-                    (Season {p.season}, Game {p.game})
+                    (Season {p.season})
                   </span>
                 </span>
               </div>

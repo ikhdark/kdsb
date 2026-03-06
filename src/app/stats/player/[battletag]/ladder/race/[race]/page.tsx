@@ -73,12 +73,14 @@ export default async function RaceLadderPage({
       title={canonicalBt}
       subtitle={`${raceLabel(race)} Ladder · Season 24 · ${poolSize.toLocaleString()} players`}
       base={base}
-      rows={rows}
+      rows={data.full.map(r => ({
+  ...r,
+  sos: r.sos ?? 0,
+}))}
       poolSize={poolSize}
       currentPage={currentPage}
       totalPages={totalPages}
       highlight={highlight}
-      me={data.me}
     />
   );
 }

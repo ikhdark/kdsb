@@ -30,7 +30,10 @@ export default async function Page({
       title="Global Ladder"
       subtitle={`Season 24 · ${data.poolSize.toLocaleString()} players • Rank = 80% MMR + 15% SoS (game-scaled) + 5% activity`}
       base="/stats/ladder"
-      rows={data.full}
+      rows={data.full.map(r => ({
+  ...r,
+  sos: r.sos ?? 0,
+}))}
       poolSize={data.poolSize}
       currentPage={currentPage}
       totalPages={totalPages}
