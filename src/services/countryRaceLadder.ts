@@ -42,7 +42,7 @@ const RACE_ID: Record<RaceKey, number> = {
 
 const SEASON = 24;
 const GATEWAY = 20;
-const GAME_MODE = 1;
+const GAMEMODE = 1;
 
 /* =====================================================
    HELPERS
@@ -77,6 +77,7 @@ export async function getCountryRaceLadder(
   page = 1,
   pageSize = 50
 ): Promise<CountryRaceLadderResponse | null> {
+
   const canonicalTag = inputBattleTag
     ? await resolveBattleTagViaSearch(inputBattleTag)
     : null;
@@ -86,7 +87,13 @@ export async function getCountryRaceLadder(
 
   /* ---------------- FETCH COUNTRY LADDER ---------------- */
 
-  const payload = await fetchCountryLadder(countryUpper, GATEWAY, GAME_MODE, SEASON);
+  const payload = await fetchCountryLadder(
+    countryUpper,
+    GATEWAY,
+    GAMEMODE,
+    SEASON
+  );
+
   if (!payload) return null;
 
   const flattened = flattenCountryLadder(payload);
@@ -97,43 +104,48 @@ export async function getCountryRaceLadder(
 
   /* ---------------- COUNTRY OVERRIDES ---------------- */
 
-  if (raceRows.length) {
-    // Remove players overridden OUT of this country
-    raceRows = raceRows.filter((r: any) => {
-      const bt = getBT(r);
-      const override = COUNTRY_OVERRIDE[bt];
-      if (!override) return true;
-      return override.from.toUpperCase() !== countryUpper;
-    });
+  raceRows = raceRows.filter((r: any) => {
+    const bt = getBT(r);
+    const override = COUNTRY_OVERRIDE[bt];
+    if (!override) return true;
+    return override.from.toUpperCase() !== countryUpper;
+  });
 
-    // Inject players overridden INTO this country
-    const injectTargets = Object.entries(COUNTRY_OVERRIDE).filter(
-      ([, o]) => o.to.toUpperCase() === countryUpper
-    );
+  const injectTargets = Object.entries(COUNTRY_OVERRIDE).filter(
+    ([, o]) => o.to.toUpperCase() === countryUpper
+  );
 
-    if (injectTargets.length) {
-      const byFrom = new Map<string, string[]>();
+  if (injectTargets.length) {
+    const byFrom = new Map<string, string[]>();
 
-      for (const [bt, o] of injectTargets) {
-        const from = o.from.toUpperCase();
-        byFrom.set(from, [...(byFrom.get(from) ?? []), bt]);
-      }
-
-      for (const [fromCountry, battletags] of byFrom.entries()) {
-        const fromPayload = await fetchCountryLadder(fromCountry, GATEWAY, GAME_MODE, SEASON);
-        if (!fromPayload) continue;
-
-        const fromFlat = flattenCountryLadder(fromPayload);
-        const fromRaceRows = fromFlat.filter((r: any) => r.race === raceId);
-
-        for (const bt of battletags) {
-          const hit = fromRaceRows.find((r: any) => getBT(r) === bt);
-          if (hit) raceRows.push(hit);
-        }
-      }
-
-      raceRows = uniqBy(raceRows, (r: any) => getBT(r));
+    for (const [bt, o] of injectTargets) {
+      const from = o.from.toUpperCase();
+      const arr = byFrom.get(from);
+      if (arr) arr.push(bt);
+      else byFrom.set(from, [bt]);
     }
+
+    for (const [fromCountry, battletags] of byFrom.entries()) {
+
+      const fromPayload = await fetchCountryLadder(
+        fromCountry,
+        GATEWAY,
+        GAMEMODE,
+        SEASON
+      );
+
+      if (!fromPayload) continue;
+
+      const fromRaceRows = flattenCountryLadder(fromPayload)
+        .filter((r: any) => r.race === raceId);
+
+      for (const bt of battletags) {
+        const hit = fromRaceRows.find((r: any) => getBT(r) === bt);
+        if (hit) raceRows.push(hit);
+      }
+    }
+
+    raceRows = uniqBy(raceRows, (r: any) => getBT(r));
   }
 
   /* ---------------- EMPTY STATE ---------------- */
@@ -173,7 +185,7 @@ export async function getCountryRaceLadder(
   const { visible, top } = buildPaged(baseline, page, pageSize);
 
   /* ---------------- COMPUTE SOS (PAGE ONLY) ---------------- */
-  // computeSoS expects LadderInputRow[], so convert visible LadderRow -> input rows
+
   const pageInputs: LadderInputRow[] = visible.map((p) => ({
     battletag: p.battletag,
     mmr: p.mmr,

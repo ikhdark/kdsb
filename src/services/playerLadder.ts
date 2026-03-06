@@ -39,35 +39,37 @@ async function _getPlayerLadder(
     ? await resolveBattleTagViaSearch(inputBattleTag)
     : null;
 
-  const rows = await fetchAllLeagues();
+  const battletagLower = battletag?.toLowerCase();
 
+  const rows = await fetchAllLeagues();
   const inputs = buildInputs(rows);
 
   /* baseline ladder (MMR only) */
   const ladder = buildLadder(inputs);
 
-  const { visible, top } =
-    buildPaged(ladder, page, pageSize);
-
-  /* compute SoS only for visible players */
-  await computeSoS(visible as any);
-
-  /* rebuild visible rows with SoS */
-  const updatedVisible = buildLadder(
-    visible.map((p) => ({
-      battletag: p.battletag,
-      mmr: p.mmr,
-      wins: p.wins,
-      games: p.games,
-      sos: p.sos,
-    }))
+  const { visible, top } = buildPaged(
+    ladder,
+    page,
+    pageSize
   );
 
-  const me = battletag
+  /* compute SoS only for visible players */
+  await computeSoS(visible);
+
+  /* rebuild visible rows with SoS */
+  const pageInputs = visible.map((p) => ({
+    battletag: p.battletag,
+    mmr: p.mmr,
+    wins: p.wins,
+    games: p.games,
+    sos: p.sos,
+  }));
+
+  const updatedVisible = buildLadder(pageInputs);
+
+  const me = battletagLower
     ? ladder.find(
-        (r) =>
-          r.battletag.toLowerCase() ===
-          battletag.toLowerCase()
+        (r) => r.battletag.toLowerCase() === battletagLower
       ) ?? null
     : null;
 

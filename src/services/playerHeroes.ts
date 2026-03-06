@@ -5,6 +5,7 @@ import { HERO_MAP } from "@/lib/heroMap";
 
 const SEASONS = [24];
 const MIN_GAMES = 5;
+const GAMEMODE = 1;
 
 /* ---------------- HERO DISPLAY ---------------- */
 
@@ -27,6 +28,38 @@ type Row = {
   winrate: number;
 };
 
+/* ---------------- HELPERS ---------------- */
+
+function recordStat(stat: HeroStat, didWin: boolean) {
+  stat.games++;
+  didWin ? stat.wins++ : stat.losses++;
+}
+
+function toRow(hero: string, s: HeroStat): Row {
+  return {
+    label: heroDisplay(hero),
+    wins: s.wins,
+    losses: s.losses,
+    games: s.games,
+    winrate: +((s.wins / s.games) * 100).toFixed(1),
+  };
+}
+
+function sortRows(
+  obj: Record<string, HeroStat>,
+  asc: boolean
+): Row[] {
+  const rows = Object.entries(obj)
+    .filter(([, s]) => s.games >= MIN_GAMES)
+    .map(([hero, s]) => toRow(hero, s));
+
+  rows.sort((a, b) =>
+    asc ? a.winrate - b.winrate : b.winrate - a.winrate
+  );
+
+  return rows.slice(0, 5);
+}
+
 /* ===================================================
    SERVICE
 =================================================== */
@@ -38,6 +71,7 @@ export async function getW3CHeroStats(inputTag: string) {
     (await resolveBattleTagViaSearch(inputTag)) || inputTag;
 
   let profile: any = null;
+
   try {
     profile = await fetchPlayerProfile(canonical);
   } catch {}
@@ -68,7 +102,7 @@ export async function getW3CHeroStats(inputTag: string) {
   };
 
   for (const match of matches) {
-    if (match?.gameMode !== 1 || !Array.isArray(match?.teams)) continue;
+    if (match?.gameMode !== GAMEMODE || !Array.isArray(match?.teams)) continue;
 
     const players = match.teams.flatMap((t: any) => t.players ?? []);
     if (players.length !== 2) continue;
@@ -89,15 +123,8 @@ export async function getW3CHeroStats(inputTag: string) {
     const yourCount = Math.min(Math.max(me.heroes.length, 1), 3) as 1 | 2 | 3;
     const oppCount = Math.min(Math.max(opp.heroes.length, 1), 3) as 1 | 2 | 3;
 
-    yourHeroCountStats[yourCount].games++;
-    didWin
-      ? yourHeroCountStats[yourCount].wins++
-      : yourHeroCountStats[yourCount].losses++;
-
-    opponentHeroCountStats[oppCount].games++;
-    didWin
-      ? opponentHeroCountStats[oppCount].wins++
-      : opponentHeroCountStats[oppCount].losses++;
+    recordStat(yourHeroCountStats[yourCount], didWin);
+    recordStat(opponentHeroCountStats[oppCount], didWin);
 
     const uniqueOppHeroes = new Set<string>(
       opp.heroes.map((h: any) => h?.name).filter(Boolean)
@@ -105,52 +132,19 @@ export async function getW3CHeroStats(inputTag: string) {
 
     for (const hero of uniqueOppHeroes) {
       opponentHeroStats[hero] ??= { games: 0, wins: 0, losses: 0 };
-      opponentHeroStats[hero].games++;
-      didWin
-        ? opponentHeroStats[hero].wins++
-        : opponentHeroStats[hero].losses++;
+      recordStat(opponentHeroStats[hero], didWin);
     }
 
     const primaryHero = opp.heroes[0]?.name;
+
     if (primaryHero) {
       opponentPrimaryHeroStats[primaryHero] ??= {
         games: 0,
         wins: 0,
         losses: 0,
       };
-      opponentPrimaryHeroStats[primaryHero].games++;
-      didWin
-        ? opponentPrimaryHeroStats[primaryHero].wins++
-        : opponentPrimaryHeroStats[primaryHero].losses++;
+      recordStat(opponentPrimaryHeroStats[primaryHero], didWin);
     }
-  }
-
-  function sortBest(obj: Record<string, HeroStat>): Row[] {
-    return Object.entries(obj)
-      .filter(([, s]) => s.games >= MIN_GAMES)
-      .map(([hero, s]) => ({
-        label: heroDisplay(hero),
-        wins: s.wins,
-        losses: s.losses,
-        games: s.games,
-        winrate: +((s.wins / s.games) * 100).toFixed(1),
-      }))
-      .sort((a, b) => b.winrate - a.winrate)
-      .slice(0, 5);
-  }
-
-  function sortWorst(obj: Record<string, HeroStat>): Row[] {
-    return Object.entries(obj)
-      .filter(([, s]) => s.games >= MIN_GAMES)
-      .map(([hero, s]) => ({
-        label: heroDisplay(hero),
-        wins: s.wins,
-        losses: s.losses,
-        games: s.games,
-        winrate: +((s.wins / s.games) * 100).toFixed(1),
-      }))
-      .sort((a, b) => a.winrate - b.winrate)
-      .slice(0, 5);
   }
 
   return {
@@ -177,10 +171,10 @@ export async function getW3CHeroStats(inputTag: string) {
         winrate: +((s.wins / s.games) * 100).toFixed(1),
       })),
 
-    bestOpeners: sortBest(opponentPrimaryHeroStats),
-    worstOpeners: sortWorst(opponentPrimaryHeroStats),
+    bestOpeners: sortRows(opponentPrimaryHeroStats, false),
+    worstOpeners: sortRows(opponentPrimaryHeroStats, true),
 
-    bestOverall: sortBest(opponentHeroStats),
-    worstOverall: sortWorst(opponentHeroStats),
+    bestOverall: sortRows(opponentHeroStats, false),
+    worstOverall: sortRows(opponentHeroStats, true),
   };
 }

@@ -62,13 +62,18 @@ async function _getPlayerRaceLadder(
     ? await resolveBattleTagViaSearch(inputBattleTag)
     : null;
 
+  const battletagLower = battletag?.toLowerCase();
+
   const raceId = RACE_ID[race];
 
-  const rows = (await fetchAllLeagues()).filter(
-    (r) => r.race === raceId
-  );
+  const allRows = await fetchAllLeagues();
 
-  const inputs = buildInputs(rows);
+  const raceRows = [];
+  for (const r of allRows) {
+    if (r.race === raceId) raceRows.push(r);
+  }
+
+  const inputs = buildInputs(raceRows);
 
   /* compute SoS BEFORE ranking */
   await computeSoS(inputs, raceId);
@@ -77,14 +82,15 @@ async function _getPlayerRaceLadder(
   const ladder = buildLadder(inputs);
 
   /* paginate ladder */
-  const { visible, top } =
-    buildPaged(ladder, page, pageSize);
+  const { visible, top } = buildPaged(
+    ladder,
+    page,
+    pageSize
+  );
 
-  const me = battletag
+  const me = battletagLower
     ? ladder.find(
-        (r) =>
-          r.battletag.toLowerCase() ===
-          battletag.toLowerCase()
+        (r) => r.battletag.toLowerCase() === battletagLower
       ) ?? null
     : null;
 

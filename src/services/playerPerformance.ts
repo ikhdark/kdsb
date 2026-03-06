@@ -9,6 +9,7 @@ import { resolveBattleTagViaSearch } from "../lib/w3cBattleTagResolver";
 
 const SEASONS = [24];
 const MIN_DURATION_SECONDS = 120;
+const GAMEMODE = 1;
 
 const BUCKET_SIZE = 50;
 const MAX_BUCKET_EDGE = 300;
@@ -53,6 +54,11 @@ function makeWL(): WL {
   return { games: 0, wins: 0, losses: 0, winrate: 0 };
 }
 
+function recordWL(wl: WL, didWin: boolean) {
+  wl.games++;
+  didWin ? wl.wins++ : wl.losses++;
+}
+
 function finalizeWL(wl: WL) {
   if (wl.games) wl.winrate = wl.wins / wl.games;
 }
@@ -70,6 +76,7 @@ function bucketFloor(diff: number) {
 async function _getPlayerPerformance(
   inputBattleTag: string
 ): Promise<PlayerPerformanceStats | null> {
+
   const battletag = await resolveBattleTagViaSearch(inputBattleTag);
   if (!battletag) return null;
 
@@ -86,9 +93,12 @@ async function _getPlayerPerformance(
   const bucketMap = new Map<number, PerformanceBucket>();
 
   for (const match of matches) {
-    if (match.durationInSeconds < MIN_DURATION_SECONDS) continue;
-    if (match.gameMode !== 1) continue;
-    if (!match.teams || match.teams.length !== 2) continue;
+    if (
+      match.durationInSeconds < MIN_DURATION_SECONDS ||
+      match.gameMode !== GAMEMODE ||
+      !match.teams ||
+      match.teams.length !== 2
+    ) continue;
 
     const [teamA, teamB] = match.teams;
 
@@ -115,25 +125,22 @@ async function _getPlayerPerformance(
     const didWin = !!me.won;
 
     /* overall */
-    overall.games++;
-    didWin ? overall.wins++ : overall.losses++;
+    recordWL(overall, didWin);
 
     /* higher/lower/even */
     if (Math.abs(diff) <= EVEN_THRESHOLD) {
-      even.games++;
-      didWin ? even.wins++ : even.losses++;
+      recordWL(even, didWin);
     } else if (diff > 0) {
-      higher.games++;
-      didWin ? higher.wins++ : higher.losses++;
+      recordWL(higher, didWin);
     } else {
-      lower.games++;
-      didWin ? lower.wins++ : lower.losses++;
+      recordWL(lower, didWin);
     }
 
     /* bucket */
     const min = bucketFloor(diff);
 
     let bucket = bucketMap.get(min);
+
     if (!bucket) {
       bucket = {
         min,
@@ -143,11 +150,11 @@ async function _getPlayerPerformance(
         losses: 0,
         winrate: 0,
       };
+
       bucketMap.set(min, bucket);
     }
 
-    bucket.games++;
-    didWin ? bucket.wins++ : bucket.losses++;
+    recordWL(bucket, didWin);
   }
 
   finalizeWL(overall);
