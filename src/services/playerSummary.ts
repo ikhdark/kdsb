@@ -26,7 +26,7 @@ const GATEWAY = 20;
 const GAMEMODE = 1;
 
 const SEASON = 24;
-const SEASONS = [22, 23, 24];
+const SEASONS = [23, 24];
 
 const MIN_GAMES = 5;
 const MIN_DURATION_SECONDS = 120;
