@@ -8,7 +8,7 @@ import { fetchJson } from "@/lib/w3cUtils";
 ========================= */
 
 export type PlayerProfile = {
-  battletag: string; // canonical casing (best effort)
+  battletag: string;
   playerId: string | null;
   countryCode: string | null;
   location: string | null;
@@ -21,9 +21,8 @@ export type CountryLadderPayload = unknown[];
    HELPERS
 ========================= */
 
-function pickString(x: any): string | null {
-  return typeof x === "string" && x.trim() ? x.trim() : null;
-}
+const pickString = (v: any): string | null =>
+  typeof v === "string" && v.trim() ? v.trim() : null;
 
 /* =========================
    PROFILE
@@ -32,7 +31,20 @@ function pickString(x: any): string | null {
 export async function fetchPlayerProfile(
   battletag: string
 ): Promise<PlayerProfile> {
-  const safeDefault: PlayerProfile = {
+
+  if (!battletag) {
+    return {
+      battletag,
+      playerId: null,
+      countryCode: null,
+      location: null,
+      playerAkaCountry: null,
+    };
+  }
+
+  const btEnc = encodeURIComponent(battletag);
+
+  const base: PlayerProfile = {
     battletag,
     playerId: null,
     countryCode: null,
@@ -40,18 +52,16 @@ export async function fetchPlayerProfile(
     playerAkaCountry: null,
   };
 
-  if (!battletag) return safeDefault;
-
-  const btEnc = encodeURIComponent(battletag);
-
   /* ---------- primary endpoint ---------- */
 
   try {
+
     const json = await fetchJson<any>(
       `https://website-backend.w3champions.com/api/players/${btEnc}`
     );
 
     if (json) {
+
       const canonical =
         pickString(json?.battleTag) ||
         pickString(json?.battletag) ||
@@ -66,18 +76,20 @@ export async function fetchPlayerProfile(
         playerAkaCountry: pickString(json?.playerAkaData?.country),
       };
     }
-  } catch (e) {
-    console.warn("players endpoint failed, falling back:", e);
+
+  } catch (err) {
+    console.warn("players endpoint failed, falling back:", err);
   }
 
   /* ---------- fallback endpoint ---------- */
 
   try {
+
     const json = await fetchJson<any>(
       `https://website-backend.w3champions.com/api/personal-settings/${btEnc}`
     );
 
-    if (!json) return safeDefault;
+    if (!json) return base;
 
     return {
       battletag,
@@ -86,9 +98,10 @@ export async function fetchPlayerProfile(
       location: pickString(json?.location),
       playerAkaCountry: null,
     };
+
   } catch (err) {
     console.error(`❌ Error fetching profile for ${battletag}:`, err);
-    return safeDefault;
+    return base;
   }
 }
 
@@ -102,6 +115,7 @@ export async function fetchCountryLadder(
   gameMode: number,
   season: number
 ): Promise<CountryLadderPayload> {
+
   if (!country) return [];
 
   const url =
@@ -110,10 +124,18 @@ export async function fetchCountryLadder(
     )}?gateWay=${gateway}&gameMode=${gameMode}&season=${season}`;
 
   try {
+
     const json = await fetchJson<unknown[]>(url);
+
     return Array.isArray(json) ? json : [];
+
   } catch (err) {
-    console.error(`❌ Error fetching country ladder (${country}):`, err);
+
+    console.error(
+      `❌ Error fetching country ladder (${country}):`,
+      err
+    );
+
     return [];
   }
 }

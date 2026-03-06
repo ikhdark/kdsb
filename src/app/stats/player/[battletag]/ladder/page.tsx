@@ -15,14 +15,11 @@ export default async function Page({
   const { battletag } = await params;
   const { page } = await searchParams;
 
-  const rawPage = Number(page) || 1;
+  const tag = decodeURIComponent(battletag);
 
-  const data = await getPlayerLadder(
-    battletag,
-    rawPage,
-    PAGE_SIZE
-  );
+  const rawPage = Math.max(1, Number(page) || 1);
 
+  const data = await getPlayerLadder(tag, rawPage, PAGE_SIZE);
   if (!data) return null;
 
   const totalPages = Math.max(
@@ -30,13 +27,13 @@ export default async function Page({
     Math.ceil(data.poolSize / PAGE_SIZE)
   );
 
+  const base = `/stats/player/${encodeURIComponent(data.battletag)}/ladder`;
+
   return (
     <LadderPageUI
       title={data.battletag}
       subtitle={`SoS Ladder · ${data.poolSize.toLocaleString()} players`}
-      base={`/stats/player/${encodeURIComponent(
-        data.battletag
-      )}/ladder`}
+      base={base}
       rows={data.full}
       poolSize={data.poolSize}
       currentPage={rawPage}

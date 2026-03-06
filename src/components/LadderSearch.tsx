@@ -6,7 +6,6 @@ import BattleTagInput from "@/components/BattleTagInput";
 
 const PAGE_SIZE = 50;
 
-/* stable helper */
 const normalize = (s: string) =>
   s.replace(/\s+/g, "").toLowerCase();
 
@@ -21,12 +20,8 @@ export default function LadderSearch({
   const [q, setQ] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  /* precompute once */
   const normalizedRows = useMemo(
-    () =>
-      rows.map((r) => ({
-        norm: normalize(r.battletag),
-      })),
+    () => rows.map((r) => normalize(r.battletag)),
     [rows]
   );
 
@@ -37,8 +32,8 @@ export default function LadderSearch({
 
       const qNorm = normalize(query);
 
-      const idx = normalizedRows.findIndex((r) =>
-        r.norm.includes(qNorm)
+      const idx = normalizedRows.findIndex((tag) =>
+        tag.includes(qNorm)
       );
 
       if (idx === -1) {
@@ -64,7 +59,7 @@ export default function LadderSearch({
         onChange={(v) => {
           setQ(v);
           setError(null);
-          runSearch(v); // ← jump when user selects
+          runSearch(v);
         }}
         placeholder="Find player in ladder..."
       />

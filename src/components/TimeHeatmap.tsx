@@ -12,8 +12,6 @@ type Cell = {
 };
 
 const DAY_NAMES = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-
-/* local time labels */
 const BUCKET_LABELS = ["00–08","08–16","16–24"];
 
 function textColor(wr: number | null) {
@@ -26,100 +24,97 @@ function textColor(wr: number | null) {
 export default function TimeHeatmap({ data }: { data: Cell[] }) {
   const safe = Array.isArray(data) ? data : [];
 
-  const map = new Map<string, Cell>(
-    safe.map(d => [`${d.day}-${d.bucket}`, d])
-  );
+  const map = new Map<string, Cell>();
 
-  /* ================= totals ================= */
+  const columnTotals = [
+    { games: 0, wins: 0 },
+    { games: 0, wins: 0 },
+    { games: 0, wins: 0 },
+  ];
 
-  const columnTotals = [0,1,2].map(bucket => {
-    let games = 0, wins = 0;
+  const rowTotals = Array.from({ length: 7 }, () => ({
+    games: 0,
+    wins: 0,
+  }));
 
-    for (const c of safe) {
-      if (c.bucket === bucket) {
-        games += c.games;
-        wins += c.wins;
-      }
-    }
+  /* ===== single aggregation pass ===== */
 
-    const losses = games - wins;
+  for (const c of safe) {
+    map.set(`${c.day}-${c.bucket}`, c);
+
+    columnTotals[c.bucket].games += c.games;
+    columnTotals[c.bucket].wins += c.wins;
+
+    rowTotals[c.day].games += c.games;
+    rowTotals[c.day].wins += c.wins;
+  }
+
+  /* ===== finalize totals ===== */
+
+  const colFinal = columnTotals.map((c) => {
+    const losses = c.games - c.wins;
 
     return {
-      games,
-      wins,
+      games: c.games,
+      wins: c.wins,
       losses,
-      winrate: games ? Math.round((wins/games)*100) : null
+      winrate: c.games ? Math.round((c.wins / c.games) * 100) : null,
     };
   });
 
-  const rowTotals = DAY_NAMES.map((_, day) => {
-    let games = 0, wins = 0;
-
-    for (const c of safe) {
-      if (c.day === day) {
-        games += c.games;
-        wins += c.wins;
-      }
-    }
-
-    const losses = games - wins;
+  const rowFinal = rowTotals.map((r) => {
+    const losses = r.games - r.wins;
 
     return {
-      games,
-      wins,
+      games: r.games,
+      wins: r.wins,
       losses,
-      winrate: games ? Math.round((wins/games)*100) : null
+      winrate: r.games ? Math.round((r.wins / r.games) * 100) : null,
     };
   });
 
-  /* ================= grand ================= */
+  /* ===== grand totals ===== */
 
-  const grandGames = columnTotals.reduce((n,c)=>n+c.games,0);
-  const grandWins  = columnTotals.reduce((n,c)=>n+c.wins,0);
-  const grandLoss  = grandGames - grandWins;
-  const grandWR    = grandGames ? Math.round((grandWins/grandGames)*100) : null;
+  const grandGames = colFinal.reduce((n, c) => n + c.games, 0);
+  const grandWins = colFinal.reduce((n, c) => n + c.wins, 0);
+  const grandLoss = grandGames - grandWins;
+  const grandWR = grandGames ? Math.round((grandWins / grandGames) * 100) : null;
 
-  /* ================= best ================= */
+  /* ===== best day/time ===== */
 
-  const bestDayIndex = rowTotals.reduce(
+  const bestDayIndex = rowFinal.reduce(
     (best, cur, i) =>
       cur.winrate != null &&
-      (best === -1 || cur.winrate > (rowTotals[best].winrate ?? -1))
+      (best === -1 || cur.winrate > (rowFinal[best].winrate ?? -1))
         ? i
         : best,
     -1
   );
 
-  const bestTimeIndex = columnTotals.reduce(
+  const bestTimeIndex = colFinal.reduce(
     (best, cur, i) =>
       cur.winrate != null &&
-      (best === -1 || cur.winrate > (columnTotals[best].winrate ?? -1))
+      (best === -1 || cur.winrate > (colFinal[best].winrate ?? -1))
         ? i
         : best,
     -1
   );
-
-  /* ================= render ================= */
 
   return (
     <div className="space-y-6">
-
       <div className="grid grid-cols-[55px_repeat(4,1fr)] gap-2 text-xs tabular-nums">
-
-        {/* header */}
         <div />
-        {BUCKET_LABELS.map(b => (
+
+        {BUCKET_LABELS.map((b) => (
           <div key={b} className="text-center text-gray-500 font-semibold">
             {b}
           </div>
         ))}
-        <div className="text-center text-gray-500 font-semibold">
-          Total
-        </div>
 
-        {/* rows */}
+        <div className="text-center text-gray-500 font-semibold">Total</div>
+
         {DAY_NAMES.map((dayName, day) => {
-          const rt = rowTotals[day];
+          const rt = rowFinal[day];
 
           return (
             <React.Fragment key={day}>
@@ -127,7 +122,7 @@ export default function TimeHeatmap({ data }: { data: Cell[] }) {
                 {dayName}
               </div>
 
-              {[0,1,2].map(bucket => {
+              {[0, 1, 2].map((bucket) => {
                 const cell = map.get(`${day}-${bucket}`);
 
                 return (
@@ -155,12 +150,9 @@ export default function TimeHeatmap({ data }: { data: Cell[] }) {
           );
         })}
 
-        {/* column totals */}
-        <div className="font-semibold text-gray-700 border-t pt-2">
-          Total
-        </div>
+        <div className="font-semibold text-gray-700 border-t pt-2">Total</div>
 
-        {columnTotals.map((c, i) => (
+        {colFinal.map((c, i) => (
           <div
             key={i}
             className="h-10 rounded border border-gray-300 bg-gray-50 flex items-center justify-center border-t font-semibold"
@@ -182,7 +174,6 @@ export default function TimeHeatmap({ data }: { data: Cell[] }) {
         </div>
       </div>
 
-      {/* best */}
       <div className="flex gap-10 text-sm">
         <div>
           <div className="text-gray-500">Best Day</div>
@@ -198,7 +189,6 @@ export default function TimeHeatmap({ data }: { data: Cell[] }) {
           </div>
         </div>
       </div>
-
     </div>
   );
 }

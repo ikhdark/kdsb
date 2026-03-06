@@ -14,58 +14,50 @@ type PageProps = {
 
 const PAGE_SIZE = 50;
 
-function raceLabel(race: string) {
-  const r = race.toLowerCase();
-  if (r === "human") return "Human";
-  if (r === "orc") return "Orc";
-  if (r === "elf") return "Night Elf";
-  if (r === "undead") return "Undead";
-  if (r === "random") return "Random";
-  return race;
-}
+const RACE_LABEL: Record<Race, string> = {
+  human: "Human",
+  orc: "Orc",
+  elf: "Night Elf",
+  undead: "Undead",
+  random: "Random",
+};
 
 export default async function RaceGlobalPage({
   params,
   searchParams,
 }: PageProps) {
-  // ✅ ALWAYS await (your project rule)
   const { race: raceParam } = await params;
   const { page, highlight } = await searchParams;
 
-  const race = raceParam.toLowerCase() as Race;
+  const race = raceParam?.toLowerCase() as Race;
 
-  if (!["human", "orc", "elf", "undead", "random"].includes(race)) {
+  if (!RACE_LABEL[race]) {
     return <EmptyState message="Invalid race" />;
   }
 
-  const rawPage = Math.max(1, Number(page) || 1);
+  const pageNum = Math.max(1, Number(page) || 1);
 
   const data = await getPlayerRaceLadder(
     undefined,
     race,
-    rawPage,
+    pageNum,
     PAGE_SIZE
   );
 
-  if (!data || !data.full?.length) {
+  if (!data?.full?.length) {
     return <EmptyState message="No ladder data available yet" />;
   }
 
-  const { full: rows, poolSize } = data;
-
-  const totalPages = Math.max(1, Math.ceil(poolSize / PAGE_SIZE));
-  const currentPage = Math.min(Math.max(1, rawPage), totalPages);
-
-  const base = `/stats/ladder/race/${race}`;
+  const totalPages = Math.max(1, Math.ceil(data.poolSize / PAGE_SIZE));
 
   return (
     <LadderPageUI
-      title={`Global ${raceLabel(race)} Ladder`}
-      subtitle={`Season 24 · ${poolSize.toLocaleString()} players · Rank = 80% MMR + 15% SoS (game-scaled) + 5% activity`}
-      base={base}
-      rows={rows}
-      poolSize={poolSize}
-      currentPage={currentPage}
+      title={`Global ${RACE_LABEL[race]} Ladder`}
+      subtitle={`Season 24 · ${data.poolSize.toLocaleString()} players · Rank = 80% MMR + 15% SoS (game-scaled) + 5% activity`}
+      base={`/stats/ladder/race/${race}`}
+      rows={data.full}
+      poolSize={data.poolSize}
+      currentPage={Math.min(pageNum, totalPages)}
       totalPages={totalPages}
       highlight={highlight}
     />

@@ -3,6 +3,12 @@ import { fetchCountryLadder } from "@/services/w3cApi";
 import { flattenCountryLadder } from "@/lib/ranking";
 import { PlayerHeader, Section } from "@/components/PlayerUI";
 
+export const revalidate = 300;
+
+const GATEWAY = 20;
+const GAMEMODE = 1;
+const SEASON = 24;
+
 const KNOWN_COUNTRIES = [
 "AF","AL","DZ","AS","AD","AO","AI","AQ","AG","AR","AM","AW","AU","AT","AZ",
 "BS","BH","BD","BB","BY","BE","BZ","BJ","BM","BT","BO","BA","BW","BV","BR",
@@ -81,64 +87,49 @@ WF:"Wallis and Futuna",EH:"Western Sahara",YE:"Yemen",ZM:"Zambia",ZW:"Zimbabwe"
 };
 
 export default async function CountryHubPage() {
-  const found = new Set<string>();
+  const found: string[] = [];
 
   await Promise.all(
     KNOWN_COUNTRIES.map(async (code) => {
       try {
-        const payload = await fetchCountryLadder(code, 20, 1, 24);
+        const payload = await fetchCountryLadder(code, GATEWAY, GAMEMODE, SEASON);
         const rows = flattenCountryLadder(payload);
 
-        if (rows.length > 0) {
-          found.add(code);
-        }
+        if (rows.length) found.push(code);
       } catch {}
     })
   );
 
-  const countries = Array.from(found).sort();
+  found.sort();
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto px-3 sm:px-4 md:px-0">
+
       <PlayerHeader
         battletag="Country Ladder"
         subtitle="Select Country (If you do not see your country, try again later as the database is updated)"
       />
 
       <Section title="Country Selection">
-        {countries.length === 0 ? (
+        {found.length === 0 ? (
           <div className="text-sm text-zinc-500 text-center py-6">
             No countries available.
           </div>
         ) : (
-          <div
-            className="
-              grid
-              grid-cols-2
-              sm:grid-cols-3
-              md:grid-cols-5
-              lg:grid-cols-8
-              gap-2
-            "
-          >
-            {countries.map((code) => (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-2">
+            {found.map((code) => (
               <Link
                 key={code}
                 href={`/stats/ladder/country/${code}`}
                 className="
-                  h-11
-                  rounded-md
-                  border border-zinc-400 dark:border-zinc-800
+                  h-11 rounded-md border border-zinc-400 dark:border-zinc-800
                   bg-white dark:bg-zinc-900
                   flex items-center justify-center
                   text-sm font-medium
                   text-zinc-700 dark:text-zinc-200
                   hover:bg-zinc-100 dark:hover:bg-zinc-800
-                  hover:border-emerald-500
-                  dark:hover:border-emerald-500
-                  transition-colors
-                  text-center
-                  px-2
+                  hover:border-emerald-500 dark:hover:border-emerald-500
+                  transition-colors text-center px-2
                 "
               >
                 {COUNTRY_NAMES[code] ?? code}
@@ -147,6 +138,7 @@ export default async function CountryHubPage() {
           </div>
         )}
       </Section>
+
     </div>
   );
 }

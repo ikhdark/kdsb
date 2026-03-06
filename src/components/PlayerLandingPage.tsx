@@ -1,17 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import WhatsNew from "@/components/WhatsNew";
 import { useBattleTagAutocomplete } from "@/hooks/useBattleTagAutocomplete";
 
 const RECENT_KEY = "w3c_recent_searches";
 
-/* ================= STORAGE HELPERS ================= */
+/* ================= STORAGE ================= */
 
 function readRecent(): string[] {
-  if (typeof window === "undefined") return [];
-
   try {
     return JSON.parse(localStorage.getItem(RECENT_KEY) || "[]");
   } catch {
@@ -19,19 +17,22 @@ function readRecent(): string[] {
   }
 }
 
-function writeRecent(tag: string) {
+function writeRecent(tag: string): string[] {
   try {
     const prev = readRecent();
     const next = [tag, ...prev.filter((t) => t !== tag)].slice(0, 3);
     localStorage.setItem(RECENT_KEY, JSON.stringify(next));
-  } catch {}
+    return next;
+  } catch {
+    return [];
+  }
 }
 
 function normalizeBattleTagInput(value: string) {
   return value.trim();
 }
 
-/* ================================================== */
+/* ================================================= */
 
 export default function PlayerLandingPage() {
   const router = useRouter();
@@ -39,13 +40,9 @@ export default function PlayerLandingPage() {
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
   const [recent, setRecent] = useState<string[]>([]);
 
-  /* ✅ shared autocomplete hook */
   const { results, clear } = useBattleTagAutocomplete(query);
-
-  /* ================= PWA INSTALL SUPPORT ================= */
 
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
@@ -59,13 +56,18 @@ export default function PlayerLandingPage() {
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
-  /* ================= INIT ================= */
-
   useEffect(() => {
     setRecent(readRecent());
   }, []);
 
-  /* ================= SUBMIT ================= */
+  const go = useCallback(
+    (tag: string) => {
+      const updated = writeRecent(tag);
+      setRecent(updated);
+      router.replace(`/stats/player/${encodeURIComponent(tag)}/summary`);
+    },
+    [router]
+  );
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -89,32 +91,16 @@ export default function PlayerLandingPage() {
       if (!res.ok) throw new Error();
 
       const data = await res.json();
-
       if (!data?.battleTag) throw new Error();
 
-      writeRecent(data.battleTag);
-      setRecent(readRecent());
-
-      router.replace(
-        `/stats/player/${encodeURIComponent(data.battleTag)}/summary`
-      );
+      go(data.battleTag);
     } catch {
       setError("Player not found");
       setLoading(false);
     }
   }
 
-  function quickGo(tag: string) {
-    writeRecent(tag);
-    setRecent(readRecent());
-
-    router.replace(`/stats/player/${encodeURIComponent(tag)}/summary`);
-  }
-
-  /* ================= BOOKMARK / INSTALL ================= */
-
   async function bookmark() {
-    /* real install button if supported */
     if (deferredPrompt) {
       deferredPrompt.prompt();
       await deferredPrompt.userChoice;
@@ -122,7 +108,6 @@ export default function PlayerLandingPage() {
       return;
     }
 
-    /* desktop fallback */
     const isMac = navigator.platform.toUpperCase().includes("MAC");
 
     alert(
@@ -131,8 +116,6 @@ export default function PlayerLandingPage() {
         : "Press Ctrl + D to bookmark this page."
     );
   }
-
-  /* ================= UI ================= */
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex justify-center px-6 pt-16 pb-32">
@@ -143,7 +126,8 @@ export default function PlayerLandingPage() {
           </h1>
 
           <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-            Strength of Schedule Ladder<br />
+            Strength of Schedule Ladder
+            <br />
             Detailed Player Stats
           </p>
         </div>
@@ -200,7 +184,7 @@ export default function PlayerLandingPage() {
               {recent.map((tag) => (
                 <button
                   key={tag}
-                  onClick={() => quickGo(tag)}
+                  onClick={() => go(tag)}
                   className="underline hover:text-black dark:hover:text-white"
                 >
                   {tag}

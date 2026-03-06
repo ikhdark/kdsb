@@ -12,12 +12,12 @@ export default async function Page({
   const { battletag } = await params;
   const { vs } = await searchParams;
 
-  const player = decodeURIComponent(battletag);
+  const player = decodeURIComponent(battletag).trim();
 
   return (
     <MatchHistoryShell
       player={player}
-      vsFilter={vs ?? ""}
+      vsFilter={vs?.trim() ?? ""}
     />
   );
 }

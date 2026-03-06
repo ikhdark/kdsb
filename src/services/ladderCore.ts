@@ -1,10 +1,13 @@
 // src/services/ladderCore.ts
 
+import { unstable_cache } from "next/cache";
+
 import {
-  fetchAllMatches,
   getPlayerAndOpponent,
   fetchJson,
 } from "@/lib/w3cUtils";
+
+import { getMatchesCached } from "@/services/matchCache";
 
 import { flattenCountryLadder } from "@/lib/ranking";
 
@@ -28,78 +31,86 @@ const MAX_LEAGUE = 50;
 const SOS_CONCURRENCY = 25;
 
 /* =====================================================
-   FETCH ALL LEAGUES
+   FETCH ALL LEAGUES (UNCACHED CORE)
 ===================================================== */
 
-export async function fetchAllLeagues() {
-  const urls: string[] = [];
+async function _fetchAllLeagues() {
+
+  const requests = new Array(MAX_LEAGUE - MIN_LEAGUE + 1);
 
   for (let league = MIN_LEAGUE; league <= MAX_LEAGUE; league++) {
-    urls.push(
+
+    const url =
       `https://website-backend.w3champions.com/api/ladder/${league}` +
-        `?gateWay=${GATEWAY}` +
-        `&gameMode=${GAME_MODE}` +
-        `&season=${SEASON}`
-    );
+      `?gateWay=${GATEWAY}` +
+      `&gameMode=${GAME_MODE}` +
+      `&season=${SEASON}`;
+
+    requests[league] =
+      fetchJson<any[]>(url).then((r) => r ?? []);
   }
 
-  const results = await Promise.all(
-    urls.map(async (url) => (await fetchJson<any[]>(url)) ?? [])
-  );
+  const results = await Promise.all(requests);
 
   return flattenCountryLadder(results.flat());
 }
+
+/* =====================================================
+   CACHED EXPORT
+===================================================== */
+
+export const fetchAllLeagues = unstable_cache(
+  async () => _fetchAllLeagues(),
+  ["w3c-all-leagues"],
+  { revalidate: 300 }
+);
 
 /* =====================================================
    BUILD INPUTS
 ===================================================== */
 
 export function buildInputs(rows: any[]): LadderInputRow[] {
-  const map = new Map<string, any>();
 
-  for (const r of rows) {
+  const best = new Map<string, any>();
+
+  for (let i = 0; i < rows.length; i++) {
+
+    const r = rows[i];
     const key = r.battleTagLower;
+
     if (!key) continue;
 
-    const existing = map.get(key);
+    const prev = best.get(key);
 
-    if (!existing || r.mmr > existing.mmr) {
-      map.set(key, r);
+    if (!prev || r.mmr > prev.mmr) {
+      best.set(key, r);
     }
   }
 
-  return [...map.values()]
-    .filter(
-      (r) =>
-        (r.games ?? 0) >= MIN_GAMES &&
-        (r.mmr ?? 0) > 0
-    )
-    .map((r) => ({
+  const inputs: LadderInputRow[] = [];
+
+  for (const r of best.values()) {
+
+    if ((r.games ?? 0) < MIN_GAMES) continue;
+    if ((r.mmr ?? 0) <= 0) continue;
+
+    inputs.push({
       battletag: r.battleTag,
       mmr: r.mmr,
       wins: r.wins,
       games: r.games,
-      sos: null, // NOTE: now interpreted as "SoS delta" (+/- relative to player MMR)
-    }));
+      sos: null,
+    });
+  }
+
+  return inputs;
 }
 
 /* =====================================================
    SoS ENGINE
-   SoS = weighted average of (oppMMR - playerMMR)
-
-   Per match:
-     diff = oppMMR - playerMMR
-     w    = 1 / (1 + abs(diff) / S)   (Option A)
-
-   Per player:
-     SoS_delta = sum(diff * w) / sum(w)
-
-   Meaning:
-     +120 => opponents ~120 MMR higher on average
-     -80  => opponents ~80 MMR lower on average
 ===================================================== */
 
-const SOS_DIFF_SCALE = 300; // S (tune 200–400)
+const SOS_DIFF_SCALE = 300;
 
 function weightByDiffAbs(diffAbs: number) {
   return 1 / (1 + diffAbs / SOS_DIFF_SCALE);
@@ -109,33 +120,39 @@ export async function computeSoS(
   rows: LadderInputRow[],
   raceId?: number
 ) {
-  const cache = new Map<string, any[]>();
 
   for (let i = 0; i < rows.length; i += SOS_CONCURRENCY) {
-    const chunk = rows.slice(i, i + SOS_CONCURRENCY);
 
-    await Promise.all(
-      chunk.map(async (row) => {
-        const key = row.battletag.toLowerCase();
+    const end = Math.min(i + SOS_CONCURRENCY, rows.length);
 
-        let matches = cache.get(key);
+    const tasks = new Array(end - i);
 
-        if (!matches) {
-          matches = await fetchAllMatches(row.battletag, [SEASON]);
-          cache.set(key, matches);
-        }
+    for (let j = i; j < end; j++) {
+
+      const row = rows[j];
+
+      tasks[j - i] = (async () => {
+
+        const matches =
+          await getMatchesCached(row.battletag, [SEASON]);
 
         let weightedSum = 0;
         let weightSum = 0;
 
-        for (const m of matches) {
-          if (m.gameMode !== GAME_MODE) continue;
-          if (m.durationInSeconds < 120) continue;
+        for (let k = 0; k < matches.length; k++) {
+
+          const m = matches[k];
+
+          if (
+            m.gameMode !== GAME_MODE ||
+            m.durationInSeconds < 120
+          ) continue;
 
           const pair = getPlayerAndOpponent(m, row.battletag);
           if (!pair) continue;
 
-          if (raceId && raceId !== 0 && pair.me.race !== raceId) continue;
+          if (raceId && raceId !== 0 && pair.me.race !== raceId)
+            continue;
 
           const oppRaw =
             pair.opp.oldMmr ??
@@ -145,19 +162,28 @@ export async function computeSoS(
             (pair.opp as any).rating ??
             (pair.opp as any).mmrValue;
 
-          const opp = typeof oppRaw === "string" ? Number(oppRaw) : oppRaw;
+          const opp =
+            typeof oppRaw === "string"
+              ? Number(oppRaw)
+              : oppRaw;
+
           if (!Number.isFinite(opp)) continue;
 
           const diff = opp - row.mmr;
+
           const w = weightByDiffAbs(Math.abs(diff));
 
           weightedSum += diff * w;
           weightSum += w;
         }
 
-        row.sos = weightSum ? weightedSum / weightSum : null;
-      })
-    );
+        row.sos =
+          weightSum ? weightedSum / weightSum : null;
+
+      })();
+    }
+
+    await Promise.all(tasks);
   }
 }
 
@@ -170,12 +196,12 @@ export function buildPaged(
   page: number,
   pageSize: number
 ) {
+
   const start = (page - 1) * pageSize;
-  const end = start + pageSize;
 
   return {
     ladder,
-    visible: ladder.slice(start, end),
+    visible: ladder.slice(start, start + pageSize),
     top: ladder.slice(0, pageSize),
   };
 }

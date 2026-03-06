@@ -4,21 +4,34 @@ import { PlayerHeader, Section } from "@/components/PlayerUI";
 import LadderSearch from "@/components/LadderSearch";
 import { PLAYER_LABELS } from "@/lib/playerLabels";
 
+type Row = {
+  battletag: string;
+  rank: number;
+  score: number;
+  mmr: number;
+  sos: number;
+  wins: number;
+  losses: number;
+};
+
 type Props = {
   title: string;
   subtitle: string;
   base: string;
-  rows: any[];
+  rows: Row[];
   poolSize: number;
   currentPage: number;
   totalPages: number;
   highlight?: string;
-  me?: any;
 };
 
-function num(n: number | null | undefined, d = 0) {
-  if (n == null) return "—";
-  return n.toFixed(d);
+function num(n?: number | null, d = 0) {
+  return n == null ? "—" : n.toFixed(d);
+}
+
+function playerLabel(tag: string) {
+  const label = PLAYER_LABELS[tag];
+  return label ? `${tag} (${label})` : tag;
 }
 
 export default function LadderPage({
@@ -36,10 +49,7 @@ export default function LadderPage({
   return (
     <div className="space-y-6 max-w-6xl mx-auto px-3 md:px-0">
 
-      <PlayerHeader
-        battletag={title}
-        subtitle={subtitle}
-      />
+      <PlayerHeader battletag={title} subtitle={subtitle} />
 
       <LadderSearch rows={rows} base={base} />
 
@@ -49,7 +59,6 @@ export default function LadderPage({
 
           <table className="w-full border-collapse text-sm">
 
-            {/* HEADER */}
             <thead className="sticky top-0 bg-white dark:bg-zinc-900 z-10 text-xs uppercase tracking-wide text-zinc-500 font-semibold">
               <tr className="border-b border-zinc-200 dark:border-zinc-800">
                 <th className="w-14 text-left px-3 py-3">#</th>
@@ -61,56 +70,47 @@ export default function LadderPage({
               </tr>
             </thead>
 
-            {/* BODY */}
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {rows.map((p) => (
                 <tr
-                  key={`${p.battletag}-${p.rank}`}
+                  key={p.battletag}
                   className="hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                 >
-                  {/* rank */}
                   <td className="px-3 py-2.5 text-zinc-500 font-medium tabular-nums">
                     #{p.rank}
                   </td>
 
-                  {/* player */}
-                 <td className="px-3 py-2.5 truncate font-medium text-zinc-900 dark:text-zinc-100">
-  <Link
-    href={`/stats/player/${encodeURIComponent(p.battletag)}/summary`}
-    className="hover:underline"
-  >
-    {PLAYER_LABELS[p.battletag] 
-      ? `${p.battletag} (${PLAYER_LABELS[p.battletag]})`
-      : p.battletag}
-  </Link>
-</td>
+                  <td className="px-3 py-2.5 truncate font-medium text-zinc-900 dark:text-zinc-100">
+                    <Link
+                      href={`/stats/player/${encodeURIComponent(p.battletag)}/summary`}
+                      className="hover:underline"
+                    >
+                      {playerLabel(p.battletag)}
+                    </Link>
+                  </td>
 
-                  {/* score */}
                   <td className="px-3 py-2.5 text-right font-semibold tabular-nums tracking-tight text-zinc-700 dark:text-zinc-300">
                     {num(p.score, 1)}
                   </td>
 
-                  {/* mmr */}
                   <td className="px-3 py-2.5 text-right font-semibold tabular-nums tracking-tight text-zinc-700 dark:text-zinc-300">
                     {p.mmr}
                   </td>
 
-                  {/* sos */}
                   <td className="px-3 py-2.5 text-right font-semibold tabular-nums tracking-tight text-zinc-700 dark:text-zinc-300">
-                    {num(p.sos, 0)}
+                    {num(p.sos)}
                   </td>
 
-                  {/* win-loss */}
                   <td className="px-3 py-2.5 text-right tabular-nums tracking-tight text-zinc-700 dark:text-zinc-300">
                     {p.wins}-{p.losses}
                   </td>
                 </tr>
               ))}
             </tbody>
+
           </table>
         </div>
 
-        {/* pagination */}
         <div className="flex justify-center gap-4 pt-4 text-sm font-medium">
           {currentPage > 1 && (
             <Link

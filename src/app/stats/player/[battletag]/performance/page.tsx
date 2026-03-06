@@ -1,4 +1,5 @@
 export const revalidate = 300;
+
 import EmptyState from "@/components/EmptyState";
 import { getPlayerPerformance } from "@/services/playerPerformance";
 import { PlayerHeader, Section, StatCard } from "@/components/PlayerUI";
@@ -11,7 +12,9 @@ export default async function VsPlayerPage({ params }: PageProps) {
   const { battletag } = await params;
   if (!battletag) return <EmptyState message="Player not found" />;
 
-  const data = await getPlayerPerformance(battletag);
+  const tag = decodeURIComponent(battletag);
+
+  const data = await getPlayerPerformance(tag);
   if (!data) return <EmptyState message="Not enough data/recent games available" />;
 
   const {
@@ -24,8 +27,6 @@ export default async function VsPlayerPage({ params }: PageProps) {
   } = data;
 
   const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
-
-  /* ================= COLORS ================= */
 
   const colorUnderdogNormal = (w: number) =>
     w >= 0.5
@@ -55,8 +56,6 @@ export default async function VsPlayerPage({ params }: PageProps) {
       ? "text-red-600 font-semibold"
       : "text-yellow-500 font-semibold";
 
-  /* ================= SPLIT RAW BUCKETS ================= */
-
   const favoredBuckets = buckets
     .filter((b) => b.min >= 0)
     .sort((a, b) => a.min - b.min);
@@ -65,20 +64,22 @@ export default async function VsPlayerPage({ params }: PageProps) {
     .filter((b) => b.min < 0)
     .sort((a, b) => b.min - a.min);
 
-  
-  /* ================= EXTREME (CUMULATIVE THRESHOLDS) ================= */
-  /* THIS IS THE IMPORTANT PART */
-
   const buildThresholds = (
     source: typeof buckets,
     thresholds: number[]
-  ) => {
-    return thresholds.map((edge) => {
-      const slice = source.filter((b) => Math.abs(b.min) >= edge);
+  ) =>
+    thresholds.map((edge) => {
+      let games = 0;
+      let wins = 0;
+      let losses = 0;
 
-      const games = slice.reduce((a, x) => a + x.games, 0);
-      const wins = slice.reduce((a, x) => a + x.wins, 0);
-      const losses = slice.reduce((a, x) => a + x.losses, 0);
+      for (const b of source) {
+        if (Math.abs(b.min) >= edge) {
+          games += b.games;
+          wins += b.wins;
+          losses += b.losses;
+        }
+      }
 
       return {
         min: edge,
@@ -89,16 +90,14 @@ export default async function VsPlayerPage({ params }: PageProps) {
         winrate: games ? wins / games : 0,
       };
     });
-  };
 
- const favoredNormal = buildThresholds(favoredBuckets, [50, 100, 150]);
-const favoredLarge  = buildThresholds(favoredBuckets, [200, 250, 300]);
+  const favoredNormal = buildThresholds(favoredBuckets, [50, 100, 150]);
+  const favoredLarge = buildThresholds(favoredBuckets, [200, 250, 300]);
 
-  /* ================= LABEL ================= */
+  const underdogNormal = underdogBuckets.filter((b) => Math.abs(b.min) < 150);
+  const underdogLarge = underdogBuckets.filter((b) => Math.abs(b.min) >= 150);
 
   const label = (b: typeof buckets[number]) => `${Math.abs(b.min)}+`;
-
-  /* ================= TABLE ================= */
 
   const Table = ({
     rows,
@@ -120,27 +119,23 @@ const favoredLarge  = buildThresholds(favoredBuckets, [200, 250, 300]);
         </thead>
 
         <tbody>
-  {rows
-    .filter((b) => b.games > 0) // ← hide empty stats
-    .map((b) => (
-            <tr key={b.min} className="border-t dark:border-gray-700">
-              <td className="px-2 md:px-4 py-2 font-mono">{label(b)}</td>
-              <td className="px-2 md:px-4 py-2">{b.games}</td>
-              <td className="px-2 md:px-4 py-2">{b.wins}</td>
-              <td className="px-2 md:px-4 py-2">{b.losses}</td>
-              <td className={`px-2 md:px-4 py-2 ${colorFn(b.winrate)}`}>
-                {pct(b.winrate)}
-              </td>
-            </tr>
-          ))}
+          {rows
+            .filter((b) => b.games > 0)
+            .map((b) => (
+              <tr key={b.min} className="border-t dark:border-gray-700">
+                <td className="px-2 md:px-4 py-2 font-mono">{label(b)}</td>
+                <td className="px-2 md:px-4 py-2">{b.games}</td>
+                <td className="px-2 md:px-4 py-2">{b.wins}</td>
+                <td className="px-2 md:px-4 py-2">{b.losses}</td>
+                <td className={`px-2 md:px-4 py-2 ${colorFn(b.winrate)}`}>
+                  {pct(b.winrate)}
+                </td>
+              </tr>
+            ))}
         </tbody>
       </table>
     </div>
   );
-
-  const underdogNormal = underdogBuckets.filter((b) => Math.abs(b.min) < 150);
-const underdogLarge  = underdogBuckets.filter((b) => Math.abs(b.min) >= 150);
-  /* ================= RENDER ================= */
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto text-xs md:text-sm px-3 md:px-0">
@@ -190,6 +185,7 @@ const underdogLarge  = underdogBuckets.filter((b) => Math.abs(b.min) >= 150);
       <Section title="Extreme Gap (Favored)">
         <Table rows={favoredLarge} colorFn={colorFavoredExtreme} />
       </Section>
+
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { fetchAllMatches } from "../lib/w3cUtils";
 import { resolveBattleTagViaSearch } from "../lib/w3cBattleTagResolver";
 
 /* =========================
-   CONFIG
+CONFIG
 ========================= */
 
 const SEASONS = [24];
@@ -16,7 +16,7 @@ const MAX_BUCKET_EDGE = 300;
 const EVEN_THRESHOLD = 25;
 
 /* =========================
-   TYPES
+TYPES
 ========================= */
 
 type WL = {
@@ -47,7 +47,7 @@ export type PlayerPerformanceStats = {
 };
 
 /* =========================
-   HELPERS
+HELPERS
 ========================= */
 
 function makeWL(): WL {
@@ -56,7 +56,8 @@ function makeWL(): WL {
 
 function recordWL(wl: WL, didWin: boolean) {
   wl.games++;
-  didWin ? wl.wins++ : wl.losses++;
+  if (didWin) wl.wins++;
+  else wl.losses++;
 }
 
 function finalizeWL(wl: WL) {
@@ -70,7 +71,7 @@ function bucketFloor(diff: number) {
 }
 
 /* =========================
-   CORE (UNCACHED)
+CORE
 ========================= */
 
 async function _getPlayerPerformance(
@@ -92,7 +93,10 @@ async function _getPlayerPerformance(
 
   const bucketMap = new Map<number, PerformanceBucket>();
 
-  for (const match of matches) {
+  for (let i = 0; i < matches.length; i++) {
+
+    const match = matches[i];
+
     if (
       match.durationInSeconds < MIN_DURATION_SECONDS ||
       match.gameMode !== GAMEMODE ||
@@ -100,7 +104,8 @@ async function _getPlayerPerformance(
       match.teams.length !== 2
     ) continue;
 
-    const [teamA, teamB] = match.teams;
+    const teamA = match.teams[0];
+    const teamB = match.teams[1];
 
     const pA = teamA.players?.[0];
     const pB = teamB.players?.[0];
@@ -109,25 +114,30 @@ async function _getPlayerPerformance(
     const tagA = pA.battleTag?.toLowerCase();
     const tagB = pB.battleTag?.toLowerCase();
 
-    const me =
-      tagA === myTagLower ? pA :
-      tagB === myTagLower ? pB :
-      null;
+    let me;
+    let opp;
 
-    if (!me) continue;
+    if (tagA === myTagLower) {
+      me = pA;
+      opp = pB;
+    } else if (tagB === myTagLower) {
+      me = pB;
+      opp = pA;
+    } else {
+      continue;
+    }
 
-    const opp = me === pA ? pB : pA;
+    const myMmr = me.oldMmr;
+    const oppMmr = opp.oldMmr;
 
-    if (typeof me.oldMmr !== "number" || typeof opp.oldMmr !== "number")
+    if (typeof myMmr !== "number" || typeof oppMmr !== "number")
       continue;
 
-    const diff = me.oldMmr - opp.oldMmr;
+    const diff = myMmr - oppMmr;
     const didWin = !!me.won;
 
-    /* overall */
     recordWL(overall, didWin);
 
-    /* higher/lower/even */
     if (Math.abs(diff) <= EVEN_THRESHOLD) {
       recordWL(even, didWin);
     } else if (diff > 0) {
@@ -136,12 +146,12 @@ async function _getPlayerPerformance(
       recordWL(lower, didWin);
     }
 
-    /* bucket */
     const min = bucketFloor(diff);
 
     let bucket = bucketMap.get(min);
 
     if (!bucket) {
+
       bucket = {
         min,
         max: Math.abs(min) === MAX_BUCKET_EDGE ? null : min + BUCKET_SIZE,
@@ -162,12 +172,16 @@ async function _getPlayerPerformance(
   finalizeWL(lower);
   finalizeWL(even);
 
-  const buckets = [...bucketMap.values()]
-    .sort((a, b) => a.min - b.min)
-    .map((b) => ({
-      ...b,
-      winrate: b.games ? b.wins / b.games : 0,
-    }));
+  const buckets: PerformanceBucket[] = [];
+
+  for (const b of bucketMap.values()) {
+
+    if (b.games) b.winrate = b.wins / b.games;
+
+    buckets.push(b);
+  }
+
+  buckets.sort((a, b) => a.min - b.min);
 
   return {
     battletag,
@@ -180,7 +194,7 @@ async function _getPlayerPerformance(
 }
 
 /* =========================
-   CACHED EXPORT
+CACHED EXPORT
 ========================= */
 
 const _getPlayerPerformanceCached = unstable_cache(

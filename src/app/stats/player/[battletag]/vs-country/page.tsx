@@ -1,5 +1,5 @@
-// src/app/stats/player/[battletag]/vs-country/page.tsx
 export const revalidate = 300;
+
 import EmptyState from "@/components/EmptyState";
 import { getW3CCountryStats } from "@/services/vsCountry";
 import { PlayerHeader, Section, StatCard } from "@/components/PlayerUI";
@@ -11,38 +11,29 @@ type Props = {
 
 export default async function CountriesPage({ params, searchParams }: Props) {
   const { battletag: routeBt } = await params;
-  const battletag = routeBt || searchParams?.bt;
-  if (!battletag) {
-  return <EmptyState message="Invalid player" />;
-}
 
-  const data = await getW3CCountryStats(battletag);
- if (!data || !data.countries?.length) {
-  return <EmptyState message="Not enough data/recent games available" />;
-}
+  const battletag = routeBt ?? searchParams?.bt;
+  if (!battletag) return <EmptyState message="Invalid player" />;
 
-  const {
-    battletag: canonicalBt,
-    countries,
-    homeCountry,
-    homeCountryLabel,
-  } = data;
+  const tag = decodeURIComponent(battletag);
 
-  /* ================= helpers ================= */
+  const data = await getW3CCountryStats(tag);
+  if (!data?.countries?.length) {
+    return <EmptyState message="Not enough data/recent games available" />;
+  }
 
-  const sum = (arr: any[], key: string) =>
-    arr.reduce((a, b) => a + (b[key] || 0), 0);
+  const { battletag: canonicalBt, countries, homeCountry, homeCountryLabel } = data;
 
-  const countriesByGames = countries.slice().sort((a, b) => b.games - a.games);
+  const sum = <T, K extends keyof T>(arr: T[], key: K) =>
+    arr.reduce((a, b) => a + (Number(b[key]) || 0), 0);
 
-  const countriesByOppMmr = countries
-    .slice()
-    .sort((a, b) => (b.avgOpponentMMR ?? 0) - (a.avgOpponentMMR ?? 0));
-
-  // NEW — sort by total time played
-  const countriesByTime = countries
-    .slice()
-    .sort((a, b) => b.timePlayedSeconds - a.timePlayedSeconds);
+  const countriesByGames = [...countries].sort((a, b) => b.games - a.games);
+  const countriesByOppMmr = [...countries].sort(
+    (a, b) => (b.avgOpponentMMR ?? 0) - (a.avgOpponentMMR ?? 0)
+  );
+  const countriesByTime = [...countries].sort(
+    (a, b) => b.timePlayedSeconds - a.timePlayedSeconds
+  );
 
   const home = countries.filter((c) => c.country === homeCountry);
   const foreign = countries.filter((c) => c.country !== homeCountry);
@@ -52,42 +43,40 @@ export default async function CountriesPage({ params, searchParams }: Props) {
   const foreignWins = sum(foreign, "wins");
   const foreignLosses = sum(foreign, "losses");
 
+  const calcWR = (w: number, l: number) => {
+    const g = w + l;
+    return g ? (w / g) * 100 : null;
+  };
+
+  const homeWR = calcWR(homeWins, homeLosses);
+  const foreignWR = calcWR(foreignWins, foreignLosses);
+
   const wrColor = (wr: number) => {
     if (wr >= 50) return "text-emerald-500 font-medium";
     if (wr >= 40) return "text-yellow-500 font-medium";
     return "text-rose-500 font-medium";
   };
 
-  /* ================= render ================= */
-
   return (
     <div className="space-y-8 max-w-6xl mx-auto text-xs md:text-sm leading-relaxed px-3 md:px-0">
 
-
-      {/* HEADER */}
       <PlayerHeader
         battletag={canonicalBt}
         subtitle="Country Stats (All races) · Season 24 (Games under 120 seconds excluded)"
       />
 
-      {/* ================= HOME VS FOREIGN ================= */}
       <Section title="Home vs Foreign">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
           <StatCard
             label={homeCountryLabel}
             value={`${homeWins}-${homeLosses}`}
             sub={
-              homeWins + homeLosses ? (
-                <span
-                  className={wrColor(
-                    (homeWins / (homeWins + homeLosses)) * 100
-                  )}
-                >
-                  {((homeWins / (homeWins + homeLosses)) * 100).toFixed(1)}% WR
+              homeWR !== null ? (
+                <span className={wrColor(homeWR)}>
+                  {homeWR.toFixed(1)}% WR
                 </span>
-              ) : (
-                "—"
-              )
+              ) : "—"
             }
           />
 
@@ -95,23 +84,17 @@ export default async function CountriesPage({ params, searchParams }: Props) {
             label="Foreign"
             value={`${foreignWins}-${foreignLosses}`}
             sub={
-              foreignWins + foreignLosses ? (
-                <span
-                  className={wrColor(
-                    (foreignWins / (foreignWins + foreignLosses)) * 100
-                  )}
-                >
-                  {((foreignWins / (foreignWins + foreignLosses)) * 100).toFixed(1)}% WR
+              foreignWR !== null ? (
+                <span className={wrColor(foreignWR)}>
+                  {foreignWR.toFixed(1)}% WR
                 </span>
-              ) : (
-                "—"
-              )
+              ) : "—"
             }
           />
+
         </div>
       </Section>
 
-      {/* ================= RECORD VS COUNTRIES ================= */}
       <Section title="Record vs Countries">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-xs md:text-sm">
@@ -128,7 +111,7 @@ export default async function CountriesPage({ params, searchParams }: Props) {
 
             <tbody>
               {countriesByGames.map((c) => {
-                const wrPercent = c.winRate * 100;
+                const wr = c.winRate * 100;
 
                 return (
                   <tr key={c.country} className="border-b">
@@ -137,8 +120,8 @@ export default async function CountriesPage({ params, searchParams }: Props) {
                     <td className="px-2 md:px-4 py-2 tabular-nums">{c.uniqueOpponents}</td>
                     <td className="px-2 md:px-4 py-2 tabular-nums text-emerald-600">{c.wins}</td>
                     <td className="px-2 md:px-4 py-2 tabular-nums text-rose-600">{c.losses}</td>
-                    <td className={`px-2 md:px-4 py-2 tabular-nums ${wrColor(wrPercent)}`}>
-                      {wrPercent.toFixed(1)}%
+                    <td className={`px-2 md:px-4 py-2 tabular-nums ${wrColor(wr)}`}>
+                      {wr.toFixed(1)}%
                     </td>
                   </tr>
                 );
@@ -148,7 +131,6 @@ export default async function CountriesPage({ params, searchParams }: Props) {
         </div>
       </Section>
 
-      {/* ================= COUNTRY × RACE ================= */}
       <Section title="Country × Race">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-sm">
@@ -168,7 +150,7 @@ export default async function CountriesPage({ params, searchParams }: Props) {
                 [...c.races]
                   .sort((a, b) => b.games - a.games)
                   .map((r, idx) => {
-                    const wrPercent = r.winRate * 100;
+                    const wr = r.winRate * 100;
 
                     return (
                       <tr key={`${c.country}-${r.raceId}`} className="border-b">
@@ -177,8 +159,8 @@ export default async function CountriesPage({ params, searchParams }: Props) {
                         <td className="px-2 md:px-4 py-2 tabular-nums">{r.games}</td>
                         <td className="px-2 md:px-4 py-2 tabular-nums text-emerald-600">{r.wins}</td>
                         <td className="px-2 md:px-4 py-2 tabular-nums text-rose-600">{r.losses}</td>
-                        <td className={`px-2 md:px-4 py-2 tabular-nums ${wrColor(wrPercent)}`}>
-                          {wrPercent.toFixed(1)}%
+                        <td className={`px-2 md:px-4 py-2 tabular-nums ${wrColor(wr)}`}>
+                          {wr.toFixed(1)}%
                         </td>
                       </tr>
                     );
@@ -189,7 +171,6 @@ export default async function CountriesPage({ params, searchParams }: Props) {
         </div>
       </Section>
 
-      {/* ================= AVG GAME LENGTH (SORTED BY TIME) ================= */}
       <Section title="Avg Game Length">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-sm">
@@ -198,29 +179,22 @@ export default async function CountriesPage({ params, searchParams }: Props) {
                 <th className="px-2 md:px-4 py-2">Country</th>
                 <th className="px-2 md:px-4 py-2 tabular-nums">Avg (min)</th>
                 <th className="px-2 md:px-4 py-2 tabular-nums">Total (h)</th>
-                
               </tr>
             </thead>
 
             <tbody>
               {countriesByTime.map((c) => {
-                const avgMin = c.avgGameSeconds
-                  ? c.avgGameSeconds / 60
-                  : null;
-
+                const avgMin = c.avgGameSeconds ? c.avgGameSeconds / 60 : null;
                 const hours = c.timePlayedSeconds / 3600;
 
                 return (
                   <tr key={c.country} className="border-b">
                     <td className="px-2 md:px-4 py-2">{c.label}</td>
-
                     <td className="px-2 md:px-4 py-2 tabular-nums">
                       {avgMin ? avgMin.toFixed(1) : "—"}
                     </td>
-
                     <td className="px-2 md:px-4 py-2 tabular-nums">
                       {hours.toFixed(1)}
-                  
                     </td>
                   </tr>
                 );
@@ -230,7 +204,6 @@ export default async function CountriesPage({ params, searchParams }: Props) {
         </div>
       </Section>
 
-      {/* ================= AVG MMR FACED ================= */}
       <Section title="Avg MMR Faced">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-sm">
@@ -241,12 +214,17 @@ export default async function CountriesPage({ params, searchParams }: Props) {
                 <th className="px-2 md:px-4 py-2 tabular-nums">Your MMR</th>
               </tr>
             </thead>
+
             <tbody>
               {countriesByOppMmr.map((c) => (
                 <tr key={c.country} className="border-b">
                   <td className="px-2 md:px-4 py-2">{c.label}</td>
-                  <td className="px-2 md:px-4 py-2 tabular-nums">{c.avgOpponentMMR?.toFixed(0) ?? "—"}</td>
-                  <td className="px-2 md:px-4 py-2 tabular-nums">{c.avgSelfMMR?.toFixed(0) ?? "—"}</td>
+                  <td className="px-2 md:px-4 py-2 tabular-nums">
+                    {c.avgOpponentMMR?.toFixed(0) ?? "—"}
+                  </td>
+                  <td className="px-2 md:px-4 py-2 tabular-nums">
+                    {c.avgSelfMMR?.toFixed(0) ?? "—"}
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -55,6 +55,55 @@ function Board({
 
 /* ========================================= */
 
+function HeroTable({
+  player,
+  usage,
+  totalGames,
+}: {
+  player: string;
+  usage: Record<string, { games: number; wins: number }>;
+  totalGames: number;
+}) {
+  const rows = Object.entries(usage)
+    .map(([hero, v]) => {
+      const use = totalGames ? v.games / totalGames : 0;
+      const losses = v.games - v.wins;
+      const wr = v.games ? v.wins / v.games : 0;
+
+      return { hero, use, wins: v.wins, losses, wr };
+    })
+    .filter((h) => h.use > 0)
+    .sort((a, b) => b.use - a.use);
+
+  return (
+    <div className="rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
+      <div className="font-semibold mb-3">{player}</div>
+
+      <div className="grid grid-cols-4 text-xs uppercase text-gray-500 dark:text-gray-400 mb-2">
+        <span>Hero</span>
+        <span className="text-center">Use</span>
+        <span className="text-center">W-L</span>
+        <span className="text-right">WR</span>
+      </div>
+
+      {rows.map((h) => (
+        <div key={h.hero} className="grid grid-cols-4 text-xs md:text-sm py-1">
+          <span>{h.hero}</span>
+          <span className="text-center">{pct(h.use)}</span>
+          <span className="text-center">
+            {h.wins}-{h.losses}
+          </span>
+          <span className="text-right text-gray-500 dark:text-gray-400">
+            {pct(h.wr)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ========================================= */
+
 function EmptyState() {
   return (
     <Section title="Head-to-head">
@@ -203,82 +252,17 @@ export default function MatchupView({ stats }: { stats: any }) {
 
       <Section title="Hero Usage, Record & Winrate">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
-            <div className="font-semibold mb-3">{stats.playerA}</div>
+          <HeroTable
+            player={stats.playerA}
+            usage={stats.statsA.heroUsage}
+            totalGames={stats.statsA.overall.games}
+          />
 
-            <div className="grid grid-cols-4 text-xs uppercase text-gray-500 dark:text-gray-400 mb-2">
-              <span>Hero</span>
-              <span className="text-center">Use</span>
-              <span className="text-center">W-L</span>
-              <span className="text-right">WR</span>
-            </div>
-
-            {Object.entries(
-              stats.statsA.heroUsage as Record<string, { games: number; wins: number }>
-            )
-              .map(([hero, v]) => {
-                const usage = stats.statsA.overall.games
-                  ? v.games / stats.statsA.overall.games
-                  : 0;
-                const losses = v.games - v.wins;
-                const wr = v.games ? v.wins / v.games : 0;
-
-                return { hero, usage, wins: v.wins, losses, wr };
-              })
-              .filter((h) => h.usage > 0)
-              .sort((a, b) => b.usage - a.usage)
-              .map((h) => (
-                <div key={h.hero} className="grid grid-cols-4 text-xs md:text-sm py-1">
-                  <span>{h.hero}</span>
-                  <span className="text-center">{pct(h.usage)}</span>
-                  <span className="text-center">
-                    {h.wins}-{h.losses}
-                  </span>
-                  <span className="text-right text-gray-500 dark:text-gray-400">
-                    {pct(h.wr)}
-                  </span>
-                </div>
-              ))}
-          </div>
-
-          <div className="rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
-            <div className="font-semibold mb-3">{stats.playerB}</div>
-
-            <div className="grid grid-cols-4 text-xs uppercase text-gray-500 dark:text-gray-400 mb-2">
-              <span>Hero</span>
-              <span className="text-center">Use</span>
-              <span className="text-center">W-L</span>
-              <span className="text-right">WR</span>
-            </div>
-
-            {Object.entries(
-              stats.statsB.heroUsage as Record<string, { games: number; wins: number }>
-            )
-              .map(([hero, v]) => {
-                const usage = stats.statsB.overall.games
-                  ? v.games / stats.statsB.overall.games
-                  : 0;
-
-                const losses = v.games - v.wins;
-                const wr = v.games ? v.wins / v.games : 0;
-
-                return { hero, usage, wins: v.wins, losses, wr };
-              })
-              .filter((h) => h.usage > 0)
-              .sort((a, b) => b.usage - a.usage)
-              .map((h) => (
-                <div key={h.hero} className="grid grid-cols-4 text-xs md:text-sm py-1">
-                  <span>{h.hero}</span>
-                  <span className="text-center">{pct(h.usage)}</span>
-                  <span className="text-center">
-                    {h.wins}-{h.losses}
-                  </span>
-                  <span className="text-right text-gray-500 dark:text-gray-400">
-                    {pct(h.wr)}
-                  </span>
-                </div>
-              ))}
-          </div>
+          <HeroTable
+            player={stats.playerB}
+            usage={stats.statsB.heroUsage}
+            totalGames={stats.statsB.overall.games}
+          />
         </div>
       </Section>
 
@@ -288,11 +272,8 @@ export default function MatchupView({ stats }: { stats: any }) {
             aLabel={stats.playerA}
             bLabel={stats.playerB}
             rows={stats.maps
-              .sort(
-                (a: typeof stats.maps[number], b: typeof stats.maps[number]) =>
-                  b.games - a.games
-              )
-              .map((m: typeof stats.maps[number]) => ({
+              .sort((a: any, b: any) => b.games - a.games)
+              .map((m: any) => ({
                 label: `${m.map} (${m.games})`,
                 a: pct(m.winrateA),
                 b: pct(m.winrateB),

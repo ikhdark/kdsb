@@ -14,7 +14,10 @@ const PAGE_SIZE = 50;
 /* -------------------- CORE (UNCACHED) -------------------- */
 
 async function _fetchMatchHistory(inputBattletag: string) {
-  const canonical = (await resolveBattleTagViaSearch(inputBattletag)) || inputBattletag;
+
+  const canonical =
+    (await resolveBattleTagViaSearch(inputBattletag)) ||
+    inputBattletag;
 
   const url =
     `https://website-backend.w3champions.com/api/matches/search` +
@@ -26,7 +29,16 @@ async function _fetchMatchHistory(inputBattletag: string) {
   const json = await fetchJson<any>(url);
   if (!json?.matches) return [];
 
-  return json.matches.map((m: any) => extractMatch(m, canonical)).filter(Boolean);
+  const out: any[] = [];
+
+  for (let i = 0; i < json.matches.length; i++) {
+
+    const m = extractMatch(json.matches[i], canonical);
+
+    if (m) out.push(m);
+  }
+
+  return out;
 }
 
 /* -------------------- CACHED EXPORT -------------------- */
@@ -40,31 +52,52 @@ export const fetchMatchHistory = unstable_cache(
 /* -------------------- EXTRACTOR -------------------- */
 
 function extractMatch(match: any, battletag: string) {
-  const players =
-    match.teams?.flatMap((t: any) => t.players ?? []) ?? [];
 
-  const me = players.find(
-    (p: any) =>
-      p?.battleTag?.toLowerCase() === battletag.toLowerCase()
-  );
+  const tagLower = battletag.toLowerCase();
+
+  const teams = match.teams;
+  if (!Array.isArray(teams)) return null;
+
+  let me: any = null;
+  let opponent: any = null;
+
+  for (let i = 0; i < teams.length; i++) {
+
+    const players = teams[i]?.players;
+    if (!Array.isArray(players)) continue;
+
+    for (let j = 0; j < players.length; j++) {
+
+      const p = players[j];
+      const tag = p?.battleTag?.toLowerCase();
+
+      if (!tag) continue;
+
+      if (tag === tagLower) {
+        me = p;
+      } else if (!opponent) {
+        opponent = p;
+      }
+    }
+  }
 
   if (!me) return null;
 
-  const opponent = players.find(
-    (p: any) =>
-      p?.battleTag?.toLowerCase() !== battletag.toLowerCase()
-  );
-
   const oppOldMmr =
-    typeof opponent?.oldMmr === "number" ? opponent.oldMmr : undefined;
+    typeof opponent?.oldMmr === "number"
+      ? opponent.oldMmr
+      : undefined;
 
   const oppNewMmr =
-    typeof opponent?.currentMmr === "number" ? opponent.currentMmr : undefined;
+    typeof opponent?.currentMmr === "number"
+      ? opponent.currentMmr
+      : undefined;
 
   const oppMmrGain =
     typeof opponent?.mmrGain === "number"
       ? opponent.mmrGain
-      : typeof oppOldMmr === "number" && typeof oppNewMmr === "number"
+      : typeof oppOldMmr === "number" &&
+        typeof oppNewMmr === "number"
       ? oppNewMmr - oppOldMmr
       : undefined;
 
@@ -83,7 +116,6 @@ function extractMatch(match: any, battletag: string) {
     newMmr: me.currentMmr,
     mmrGain: me.mmrGain,
 
-    // add opponent MMR
     oppOldMmr,
     oppNewMmr,
     oppMmrGain,
@@ -99,7 +131,8 @@ function extractMatch(match: any, battletag: string) {
     oppRndRace: opponent?.rndRace ?? null,
 
     opponentTag: opponent?.battleTag ?? null,
-    opponentCountry: opponent?.countryCode ?? opponent?.location ?? null,
+    opponentCountry:
+      opponent?.countryCode ?? opponent?.location ?? null,
 
     myHeroes: me.heroes ?? [],
     oppHeroes: opponent?.heroes ?? [],

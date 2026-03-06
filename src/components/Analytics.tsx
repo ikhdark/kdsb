@@ -6,7 +6,6 @@ import { pageview, event } from "@/lib/ga";
 
 const STAT_MAP = {
   summary: "Summary",
-  rank: "Rank Stats",
   performance: "Performance",
   consistency: "Time Consistency",
   heroes: "Hero Stats",
@@ -23,13 +22,17 @@ export default function Analytics() {
 
     pageview(url);
 
-    if (pathname.startsWith("/stats/player/")) {
-      const statSegment = pathname.split("/").at(4);
-      const statType = STAT_MAP[statSegment as keyof typeof STAT_MAP];
+    if (!pathname.startsWith("/stats/player/")) return;
 
-      if (statType) {
-        event("stat_page_view", { stat_type: statType });
-      }
+    const parts = pathname.split("/");
+    const statSegment = parts[4];
+
+    if (!statSegment) return;
+
+    const statType = STAT_MAP[statSegment as keyof typeof STAT_MAP];
+
+    if (statType) {
+      event("stat_page_view", { stat_type: statType });
     }
   }, [pathname]);
 

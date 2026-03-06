@@ -19,17 +19,14 @@ const GAME_MODE = 1
 const wr = (w: number, g: number) =>
   g ? +(w / g * 100).toFixed(2) : null
 
-const countWins = (arr: boolean[]) =>
-  arr.reduce((n, v) => n + (v ? 1 : 0), 0)
-
 /* =====================================================
    SERVICE
 ===================================================== */
 
 export async function getPlayerConsistency(input: string) {
-  const battletag = await resolveBattleTagViaSearch(
-    decodeURIComponent(input)
-  )
+
+  const battletag =
+    await resolveBattleTagViaSearch(decodeURIComponent(input))
 
   if (!battletag) return null
 
@@ -72,13 +69,17 @@ export async function getPlayerConsistency(input: string) {
       }
     | null = null
 
-  const recentResults: boolean[] = []
+  const recent: boolean[] = []
+
   const simpleMatches: {
     startTime: string
     didWin: boolean
   }[] = []
 
-  for (const m of matches) {
+  for (let i = 0; i < matches.length; i++) {
+
+    const m = matches[i]
+
     const pair = getPlayerAndOpponent(m, battletag)
     if (!pair) continue
 
@@ -97,13 +98,14 @@ export async function getPlayerConsistency(input: string) {
       if (current > longestWin) longestWin = current
     } else {
       current = current <= 0 ? current - 1 : -1
-      const abs = Math.abs(current)
+      const abs = -current
       if (abs > longestLoss) longestLoss = abs
     }
 
     const time = Date.parse(m.startTime)
 
     if (!session || time - lastTime > SESSION_GAP_MS) {
+
       if (session) sessions.push(session)
 
       session = {
@@ -118,17 +120,31 @@ export async function getPlayerConsistency(input: string) {
 
     lastTime = time
 
-    recentResults.push(didWin)
-    if (recentResults.length > 50) recentResults.shift()
+    recent.push(didWin)
   }
 
   if (session) sessions.push(session)
 
   const totalGames = wins + losses
 
-  const last10 = recentResults.slice(-10)
-  const last25 = recentResults.slice(-25)
-  const last50 = recentResults.slice(-50)
+  const len = recent.length
+
+  let w10 = 0
+  let w25 = 0
+  let w50 = 0
+
+  for (let i = Math.max(0, len - 50); i < len; i++) {
+
+    if (!recent[i]) continue
+
+    if (i >= len - 10) w10++
+    if (i >= len - 25) w25++
+    if (i >= len - 50) w50++
+  }
+
+  const last10 = Math.min(10, len)
+  const last25 = Math.min(25, len)
+  const last50 = Math.min(50, len)
 
   return {
     battletag,
@@ -156,9 +172,9 @@ export async function getPlayerConsistency(input: string) {
     })),
 
     recent: {
-      last10: wr(countWins(last10), last10.length),
-      last25: wr(countWins(last25), last25.length),
-      last50: wr(countWins(last50), last50.length),
+      last10: wr(w10, last10),
+      last25: wr(w25, last25),
+      last50: wr(w50, last50),
     },
 
     matches: simpleMatches,

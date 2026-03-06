@@ -11,11 +11,12 @@ export default async function Page({
 }) {
   const { a, b } = await searchParams;
 
-  let stats = null;
+  const playerA = a?.trim();
+  const playerB = b?.trim();
 
-  if (a && b) {
-    stats = await getVsPlayer(a, b);
-  }
+  const hasQuery = Boolean(playerA && playerB);
+
+  const stats = hasQuery ? await getVsPlayer(playerA!, playerB!) : null;
 
   return (
     <div className="max-w-6xl mx-auto px-3 md:px-0 space-y-6">
@@ -28,10 +29,10 @@ export default async function Page({
       </Section>
 
       <Section title="Search">
-        <MatchupSearch initialA={a} initialB={b} />
+        <MatchupSearch initialA={playerA} initialB={playerB} />
       </Section>
 
-      {!a || !b ? (
+      {!hasQuery ? (
         <Section title="Ready">
           <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-2">
             Select two players and press{" "}

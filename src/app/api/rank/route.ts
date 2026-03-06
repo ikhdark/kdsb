@@ -1,11 +1,13 @@
 import { fetchPlayerProfile } from "@/services/w3cApi";
 
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const player = searchParams.get("player");
+  const player = new URL(req.url).searchParams.get("player");
   if (!player) return Response.json(null);
 
-  const profile = await fetchPlayerProfile(player);
-
-  return Response.json(profile ?? null);
+  try {
+    const profile = await fetchPlayerProfile(player);
+    return Response.json(profile ?? null);
+  } catch {
+    return Response.json(null);
+  }
 }

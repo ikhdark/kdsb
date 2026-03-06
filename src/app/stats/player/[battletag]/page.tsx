@@ -8,13 +8,11 @@ type PageProps = {
 export default async function PlayerIndex({ params }: PageProps) {
   const { battletag } = await params;
 
-  const raw = decodeURIComponent(battletag).trim();
-  if (!raw) notFound();
+  const input = decodeURIComponent(battletag).trim();
+  if (!input) notFound();
 
-  const canonicalBattleTag = await resolveBattleTagViaSearch(raw);
-  if (!canonicalBattleTag) notFound();
+  const canonical = await resolveBattleTagViaSearch(input);
+  if (!canonical) notFound();
 
-  redirect(
-    `/stats/player/${encodeURIComponent(canonicalBattleTag)}/summary`
-  );
+  redirect(`/stats/player/${encodeURIComponent(canonical)}/summary`);
 }

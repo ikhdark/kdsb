@@ -8,18 +8,31 @@ type PageProps = {
   params: Promise<{ battletag: string }>;
 };
 
+function Rows({ rows }: { rows: { label: string; wins: number; losses: number; winrate: number }[] }) {
+  return (
+    <>
+      {rows.map((row) => (
+        <StatRow
+          key={row.label}
+          label={row.label}
+          value={`${row.wins}-${row.losses} (${row.winrate}%)`}
+          winrate={row.winrate}
+        />
+      ))}
+    </>
+  );
+}
+
 export default async function HeroesPage({ params }: PageProps) {
   const { battletag } = await params;
+  if (!battletag) return <EmptyState message="Player not found" />;
 
-  if (!battletag)
-    return <EmptyState message="Player not found" />;
+  const tag = decodeURIComponent(battletag);
 
-  const data = await getW3CHeroStats(battletag);
-
-  if (!data)
-    return (
-      <EmptyState message="Not enough data/recent games available" />
-    );
+  const data = await getW3CHeroStats(tag);
+  if (!data) {
+    return <EmptyState message="Not enough data/recent games available" />;
+  }
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto text-xs md:text-sm px-3 md:px-0">
@@ -29,76 +42,28 @@ export default async function HeroesPage({ params }: PageProps) {
         subtitle="Hero Stats (All races) · Season 24 (Games under 120 seconds excluded)"
       />
 
-      {/* ================= HERO COUNT ================= */}
       <Section title="W/L by Hero Count">
-        {data.byHeroCount.map((row) => (
-          <StatRow
-            key={row.label}
-            label={row.label}
-            value={`${row.wins}-${row.losses} (${row.winrate}%)`}
-            winrate={row.winrate}
-          />
-        ))}
+        <Rows rows={data.byHeroCount} />
       </Section>
 
-      {/* ================= VS OPP HERO COUNT ================= */}
       <Section title="W/L vs Opponent Hero Count">
-        {data.vsOppHeroCount.map((row) => (
-          <StatRow
-            key={row.label}
-            label={row.label}
-            value={`${row.wins}-${row.losses} (${row.winrate}%)`}
-            winrate={row.winrate}
-          />
-        ))}
+        <Rows rows={data.vsOppHeroCount} />
       </Section>
 
-      {/* ================= BEST OPENERS ================= */}
       <Section title="Best Matchups vs Opponent Opening Hero (Min 5 games)">
-        {data.bestOpeners.map((row) => (
-          <StatRow
-            key={row.label}
-            label={row.label}
-            value={`${row.wins}-${row.losses} (${row.winrate}%)`}
-            winrate={row.winrate}
-          />
-        ))}
+        <Rows rows={data.bestOpeners} />
       </Section>
 
-      {/* ================= WORST OPENERS ================= */}
       <Section title="Worst Matchups vs Opponent Opening Hero (Min 5 games)">
-        {data.worstOpeners.map((row) => (
-          <StatRow
-            key={row.label}
-            label={row.label}
-            value={`${row.wins}-${row.losses} (${row.winrate}%)`}
-            winrate={row.winrate}
-          />
-        ))}
+        <Rows rows={data.worstOpeners} />
       </Section>
 
-      {/* ================= BEST OVERALL ================= */}
       <Section title="Best Winrates vs Opponent Heroes Any Stage Of The Game (Min 5 games)">
-        {data.bestOverall.map((row) => (
-          <StatRow
-            key={row.label}
-            label={row.label}
-            value={`${row.wins}-${row.losses} (${row.winrate}%)`}
-            winrate={row.winrate}
-          />
-        ))}
+        <Rows rows={data.bestOverall} />
       </Section>
 
-      {/* ================= WORST OVERALL ================= */}
-      <Section title="Best Winrates vs Opponent Heroes Any Stage Of The Game (Min 5 games)">
-        {data.worstOverall.map((row) => (
-          <StatRow
-            key={row.label}
-            label={row.label}
-            value={`${row.wins}-${row.losses} (${row.winrate}%)`}
-            winrate={row.winrate}
-          />
-        ))}
+      <Section title="Worst Winrates vs Opponent Heroes Any Stage Of The Game (Min 5 games)">
+        <Rows rows={data.worstOverall} />
       </Section>
 
     </div>

@@ -9,19 +9,22 @@ export default async function Page({
 }) {
   const { player, vs } = await searchParams;
 
-  if (!player) {
+  const query = player?.trim();
+
+  if (!query) {
     return <MatchSearchInput />;
   }
 
-  const canonical = await resolveBattleTagViaSearch(player);
+  const canonical = await resolveBattleTagViaSearch(query);
+
   if (!canonical) {
-    return <div>Resolver failed for: {player}</div>;
+    return <div>Resolver failed for: {query}</div>;
   }
 
   return (
     <MatchHistoryShell
       player={canonical}
-      vsFilter={vs ?? ""}
+      vsFilter={vs?.trim() ?? ""}
     />
   );
 }

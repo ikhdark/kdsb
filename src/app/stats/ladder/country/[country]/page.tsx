@@ -14,49 +14,19 @@ const RACES = [
   { key: "random", label: "Random" },
 ];
 
-const COUNTRY_NAMES: Record<string, string> = {
-  US: "United States",
-  DE: "Germany",
-  FR: "France",
-  SE: "Sweden",
-  NO: "Norway",
-  DK: "Denmark",
-  FI: "Finland",
-  PL: "Poland",
-  CZ: "Czech Republic",
-  RU: "Russia",
-  UA: "Ukraine",
-  BR: "Brazil",
-  CN: "China",
-  KR: "South Korea",
-  AT: "Austria",
-  NL: "Netherlands",
-  BE: "Belgium",
-  GB: "United Kingdom",
-  ES: "Spain",
-  IT: "Italy",
-  CA: "Canada",
-  MX: "Mexico",
-  AU: "Australia",
-  IN: "India",
-  TR: "Turkey",
-};
-
 export default async function CountryPage({ params }: PageProps) {
-  const resolved = await params;
-  const country = resolved?.country;
+  const { country } = await params;
 
-  if (!country || typeof country !== "string") {
+  if (!country) {
     return notFound();
   }
 
   const code = country.toUpperCase();
-  const fullName = COUNTRY_NAMES[code] ?? code;
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto px-3 md:px-0">
       <PlayerHeader
-        battletag={`${fullName} Country`}
+        battletag={`${code} Country`}
         subtitle="Select race ladder"
       />
 

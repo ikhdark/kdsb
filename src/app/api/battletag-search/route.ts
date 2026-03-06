@@ -7,32 +7,36 @@ import { unstable_cache } from "next/cache"
    Cached Global Search (5 min)
 ===================================================== */
 
-const getCachedSearch = unstable_cache(
-  async (query: string) => {
-    const res = await fetch(
-      `https://website-backend.w3champions.com/api/players/global-search?search=${encodeURIComponent(query)}`,
-      {
-        next: { revalidate: 300 }, // 5 minutes
-      }
-    )
+async function fetchGlobalSearch(query: string) {
+  const res = await fetch(
+    `https://website-backend.w3champions.com/api/players/global-search?search=${encodeURIComponent(query)}`,
+    {
+      next: { revalidate: 300 },
+    }
+  )
 
-    if (!res.ok) return []
+  if (!res.ok) return []
+  return res.json()
+}
 
-    return res.json()
-  },
-  ["global-search"],
-  { revalidate: 300 }
-)
+const getCachedSearch = (query: string) =>
+  unstable_cache(
+    () => fetchGlobalSearch(query),
+    ["global-search", query],
+    { revalidate: 300 }
+  )()
 
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url)
-  const q = searchParams.get("q")
+  const q = new URL(req.url).searchParams.get("q")?.trim()
 
   if (!q || q.length < 2) {
     return NextResponse.json([])
   }
 
-  const results = await getCachedSearch(q.trim())
-
-  return NextResponse.json(results ?? [])
+  try {
+    const results = await getCachedSearch(q)
+    return NextResponse.json(results ?? [])
+  } catch {
+    return NextResponse.json([])
+  }
 }

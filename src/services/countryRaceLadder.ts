@@ -48,22 +48,18 @@ const GAMEMODE = 1;
    HELPERS
 ===================================================== */
 
-function getBT(r: any): string {
-  return r?.battleTag ?? r?.battletag ?? "";
-}
+const getBT = (r: any) => r?.battleTag ?? r?.battletag ?? "";
 
-function uniqBy<T>(rows: T[], keyFn: (r: T) => string) {
-  const seen = new Set<string>();
-  const out: T[] = [];
-
-  for (const r of rows) {
-    const k = keyFn(r);
-    if (!k || seen.has(k)) continue;
-    seen.add(k);
-    out.push(r);
-  }
-
-  return out;
+function empty(country: string, race: RaceKey): CountryRaceLadderResponse {
+  return {
+    country,
+    race,
+    me: null,
+    top: [],
+    poolSize: 0,
+    full: [],
+    updatedAtUtc: new Date().toISOString(),
+  };
 }
 
 /* =====================================================
@@ -82,10 +78,10 @@ export async function getCountryRaceLadder(
     ? await resolveBattleTagViaSearch(inputBattleTag)
     : null;
 
+  const canonicalLower = canonicalTag?.toLowerCase();
+
   const raceId = RACE_ID[race];
   const countryUpper = country.toUpperCase();
-
-  /* ---------------- FETCH COUNTRY LADDER ---------------- */
 
   const payload = await fetchCountryLadder(
     countryUpper,
@@ -96,117 +92,134 @@ export async function getCountryRaceLadder(
 
   if (!payload) return null;
 
-  const flattened = flattenCountryLadder(payload);
+  const rows = flattenCountryLadder(payload);
 
-  /* ---------------- FILTER BY RACE ---------------- */
+  /* ---------------- BUILD MAP ---------------- */
 
-  let raceRows = flattened.filter((r: any) => r.race === raceId);
+  const byTag = new Map<string, any>();
 
-  /* ---------------- COUNTRY OVERRIDES ---------------- */
+  for (let i = 0; i < rows.length; i++) {
 
-  raceRows = raceRows.filter((r: any) => {
+    const r = rows[i];
+
+    if (r.race !== raceId) continue;
+
     const bt = getBT(r);
-    const override = COUNTRY_OVERRIDE[bt];
-    if (!override) return true;
-    return override.from.toUpperCase() !== countryUpper;
-  });
 
-  const injectTargets = Object.entries(COUNTRY_OVERRIDE).filter(
-    ([, o]) => o.to.toUpperCase() === countryUpper
-  );
+    const override = COUNTRY_OVERRIDE[bt];
+
+    if (override && override.from.toUpperCase() === countryUpper) continue;
+
+    byTag.set(bt, r);
+  }
+
+  /* ---------------- OVERRIDE INJECTIONS ---------------- */
+
+  const injectTargets = Object.entries(COUNTRY_OVERRIDE)
+    .filter(([, o]) => o.to.toUpperCase() === countryUpper);
 
   if (injectTargets.length) {
+
     const byFrom = new Map<string, string[]>();
 
-    for (const [bt, o] of injectTargets) {
+    for (let i = 0; i < injectTargets.length; i++) {
+
+      const [bt, o] = injectTargets[i];
       const from = o.from.toUpperCase();
-      const arr = byFrom.get(from);
-      if (arr) arr.push(bt);
-      else byFrom.set(from, [bt]);
+
+      let arr = byFrom.get(from);
+
+      if (!arr) {
+        arr = [];
+        byFrom.set(from, arr);
+      }
+
+      arr.push(bt);
     }
+
+    const fromFetches = [...byFrom.keys()].map((c) =>
+      fetchCountryLadder(c, GATEWAY, GAMEMODE, SEASON)
+    );
+
+    const fromResults = await Promise.all(fromFetches);
+
+    let idx = 0;
 
     for (const [fromCountry, battletags] of byFrom.entries()) {
 
-      const fromPayload = await fetchCountryLadder(
-        fromCountry,
-        GATEWAY,
-        GAMEMODE,
-        SEASON
-      );
-
+      const fromPayload = fromResults[idx++];
       if (!fromPayload) continue;
 
-      const fromRaceRows = flattenCountryLadder(fromPayload)
-        .filter((r: any) => r.race === raceId);
+      const fromRows = flattenCountryLadder(fromPayload);
 
-      for (const bt of battletags) {
-        const hit = fromRaceRows.find((r: any) => getBT(r) === bt);
-        if (hit) raceRows.push(hit);
+      const lookup = new Map<string, any>();
+
+      for (let i = 0; i < fromRows.length; i++) {
+
+        const r = fromRows[i];
+
+        if (r.race === raceId) {
+          lookup.set(getBT(r), r);
+        }
+      }
+
+      for (let i = 0; i < battletags.length; i++) {
+
+        const bt = battletags[i];
+        const hit = lookup.get(bt);
+
+        if (hit) byTag.set(bt, hit);
       }
     }
-
-    raceRows = uniqBy(raceRows, (r: any) => getBT(r));
   }
 
-  /* ---------------- EMPTY STATE ---------------- */
+  if (!byTag.size) return empty(countryUpper, race);
 
-  if (!raceRows.length) {
-    return {
-      country: countryUpper,
-      race,
-      me: null,
-      top: [],
-      poolSize: 0,
-      full: [],
-      updatedAtUtc: new Date().toISOString(),
-    };
-  }
+  const inputs: LadderInputRow[] = buildInputs(Array.from(byTag.values()));
 
-  /* ---------------- BUILD INPUTS ---------------- */
-
-  const inputs: LadderInputRow[] = buildInputs(raceRows);
-
-  if (!inputs.length) {
-    return {
-      country: countryUpper,
-      race,
-      me: null,
-      top: [],
-      poolSize: 0,
-      full: [],
-      updatedAtUtc: new Date().toISOString(),
-    };
-  }
-
-  /* ---------------- BASELINE LADDER (MMR ONLY) ---------------- */
+  if (!inputs.length) return empty(countryUpper, race);
 
   const baseline = buildLadder(inputs);
 
-  const { visible, top } = buildPaged(baseline, page, pageSize);
+  const { visible, top } = buildPaged(
+    baseline,
+    page,
+    pageSize
+  );
 
-  /* ---------------- COMPUTE SOS (PAGE ONLY) ---------------- */
+  const pageInputs: LadderInputRow[] = new Array(visible.length);
 
-  const pageInputs: LadderInputRow[] = visible.map((p) => ({
-    battletag: p.battletag,
-    mmr: p.mmr,
-    wins: p.wins,
-    games: p.games,
-    sos: null,
-  }));
+  for (let i = 0; i < visible.length; i++) {
+
+    const p = visible[i];
+
+    pageInputs[i] = {
+      battletag: p.battletag,
+      mmr: p.mmr,
+      wins: p.wins,
+      games: p.games,
+      sos: null,
+    };
+  }
 
   await computeSoS(pageInputs, raceId);
 
-  /* ---------------- REBUILD VISIBLE WITH SOS + SCORE ---------------- */
-
   const updatedVisible = buildLadder(pageInputs);
 
-  /* ---------------- FIND PLAYER ---------------- */
+  let me: LadderRow | null = null;
 
-  const me = canonicalTag
-    ? baseline.find(
-        (r) => r.battletag.toLowerCase() === canonicalTag.toLowerCase()
-      ) ?? null
-    : null;
+  if (canonicalLower) {
+
+    for (let i = 0; i < baseline.length; i++) {
+
+      const r = baseline[i];
+
+      if (r.battletag.toLowerCase() === canonicalLower) {
+        me = r;
+        break;
+      }
+    }
+  }
 
   return {
     country: countryUpper,

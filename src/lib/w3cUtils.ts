@@ -2,14 +2,13 @@
 // Central W3C network + match utilities
 // SINGLE fetch layer (dedup + Next 5-min cache)
 
-import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
-
 /* =====================================================
    FETCH (SINGLE SOURCE OF TRUTH)
 ===================================================== */
 
 const fetchFn: typeof fetch =
-  typeof globalThis !== "undefined" && typeof globalThis.fetch === "function"
+  typeof globalThis !== "undefined" &&
+  typeof globalThis.fetch === "function"
     ? globalThis.fetch.bind(globalThis)
     : fetch;
 
@@ -25,22 +24,22 @@ async function fetchWithDedup(
 ): Promise<Response> {
   const key = requestKey(url, init);
 
-  let request = inFlightRequests.get(key);
+  let req = inFlightRequests.get(key);
 
-  if (!request) {
-    request = fetchFn(url, {
-      next: { revalidate: 300 }, // 5-minute Next.js cache
+  if (!req) {
+    req = fetchFn(url, {
+      next: { revalidate: 300 },
       ...init,
     });
 
-    inFlightRequests.set(key, request);
+    inFlightRequests.set(key, req);
   }
 
   try {
-    const res = await request;
+    const res = await req;
     return res.clone();
   } finally {
-    if (inFlightRequests.get(key) === request) {
+    if (inFlightRequests.get(key) === req) {
       inFlightRequests.delete(key);
     }
   }
@@ -68,21 +67,19 @@ const PAGE_SIZE = 50;
 const MAX_PAGES_PER_SEASON = 2000;
 
 /* =====================================================
-   MATCH FETCH (Parallel + optional memory assist)
+   MATCH FETCH (Parallel + memory cache)
 ===================================================== */
 
 const MATCH_CACHE_TTL = 10 * 60 * 1000;
 
-const matchCache = new Map<
-  string,
-  { ts: number; data: any[] }
->();
+const matchCache = new Map<string, { ts: number; data: any[] }>();
 
 function normalizeMatches(payload: any): any[] {
+  if (!payload) return [];
   if (Array.isArray(payload)) return payload;
-  if (payload?.matches) return payload.matches;
-  if (payload?.data?.matches) return payload.data.matches;
-  if (payload?.match) return [payload.match];
+  if (payload.matches) return payload.matches;
+  if (payload.data?.matches) return payload.data.matches;
+  if (payload.match) return [payload.match];
   return [];
 }
 
@@ -98,28 +95,27 @@ async function fetchSeasonMatches(
   const BATCH_SIZE = 10;
 
   while (!done) {
-    const offsets: number[] = [];
+    const promises: Promise<any[]>[] = new Array(BATCH_SIZE);
 
     for (let i = 0; i < BATCH_SIZE; i++) {
-      offsets.push(offset + i * PAGE_SIZE);
+      const off = offset + i * PAGE_SIZE;
+
+      const url =
+        "https://website-backend.w3champions.com/api/matches/search" +
+        `?playerId=${encodedTag}` +
+        `&gateway=${GATEWAY}` +
+        `&season=${season}` +
+        `&offset=${off}` +
+        `&pageSize=${PAGE_SIZE}`;
+
+      promises[i] = fetchJson<any>(url).then(normalizeMatches);
     }
 
-    const results = await Promise.all(
-      offsets.map(async (off) => {
-        const url =
-          "https://website-backend.w3champions.com/api/matches/search" +
-          `?playerId=${encodedTag}` +
-          `&gateway=${GATEWAY}` +
-          `&season=${season}` +
-          `&offset=${off}` +
-          `&pageSize=${PAGE_SIZE}`;
+    const results = await Promise.all(promises);
 
-        const json = await fetchJson<any>(url);
-        return normalizeMatches(json);
-      })
-    );
+    for (let i = 0; i < results.length; i++) {
+      const matches = results[i];
 
-    for (const matches of results) {
       if (!matches.length) {
         done = true;
         break;
@@ -147,10 +143,12 @@ export async function fetchAllMatches(
 ): Promise<any[]> {
   if (!canonicalBattleTag) return [];
 
-  const key = `${canonicalBattleTag.toLowerCase()}-${seasons.join(",")}`;
-  const now = Date.now();
+  const key =
+    `${canonicalBattleTag.toLowerCase()}-${seasons.join(",")}`;
 
+  const now = Date.now();
   const cached = matchCache.get(key);
+
   if (cached && now - cached.ts < MATCH_CACHE_TTL) {
     return cached.data;
   }
@@ -179,21 +177,34 @@ export function getPlayerAndOpponent(
   match: any,
   canonicalBattleTag: string
 ): { me: any; opp: any } | null {
-  if (!match || !Array.isArray(match?.teams)) return null;
+  if (!match || !Array.isArray(match.teams)) return null;
 
   const lower = canonicalBattleTag.toLowerCase();
 
-  const players: any[] = match.teams.flatMap((t: any) =>
-    Array.isArray(t?.players) ? t.players : []
-  );
+  const players: any[] = [];
 
-  const me = players.find(
-    (p) => String(p?.battleTag ?? "").toLowerCase() === lower
-  );
-  if (!me) return null;
+  for (let i = 0; i < match.teams.length; i++) {
+    const team = match.teams[i];
+    if (Array.isArray(team?.players)) {
+      players.push(...team.players);
+    }
+  }
 
-  const opp = players.find((p) => p && p !== me);
-  if (!opp) return null;
+  let me: any = null;
+  let opp: any = null;
+
+  for (let i = 0; i < players.length; i++) {
+    const p = players[i];
+    const tag = String(p?.battleTag ?? "").toLowerCase();
+
+    if (tag === lower) {
+      me = p;
+    } else if (!opp) {
+      opp = p;
+    }
+  }
+
+  if (!me || !opp) return null;
 
   return { me, opp };
 }
@@ -217,6 +228,7 @@ export async function fetchMatchDetail(
   const now = Date.now();
 
   const cached = matchDetailCache.get(matchId);
+
   if (cached && now - cached.ts < MATCH_DETAIL_TTL) {
     return cached.data;
   }

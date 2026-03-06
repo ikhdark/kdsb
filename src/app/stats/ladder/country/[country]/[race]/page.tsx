@@ -5,37 +5,6 @@ import {
   type RaceKey,
 } from "@/services/countryRaceLadder";
 
-/* ---------------------
-   Country name mapping
----------------------- */
-const COUNTRY_NAMES: Record<string, string> = {
-  US: "United States",
-  DE: "Germany",
-  FR: "France",
-  SE: "Sweden",
-  NO: "Norway",
-  DK: "Denmark",
-  FI: "Finland",
-  PL: "Poland",
-  CZ: "Czech Republic",
-  RU: "Russia",
-  UA: "Ukraine",
-  BR: "Brazil",
-  CN: "China",
-  KR: "South Korea",
-  AT: "Austria",
-  NL: "Netherlands",
-  BE: "Belgium",
-  GB: "United Kingdom",
-  ES: "Spain",
-  IT: "Italy",
-  CA: "Canada",
-  MX: "Mexico",
-  AU: "Australia",
-  IN: "India",
-  TR: "Turkey",
-};
-
 type PageProps = {
   params: Promise<{
     country?: string;
@@ -52,20 +21,18 @@ const VALID_RACES: RaceKey[] = [
 ];
 
 export default async function CountryRacePage({ params }: PageProps) {
-  const resolved = await params;
+  const { country, race } = await params;
 
-  const country = resolved?.country;
-  const race = resolved?.race as RaceKey | undefined;
-
-  if (!country || !race || !VALID_RACES.includes(race)) {
+  if (!country || !race || !VALID_RACES.includes(race as RaceKey)) {
     return notFound();
   }
 
-  const fullCountryName = COUNTRY_NAMES[country.toUpperCase()] ?? country.toUpperCase();
+  const countryCode = country.toUpperCase();
+  const raceKey = race as RaceKey;
 
   const data = await getCountryRaceLadder(
-    country,
-    race,
+    countryCode,
+    raceKey,
     undefined,
     1,
     9999
@@ -74,14 +41,14 @@ export default async function CountryRacePage({ params }: PageProps) {
   if (!data) return notFound();
 
   return (
-<LadderPage
-  title={`${fullCountryName} \n ${race.toUpperCase()} Ladder `}
-  subtitle={`Players: ${data.poolSize} • Rank = 80% MMR + 15% SoS (game-scaled) + 5% activity`}
-  base={`/stats/ladder/country/${country}/${race}`}
-  rows={data.full}
-  poolSize={data.poolSize}
-  currentPage={1}
-  totalPages={1}
-/>
+    <LadderPage
+      title={`${countryCode} ${raceKey.toUpperCase()} Ladder`}
+      subtitle={`Players: ${data.poolSize} • Rank = 80% MMR + 15% SoS (game-scaled) + 5% activity`}
+      base={`/stats/ladder/country/${countryCode}/${raceKey}`}
+      rows={data.full}
+      poolSize={data.poolSize}
+      currentPage={1}
+      totalPages={1}
+    />
   );
 }

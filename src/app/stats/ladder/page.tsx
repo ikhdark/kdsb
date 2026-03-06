@@ -8,13 +8,13 @@ export default async function Page({
 }: {
   searchParams: Promise<{ page?: string }>;
 }) {
-  const params = await searchParams;
+  const { page } = await searchParams;
 
-  const page = Number(params?.page) || 1;
+  const currentPage = Math.max(1, Number(page) || 1);
 
   const data = await getPlayerLadder(
     undefined,
-    page,
+    currentPage,
     PAGE_SIZE
   );
 
@@ -32,7 +32,7 @@ export default async function Page({
       base="/stats/ladder"
       rows={data.full}
       poolSize={data.poolSize}
-      currentPage={page}
+      currentPage={currentPage}
       totalPages={totalPages}
     />
   );

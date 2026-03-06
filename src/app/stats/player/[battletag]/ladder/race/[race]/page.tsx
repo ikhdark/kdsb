@@ -18,25 +18,20 @@ type PageProps = {
 
 const PAGE_SIZE = 50;
 
-/* helpers */
+const VALID_RACES: Race[] = ["human", "orc", "elf", "undead", "random"];
 
-function raceLabel(race: string) {
-  const r = race.toLowerCase();
-  if (r === "human") return "Human";
-  if (r === "orc") return "Orc";
-  if (r === "elf") return "Night Elf";
-  if (r === "undead") return "Undead";
-  if (r === "random") return "Random";
-  return race;
+function raceLabel(race: Race) {
+  if (race === "human") return "Human";
+  if (race === "orc") return "Orc";
+  if (race === "elf") return "Night Elf";
+  if (race === "undead") return "Undead";
+  return "Random";
 }
-
-/* page */
 
 export default async function RaceLadderPage({
   params,
   searchParams,
 }: PageProps) {
-  // ✔ required by your project setup
   const { battletag, race: raceParam } = await params;
   const { page, highlight } = await searchParams;
 
@@ -44,33 +39,30 @@ export default async function RaceLadderPage({
     return <EmptyState message="Invalid player" />;
   }
 
+  const tag = decodeURIComponent(battletag);
   const race = raceParam.toLowerCase() as Race;
 
-  if (!["human", "orc", "elf", "undead", "random"].includes(race)) {
+  if (!VALID_RACES.includes(race)) {
     return <EmptyState message="Invalid race" />;
   }
 
   const rawPage = Math.max(1, Number(page) || 1);
 
   const data = await getPlayerRaceLadder(
-    battletag,
+    tag,
     race,
     rawPage,
     PAGE_SIZE
   );
 
-  if (!data || !data.full?.length) {
+  if (!data?.full?.length) {
     return <EmptyState message="No ladder data available yet" />;
   }
 
-  const {
-    battletag: canonicalBt,
-    full: rows,
-    poolSize,
-  } = data;
+  const { battletag: canonicalBt, full: rows, poolSize } = data;
 
   const totalPages = Math.max(1, Math.ceil(poolSize / PAGE_SIZE));
-  const currentPage = Math.min(Math.max(1, rawPage), totalPages);
+  const currentPage = Math.min(rawPage, totalPages);
 
   const base = `/stats/player/${encodeURIComponent(
     canonicalBt

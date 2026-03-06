@@ -18,33 +18,7 @@ export default function BattleTagInput({
 }) {
   const { results, clear } = useBattleTagAutocomplete(value);
 
-  /* =========================
-     derived once
-  ========================= */
-
   const visible = useMemo(() => results.slice(0, 6), [results]);
-
-  /* =========================
-     stable handlers
-  ========================= */
-
-const handleChange = useCallback(
-  (v: string) => {
-    onChange(v);
-  },
-  [onChange]
-);
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === "Enter" && visible.length > 0) {
-        e.preventDefault();
-        onChange(visible[0].battleTag);
-        clear();
-      }
-    },
-    [visible, onChange, clear]
-  );
 
   const select = useCallback(
     (tag: string) => {
@@ -54,13 +28,21 @@ const handleChange = useCallback(
     [onChange, clear]
   );
 
-  /* ========================= */
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter" && visible.length) {
+        e.preventDefault();
+        select(visible[0].battleTag);
+      }
+    },
+    [visible, select]
+  );
 
   return (
     <div className="relative w-full">
       <input
         value={value}
-        onChange={(e) => handleChange(e.target.value)}
+        onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         className={INPUT_BASE}
