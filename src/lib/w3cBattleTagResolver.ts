@@ -12,10 +12,11 @@ type GlobalSearchResult = {
 };
 
 /* =====================================================
-   CACHE (hot path optimization)
+   CACHE
 ===================================================== */
 
 const SEARCH_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const SEARCH_TIMEOUT_MS = 2500;
 
 const searchCache = new Map<
   string,
@@ -27,8 +28,18 @@ const searchInFlight = new Map<
   Promise<GlobalSearchResult[] | null>
 >();
 
+const resolvedTagCache = new Map<
+  string,
+  { ts: number; value: string | null }
+>();
+
+const resolvedTagInFlight = new Map<
+  string,
+  Promise<string | null>
+>();
+
 /* =====================================================
-   helpers
+   HELPERS
 ===================================================== */
 
 function decodeInput(input: unknown): string {
@@ -53,7 +64,7 @@ function parseBattleTag(raw: string): { name: string; id: string } | null {
 }
 
 /* =====================================================
-   SEARCH (cached + deduped)
+   SEARCH (cached + deduped + timeout)
 ===================================================== */
 
 async function globalSearchByName(
@@ -61,21 +72,26 @@ async function globalSearchByName(
 ): Promise<GlobalSearchResult[] | null> {
   const now = Date.now();
 
-  // cache hit
   const cached = searchCache.get(name);
   if (cached && now - cached.ts < SEARCH_CACHE_TTL) {
     return cached.results;
   }
 
-  // in-flight dedupe
   const inFlight = searchInFlight.get(name);
   if (inFlight) return inFlight;
 
   const request = (async () => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), SEARCH_TIMEOUT_MS);
+
     try {
       const res = await fetch(
         `https://website-backend.w3champions.com/api/players/global-search` +
-          `?search=${encodeURIComponent(name)}&pageSize=100`
+          `?search=${encodeURIComponent(name)}&pageSize=100`,
+        {
+          signal: controller.signal,
+          next: { revalidate: 300 },
+        }
       );
 
       if (!res.ok) return null;
@@ -84,6 +100,8 @@ async function globalSearchByName(
       return Array.isArray(json) ? (json as GlobalSearchResult[]) : null;
     } catch {
       return null;
+    } finally {
+      clearTimeout(timer);
     }
   })();
 
@@ -104,12 +122,13 @@ async function globalSearchByName(
 }
 
 /* =====================================================
-   PUBLIC (ONLY ONE EXPORT — KEEP API SMALL)
+   PUBLIC
 ===================================================== */
 
 /**
- * Resolves to EXACT canonical BattleTag casing from backend.
- * This is the only resolver the app should ever use.
+ * Resolves to EXACT canonical BattleTag casing from backend when available.
+ * Falls back to the user-provided BattleTag if search fails or times out,
+ * so routes do not hang on slow global-search responses.
  */
 export async function resolveBattleTagViaSearch(
   input: unknown
@@ -118,23 +137,55 @@ export async function resolveBattleTagViaSearch(
   const parsed = parseBattleTag(raw);
   if (!parsed) return null;
 
-  const results = await globalSearchByName(parsed.name);
-  if (!results?.length) return null;
+  const cacheKey = raw.toLowerCase();
+  const now = Date.now();
 
-  const targetSuffix = `#${parsed.id}`.toLowerCase();
+  const cached = resolvedTagCache.get(cacheKey);
+  if (cached && now - cached.ts < SEARCH_CACHE_TTL) {
+    return cached.value;
+  }
 
-  const matches = results.filter(
-    (r) =>
-      typeof r.battleTag === "string" &&
-      r.battleTag.toLowerCase().endsWith(targetSuffix)
-  );
+  const inFlight = resolvedTagInFlight.get(cacheKey);
+  if (inFlight) return inFlight;
 
-  if (!matches.length) return null;
+  const request = (async () => {
+    const results = await globalSearchByName(parsed.name);
 
-  // prefer accounts with most seasons (most active)
-  matches.sort(
-    (a, b) => (b.seasons?.length ?? 0) - (a.seasons?.length ?? 0)
-  );
+    if (!results?.length) {
+      return raw;
+    }
 
-  return matches[0].battleTag;
+    const targetSuffix = `#${parsed.id}`.toLowerCase();
+
+    const matches = results.filter(
+      (r) =>
+        typeof r.battleTag === "string" &&
+        r.battleTag.toLowerCase().endsWith(targetSuffix)
+    );
+
+    if (!matches.length) {
+      return raw;
+    }
+
+    matches.sort(
+      (a, b) => (b.seasons?.length ?? 0) - (a.seasons?.length ?? 0)
+    );
+
+    return matches[0].battleTag;
+  })();
+
+  resolvedTagInFlight.set(cacheKey, request);
+
+  try {
+    const value = await request;
+
+    resolvedTagCache.set(cacheKey, {
+      ts: Date.now(),
+      value,
+    });
+
+    return value;
+  } finally {
+    resolvedTagInFlight.delete(cacheKey);
+  }
 }

@@ -7,6 +7,7 @@ import {
   getW3CRank,
   getPlayerSummary,
 } from "@/services/playerSummary";
+import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
 
 import { PlayerHeader, Section, StatCard } from "@/components/PlayerUI";
 
@@ -45,11 +46,16 @@ export default async function PlayerPage({ params }: PageProps) {
   const { battletag } = await params;
   if (!battletag) return <EmptyState message="Invalid player" />;
 
-  const tag = decodeURIComponent(battletag);
+  const rawTag = decodeURIComponent(battletag);
+
+  const canonicalTag = await resolveBattleTagViaSearch(rawTag);
+  if (!canonicalTag) {
+    return <EmptyState message="Invalid player" />;
+  }
 
   const [rankData, summaryData] = await Promise.all([
-    getW3CRank(tag),
-    getPlayerSummary(tag),
+    getW3CRank(canonicalTag),
+    getPlayerSummary(canonicalTag),
   ]);
 
   if (!rankData && !summaryData) {
@@ -73,9 +79,8 @@ export default async function PlayerPage({ params }: PageProps) {
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto text-xs md:text-sm px-3 md:px-0">
-
       <PlayerHeader
-        battletag={rankData?.battletag ?? s?.battletag ?? tag}
+        battletag={rankData?.battletag ?? s?.battletag ?? canonicalTag}
         subtitle="Player Stats · Seasons 23-24"
       />
 
@@ -90,8 +95,14 @@ export default async function PlayerPage({ params }: PageProps) {
                   : "N/A"
               }
             />
-            <StatCard label="Most Played (All Time)" value={s.mostPlayedAllTime ?? "N/A"} />
-            <StatCard label="Most Played (Current Season)" value={s.mostPlayedThisSeason ?? "N/A"} />
+            <StatCard
+              label="Most Played (All Time)"
+              value={s.mostPlayedAllTime ?? "N/A"}
+            />
+            <StatCard
+              label="Most Played (Current Season)"
+              value={s.mostPlayedThisSeason ?? "N/A"}
+            />
           </section>
 
           <section className="grid gap-4 sm:grid-cols-2">
@@ -111,7 +122,6 @@ export default async function PlayerPage({ params }: PageProps) {
           <Section title="SoS Ladder Race Rankings">
             <div className="rounded-xl border bg-white shadow-sm dark:bg-gray-dark overflow-x-auto">
               <table className="w-full table-fixed text-xs md:text-sm">
-
                 <thead className="bg-gray-100 dark:bg-gray-800 text-xs uppercase">
                   <tr>
                     <th className="px-2 md:px-4 py-3 text-left">Race</th>
@@ -164,7 +174,6 @@ export default async function PlayerPage({ params }: PageProps) {
                     );
                   })}
                 </tbody>
-
               </table>
             </div>
           </Section>
@@ -179,9 +188,7 @@ export default async function PlayerPage({ params }: PageProps) {
                 <span className="font-medium">{p.race}</span>
                 <span className="font-semibold">
                   {p.mmr}{" "}
-                  <span className="text-xs font-normal">
-                    (Season {p.season})
-                  </span>
+                  <span className="text-xs font-normal">(Season {p.season})</span>
                 </span>
               </div>
             ))
@@ -190,7 +197,6 @@ export default async function PlayerPage({ params }: PageProps) {
           )}
         </Section>
       )}
-
     </div>
   );
 }

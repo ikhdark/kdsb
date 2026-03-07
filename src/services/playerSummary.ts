@@ -32,7 +32,7 @@ const MIN_GAMES = 5;
 const MIN_DURATION_SECONDS = 120;
 
 const GLOBAL_CACHE_TTL = 5 * 60 * 1000;
-const MAX_LEAGUE_PAGE = 30;
+const MAX_LEAGUE_PAGE = 50;
 
 /* =====================================================
    RACE MAPS
@@ -300,8 +300,8 @@ export async function getW3CRank(
             effectiveCountry,
             raceKey,
             undefined,
-            GAMEMODE,
-            9999
+            1,
+            50
           )
         );
       }
