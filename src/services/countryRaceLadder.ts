@@ -1,7 +1,5 @@
 // src/services/countryRaceLadder.ts
 
-import { unstable_cache } from "next/cache";
-
 import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
 import { buildInputs, buildPaged, computeSoS } from "./ladderCore";
 import { fetchCountryLadder } from "@/services/w3cApi";
@@ -45,7 +43,6 @@ const RACE_ID: Record<RaceKey, number> = {
 const SEASON = 24;
 const GATEWAY = 20;
 const GAMEMODE = 1;
-const REVALIDATE_SECONDS = 300;
 
 /* =====================================================
    HELPERS
@@ -66,13 +63,22 @@ function empty(country: string, race: RaceKey): CountryRaceLadderResponse {
 }
 
 /* =====================================================
-   FULL COUNTRY/RACE SOS SNAPSHOT
+   MAIN (VISIBLE-ONLY SoS)
 ===================================================== */
 
-async function buildCountryRaceLadderSnapshot(
+export async function getCountryRaceLadder(
   country: string,
-  race: RaceKey
-): Promise<CountryRaceLadderResponse> {
+  race: RaceKey,
+  inputBattleTag?: string,
+  page = 1,
+  pageSize = 50
+): Promise<CountryRaceLadderResponse | null> {
+  const canonicalTag = inputBattleTag
+    ? await resolveBattleTagViaSearch(inputBattleTag)
+    : null;
+
+  const canonicalLower = canonicalTag?.toLowerCase();
+
   const raceId = RACE_ID[race];
   const countryUpper = country.toUpperCase();
 
@@ -83,8 +89,9 @@ async function buildCountryRaceLadderSnapshot(
     SEASON
   );
 
-  const rows = flattenCountryLadder(payload ?? []);
+  if (!payload) return null;
 
+  const rows = flattenCountryLadder(payload ?? []);
   const byTag = new Map<string, any>();
 
   for (let i = 0; i < rows.length; i++) {
@@ -96,7 +103,6 @@ async function buildCountryRaceLadderSnapshot(
     if (!bt) continue;
 
     const override = COUNTRY_OVERRIDE[bt];
-
     if (override && override.from.toUpperCase() === countryUpper) continue;
 
     byTag.set(bt, r);
@@ -157,108 +163,60 @@ async function buildCountryRaceLadderSnapshot(
   if (!byTag.size) return empty(countryUpper, race);
 
   const inputs: LadderInputRow[] = buildInputs(Array.from(byTag.values()));
-
   if (!inputs.length) return empty(countryUpper, race);
 
-  const fullInputs: LadderInputRow[] = inputs.map((p) => ({
-    battletag: p.battletag,
-    mmr: p.mmr,
-    wins: p.wins,
-    games: p.games,
-    sos: null,
-  }));
+  const baseline = buildLadder(inputs);
+  const { visible, top } = buildPaged(baseline, page, pageSize);
 
-  await computeSoS(fullInputs, raceId);
+  const pageInputs: LadderInputRow[] = new Array(visible.length);
 
-  const fullRanked = buildLadder(fullInputs);
+  for (let i = 0; i < visible.length; i++) {
+    const p = visible[i];
 
-  return {
-    country: countryUpper,
-    race,
-    me: null,
-    top: fullRanked.slice(0, 50),
-    poolSize: fullRanked.length,
-    full: fullRanked,
-    updatedAtUtc: new Date().toISOString(),
-  };
-}
-
-const cachedCountryRaceLadder = new Map<
-  string,
-  () => Promise<CountryRaceLadderResponse>
->();
-
-function getCachedCountryRaceLadderFn(country: string, race: RaceKey) {
-  const countryUpper = country.toUpperCase();
-  const key = `${countryUpper}|${race}|${SEASON}|${GATEWAY}|${GAMEMODE}`;
-
-  let fn = cachedCountryRaceLadder.get(key);
-
-  if (!fn) {
-    fn = unstable_cache(
-      async () => buildCountryRaceLadderSnapshot(countryUpper, race),
-      [`country-race-ladder:${key}`],
-      { revalidate: REVALIDATE_SECONDS }
-    );
-
-    cachedCountryRaceLadder.set(key, fn);
+    pageInputs[i] = {
+      battletag: p.battletag,
+      mmr: p.mmr,
+      wins: p.wins,
+      games: p.games,
+      sos: null,
+    };
   }
 
-  return fn;
-}
+  await computeSoS(pageInputs, raceId);
 
-/* =====================================================
-   MAIN
-===================================================== */
-
-export async function getCountryRaceLadder(
-  country: string,
-  race: RaceKey,
-  inputBattleTag?: string,
-  page = 1,
-  pageSize = 50
-): Promise<CountryRaceLadderResponse | null> {
-  const countryUpper = country.toUpperCase();
-
-  const canonicalTag = inputBattleTag
-    ? await resolveBattleTagViaSearch(inputBattleTag)
-    : null;
-
-  const canonicalLower = canonicalTag?.toLowerCase();
-
-  const snapshot = await getCachedCountryRaceLadderFn(
-    countryUpper,
-    race
-  )();
-
-  if (!snapshot) return null;
-
-  if (!snapshot.full.length) {
-    return empty(countryUpper, race);
-  }
-
-  const { visible, top } = buildPaged(snapshot.full, page, pageSize);
+  const updatedVisible = buildLadder(pageInputs);
 
   let me: LadderRow | null = null;
 
   if (canonicalLower) {
-    for (let i = 0; i < snapshot.full.length; i++) {
-      const r = snapshot.full[i];
+    for (let i = 0; i < updatedVisible.length; i++) {
+      const r = updatedVisible[i];
 
       if (r.battletag.toLowerCase() === canonicalLower) {
         me = r;
         break;
       }
     }
+
+    if (!me) {
+      for (let i = 0; i < baseline.length; i++) {
+        const r = baseline[i];
+
+        if (r.battletag.toLowerCase() === canonicalLower) {
+          me = r;
+          break;
+        }
+      }
+    }
   }
 
   return {
-    country: snapshot.country,
-    race: snapshot.race,
+    country: countryUpper,
+    race,
     me,
     top,
-    poolSize: snapshot.poolSize,
-    full: snapshot.full,
-    updatedAtUtc: snapshot.updatedAtUtc,
+    poolSize: baseline.length,
+    full: updatedVisible,
+    updatedAtUtc: new Date().toISOString(),
   };
 }
