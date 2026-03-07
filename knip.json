@@ -1,8 +1,13 @@
 {
-  "entry": [
-    "src/app/**/*.{ts,tsx}"
-  ],
+  "$schema": "https://unpkg.com/knip@latest/schema.json",
   "project": [
-    "src/**/*.{ts,tsx}"
+    "src/**/*.{ts,tsx}",
+    "scripts/**/*.{js,ts,mjs,cjs}",
+    "next.config.mjs",
+    "!src/**/*.d.ts",
+    "!**/.next/**",
+    "!**/node_modules/**",
+    "!**/dist/**",
+    "!**/build/**"
   ]
 }
