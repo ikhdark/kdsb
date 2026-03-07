@@ -28,7 +28,7 @@ const MIN_GAMES = 5;
 const MIN_LEAGUE = 0;
 const MAX_LEAGUE = 50;
 
-const SOS_CONCURRENCY = 100;
+const SOS_CONCURRENCY = 25;
 
 /* =====================================================
    FETCH ALL LEAGUES (UNCACHED CORE)
