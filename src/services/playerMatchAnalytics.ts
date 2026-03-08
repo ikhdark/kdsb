@@ -1,38 +1,42 @@
+// src/services/playerMatchAnalytics.ts
+
 import {
-  fetchAllMatches,
-  getPlayerAndOpponent,
   fetchMatchDetail,
+  getPlayerAndOpponent,
 } from "@/lib/w3cUtils";
 
 import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
 import { HERO_MAP } from "@/lib/heroMap";
 import { W3C_RACE_LABEL } from "@/lib/w3cRaces";
 
+import { getMatchesCached } from "@/services/matchCache";
+
+import {
+  W3C_CURRENT_SEASON,
+  W3C_MIN_DURATION_SECONDS,
+} from "@/lib/w3cConfig";
+
 /* ======================================================
    CONFIG
 ====================================================== */
 
-const SEASONS = [22, 23, 24] as const;
-const MIN_DURATION_SECONDS = 120;
-const REVALIDATE_SECONDS = 300; // 5 min
+const SEASONS = [22, 23, W3C_CURRENT_SEASON] as const;
+const MIN_DURATION_SECONDS = W3C_MIN_DURATION_SECONDS;
 
 /* ======================================================
    TYPES
 ====================================================== */
 
 type PlayerScoreBlock = {
-  /* unit */
   unitsProduced: number;
   unitsKilled: number;
   largestArmy: number;
 
-  /* hero */
   heroesKilled: number;
   itemsObtained: number;
   mercsHired: number;
   expGained: number;
 
-  /* eco */
   goldCollected: number;
   lumberCollected: number;
   goldUpkeepLost: number;
@@ -90,6 +94,30 @@ export type NormalizedMatch = {
   opp: NormalizedSide;
 };
 
+export type PlayerMatchAnalyticsResponse = {
+  battletag: string;
+  matches: NormalizedMatch[];
+  summary: {
+    games: number;
+    wins: number;
+    losses: number;
+    winrate: number;
+    avgDurationSec: number;
+    avgGold: number;
+    avgLumber: number;
+    avgUpkeepLoss: number;
+    avgArmy: number;
+    avgXP: number;
+  };
+  heroUsage: Record<string, number>;
+  maps: {
+    map: string;
+    games: number;
+    wins: number;
+    winrate: number;
+  }[];
+};
+
 /* ======================================================
    HELPERS
 ====================================================== */
@@ -111,28 +139,41 @@ function emptyScore(): PlayerScoreBlock {
   };
 }
 
+function toFiniteNumber(value: unknown, fallback = 0): number {
+  const n =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+      ? Number(value)
+      : NaN;
+
+  return Number.isFinite(n) ? n : fallback;
+}
+
 function pickScore(
   scores: any[] | undefined,
   battletagLower: string
 ): PlayerScoreBlock {
   const row = scores?.find(
-    (s: any) => String(s?.battleTag ?? "").toLowerCase() === battletagLower
+    (score: any) =>
+      String(score?.battleTag ?? "").toLowerCase() === battletagLower
   );
+
   if (!row) return emptyScore();
 
   return {
-    unitsProduced: row?.unitScore?.unitsProduced ?? 0,
-    unitsKilled: row?.unitScore?.unitsKilled ?? 0,
-    largestArmy: row?.unitScore?.largestArmy ?? 0,
+    unitsProduced: toFiniteNumber(row?.unitScore?.unitsProduced),
+    unitsKilled: toFiniteNumber(row?.unitScore?.unitsKilled),
+    largestArmy: toFiniteNumber(row?.unitScore?.largestArmy),
 
-    heroesKilled: row?.heroScore?.heroesKilled ?? 0,
-    itemsObtained: row?.heroScore?.itemsObtained ?? 0,
-    mercsHired: row?.heroScore?.mercsHired ?? 0,
-    expGained: row?.heroScore?.expGained ?? 0,
+    heroesKilled: toFiniteNumber(row?.heroScore?.heroesKilled),
+    itemsObtained: toFiniteNumber(row?.heroScore?.itemsObtained),
+    mercsHired: toFiniteNumber(row?.heroScore?.mercsHired),
+    expGained: toFiniteNumber(row?.heroScore?.expGained),
 
-    goldCollected: row?.resourceScore?.goldCollected ?? 0,
-    lumberCollected: row?.resourceScore?.lumberCollected ?? 0,
-    goldUpkeepLost: row?.resourceScore?.goldUpkeepLost ?? 0,
+    goldCollected: toFiniteNumber(row?.resourceScore?.goldCollected),
+    lumberCollected: toFiniteNumber(row?.resourceScore?.lumberCollected),
+    goldUpkeepLost: toFiniteNumber(row?.resourceScore?.goldUpkeepLost),
   };
 }
 
@@ -144,7 +185,8 @@ function pickAvgPing(
   if (!Array.isArray(infos)) return null;
 
   const row = infos.find(
-    (x: any) => String(x?.battleTag ?? "").toLowerCase() === battletagLower
+    (entry: any) =>
+      String(entry?.battleTag ?? "").toLowerCase() === battletagLower
   );
 
   return typeof row?.averagePing === "number" ? row.averagePing : null;
@@ -160,67 +202,75 @@ function normalizeServer(serverInfo: any): NormalizedServerInfo {
   };
 }
 
-function avg(arr: number[]) {
-  return arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+function avg(arr: number[]): number {
+  return arr.length
+    ? arr.reduce((sum, value) => sum + value, 0) / arr.length
+    : 0;
 }
 
-function normalizeHero(h: any) {
-  const id = typeof h?.id === "number" ? h.id : 0;
-  const rawName = String(h?.name ?? "Unknown");
+function normalizeHero(hero: any) {
+  const id = typeof hero?.id === "number" ? hero.id : 0;
+  const rawName = String(hero?.name ?? "Unknown");
   const name = HERO_MAP[rawName] ?? rawName;
-  const level = typeof h?.level === "number" ? h.level : 0;
+  const level = typeof hero?.level === "number" ? hero.level : 0;
+
   return { id, name, level };
 }
 
-function normalizeMap(m: any): { map: string; mapId: number | null } {
+function normalizeMap(match: any): { map: string; mapId: number | null } {
   const map =
-    typeof m?.mapName === "string"
-      ? m.mapName
-      : typeof m?.map === "string"
-        ? m.map
-        : "Unknown";
+    typeof match?.mapName === "string" && match.mapName.trim()
+      ? match.mapName.trim()
+      : typeof match?.map === "string" && match.map.trim()
+      ? match.map.trim()
+      : "Unknown";
 
-  const mapId = typeof m?.mapId === "number" ? m.mapId : null;
+  const mapId = typeof match?.mapId === "number" ? match.mapId : null;
+
   return { map, mapId };
 }
 
-function raceLabelFromId(raceId: any): string {
-  const id = typeof raceId === "number" ? raceId : Number(raceId ?? NaN);
+function raceLabelFromId(raceId: unknown): string {
+  const id =
+    typeof raceId === "number" ? raceId : Number(raceId ?? NaN);
+
   if (!Number.isFinite(id)) return "Unknown";
+
   return W3C_RACE_LABEL[id] ?? "Unknown";
 }
 
 /* ======================================================
-   CORE (non-cached, expects canonical)
+   CORE (expects canonical)
 ====================================================== */
 
-async function _getPlayerMatchAnalyticsByCanonical(canonical: string) {
-  const matches = await fetchAllMatches(canonical, [...SEASONS]);
-  if (!matches?.length) return null;
+async function _getPlayerMatchAnalyticsByCanonical(
+  canonical: string
+): Promise<PlayerMatchAnalyticsResponse | null> {
+  const matches = await getMatchesCached(canonical, SEASONS);
+  if (!matches.length) return null;
 
   const prepared = await Promise.all(
-    matches.map(async (m: any): Promise<NormalizedMatch | null> => {
-      if (m?.gameMode !== 1) return null;
+    matches.map(async (match: any): Promise<NormalizedMatch | null> => {
+      if (match?.gameMode !== 1) return null;
 
-      const dur = Number(m?.durationInSeconds);
-      if (!Number.isFinite(dur) || dur < MIN_DURATION_SECONDS) return null;
+      const durationSeconds = Number(match?.durationInSeconds);
+      if (!Number.isFinite(durationSeconds) || durationSeconds < MIN_DURATION_SECONDS) {
+        return null;
+      }
 
-      // PASS CANONICAL (function lowercases internally)
-      const pair = getPlayerAndOpponent(m, canonical);
+      const pair = getPlayerAndOpponent(match, canonical);
       if (!pair) return null;
 
       const meLower = String(pair.me?.battleTag ?? "").toLowerCase();
       const oppLower = String(pair.opp?.battleTag ?? "").toLowerCase();
 
-      // fields from list response
-      let scores = m?.playerScores;
-      let serverInfo = m?.serverInfo;
-      let endTime = m?.endTime;
-      let floMatchId = m?.floMatchId;
+      let scores = Array.isArray(match?.playerScores) ? match.playerScores : undefined;
+      let serverInfo = match?.serverInfo;
+      let endTime = match?.endTime;
+      let floMatchId = match?.floMatchId;
       let originalOngoingMatchId =
-        m?.["original-ongoing-match-id"] ?? m?.originalOngoingMatchId;
+        match?.["original-ongoing-match-id"] ?? match?.originalOngoingMatchId;
 
-      // Fetch detail if anything required is missing
       if (
         !scores ||
         !serverInfo ||
@@ -228,21 +278,23 @@ async function _getPlayerMatchAnalyticsByCanonical(canonical: string) {
         floMatchId == null ||
         originalOngoingMatchId == null
       ) {
-        const full = await fetchMatchDetail(m.id);
+        const full = await fetchMatchDetail(String(match.id));
 
-        if (!scores) scores = full?.playerScores ?? scores ?? [];
+        if (!scores) {
+          scores = Array.isArray(full?.playerScores) ? full.playerScores : [];
+        }
+
         if (!serverInfo) serverInfo = full?.serverInfo ?? serverInfo;
         if (!endTime) endTime = full?.endTime ?? endTime;
 
         if (floMatchId == null) {
-          floMatchId = full?.floMatchId ?? floMatchId ?? null;
+          floMatchId = full?.floMatchId ?? null;
         }
 
         if (originalOngoingMatchId == null) {
           originalOngoingMatchId =
             full?.["original-ongoing-match-id"] ??
             full?.originalOngoingMatchId ??
-            originalOngoingMatchId ??
             null;
         }
       }
@@ -251,38 +303,41 @@ async function _getPlayerMatchAnalyticsByCanonical(canonical: string) {
       const oppScore = pickScore(scores, oppLower);
 
       const server = normalizeServer(serverInfo);
-
-      const { map, mapId } = normalizeMap(m);
+      const { map, mapId } = normalizeMap(match);
 
       const gateway =
-        typeof m?.gateWay === "number"
-          ? m.gateWay
-          : typeof m?.gateway === "number"
-            ? m.gateway
-            : null;
+        typeof match?.gateWay === "number"
+          ? match.gateWay
+          : typeof match?.gateway === "number"
+          ? match.gateway
+          : null;
 
       const meHeroes = Array.isArray(pair.me?.heroes)
         ? pair.me.heroes.map(normalizeHero)
         : [];
+
       const oppHeroes = Array.isArray(pair.opp?.heroes)
         ? pair.opp.heroes.map(normalizeHero)
         : [];
 
-      const meRaceId = Number(pair.me?.race ?? 0);
-      const oppRaceId = Number(pair.opp?.race ?? 0);
+      const meRaceId = toFiniteNumber(pair.me?.race, 0);
+      const oppRaceId = toFiniteNumber(pair.opp?.race, 0);
 
-      return {
-        id: String(m.id),
+      const startTime = new Date(match.startTime);
+      if (!Number.isFinite(startTime.getTime())) return null;
+
+      const normalized: NormalizedMatch = {
+        id: String(match.id),
 
         map,
         mapId,
 
-        durationSeconds: dur,
-        startTime: new Date(m.startTime),
+        durationSeconds,
+        startTime,
         endTime: endTime ? new Date(endTime) : null,
 
-        season: Number(m.season),
-        gameMode: Number(m.gameMode),
+        season: toFiniteNumber(match.season, 0),
+        gameMode: toFiniteNumber(match.gameMode, 0),
         gateway,
 
         floMatchId: typeof floMatchId === "number" ? floMatchId : null,
@@ -298,9 +353,9 @@ async function _getPlayerMatchAnalyticsByCanonical(canonical: string) {
           raceId: meRaceId,
           race: raceLabelFromId(meRaceId),
 
-          oldMmr: Number(pair.me?.oldMmr ?? 0),
-          currentMmr: Number(pair.me?.currentMmr ?? 0),
-          mmrGain: Number(pair.me?.mmrGain ?? 0),
+          oldMmr: toFiniteNumber(pair.me?.oldMmr, 0),
+          currentMmr: toFiniteNumber(pair.me?.currentMmr, 0),
+          mmrGain: toFiniteNumber(pair.me?.mmrGain, 0),
 
           won: !!pair.me?.won,
 
@@ -315,9 +370,9 @@ async function _getPlayerMatchAnalyticsByCanonical(canonical: string) {
           raceId: oppRaceId,
           race: raceLabelFromId(oppRaceId),
 
-          oldMmr: Number(pair.opp?.oldMmr ?? 0),
-          currentMmr: Number(pair.opp?.currentMmr ?? 0),
-          mmrGain: Number(pair.opp?.mmrGain ?? 0),
+          oldMmr: toFiniteNumber(pair.opp?.oldMmr, 0),
+          currentMmr: toFiniteNumber(pair.opp?.currentMmr, 0),
+          mmrGain: toFiniteNumber(pair.opp?.mmrGain, 0),
 
           won: !!pair.opp?.won,
 
@@ -327,52 +382,52 @@ async function _getPlayerMatchAnalyticsByCanonical(canonical: string) {
           score: oppScore,
         },
       };
+
+      return normalized;
     })
   );
 
   const normalized = prepared.filter(Boolean) as NormalizedMatch[];
   if (!normalized.length) return null;
 
-  /* ======================================================
-     AGGREGATES
-  ====================================================== */
-
   const totalGames = normalized.length;
 
   let wins = 0;
 
   const durations: number[] = [];
-
   const gold: number[] = [];
   const lumber: number[] = [];
   const upkeep: number[] = [];
-
   const armies: number[] = [];
   const xp: number[] = [];
 
   const heroUsage: Record<string, number> = {};
   const mapAgg: Record<string, { games: number; wins: number }> = {};
 
-  for (const g of normalized) {
-    if (g.me.won) wins++;
+  for (let i = 0; i < normalized.length; i++) {
+    const game = normalized[i];
 
-    durations.push(g.durationSeconds);
+    if (game.me.won) wins++;
 
-    gold.push(g.me.score.goldCollected);
-    lumber.push(g.me.score.lumberCollected);
-    upkeep.push(g.me.score.goldUpkeepLost);
+    durations.push(game.durationSeconds);
 
-    armies.push(g.me.score.largestArmy);
-    xp.push(g.me.score.expGained);
+    gold.push(game.me.score.goldCollected);
+    lumber.push(game.me.score.lumberCollected);
+    upkeep.push(game.me.score.goldUpkeepLost);
 
-    for (const h of g.me.heroes) {
-      heroUsage[h.name] = (heroUsage[h.name] ?? 0) + 1;
+    armies.push(game.me.score.largestArmy);
+    xp.push(game.me.score.expGained);
+
+    for (let j = 0; j < game.me.heroes.length; j++) {
+      const hero = game.me.heroes[j];
+      heroUsage[hero.name] = (heroUsage[hero.name] ?? 0) + 1;
     }
 
-    const key = g.map || "Unknown";
+    const key = game.map || "Unknown";
     const row = (mapAgg[key] ??= { games: 0, wins: 0 });
+
     row.games++;
-    if (g.me.won) row.wins++;
+    if (game.me.won) row.wins++;
   }
 
   return {
@@ -397,29 +452,32 @@ async function _getPlayerMatchAnalyticsByCanonical(canonical: string) {
 
     heroUsage,
 
-    maps: Object.entries(mapAgg).map(([map, v]) => ({
-      map,
-      games: v.games,
-      wins: v.wins,
-      winrate: v.games ? v.wins / v.games : 0,
-    })),
+    maps: Object.entries(mapAgg)
+      .map(([map, value]) => ({
+        map,
+        games: value.games,
+        wins: value.wins,
+        winrate: value.games ? value.wins / value.games : 0,
+      }))
+      .sort((a, b) => {
+        if (b.games !== a.games) return b.games - a.games;
+        if (b.winrate !== a.winrate) return b.winrate - a.winrate;
+        return a.map.localeCompare(b.map);
+      }),
   };
 }
 
 /* ======================================================
-   CACHED CORE
+   PUBLIC API
 ====================================================== */
 
-const getPlayerMatchAnalyticsByCanonical = _getPlayerMatchAnalyticsByCanonical;
-/* ======================================================
-   PUBLIC API (resolve once, then cached)
-====================================================== */
-
-export async function getPlayerMatchAnalytics(input: string) {
-  if (!input) return null;
+export async function getPlayerMatchAnalytics(
+  input: string
+): Promise<PlayerMatchAnalyticsResponse | null> {
+  if (!input?.trim()) return null;
 
   const canonical = await resolveBattleTagViaSearch(input);
   if (!canonical) return null;
 
-  return getPlayerMatchAnalyticsByCanonical(canonical);
+  return _getPlayerMatchAnalyticsByCanonical(canonical);
 }

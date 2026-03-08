@@ -1,6 +1,78 @@
 // src/lib/w3cUtils.ts
-// Central W3C network + match utilities
-// SINGLE fetch layer (dedup + Next 5-min cache)
+// Central W3C network + URL + match utilities
+
+import {
+  W3C_CURRENT_SEASON,
+  W3C_GATEWAY,
+  W3C_MATCH_CACHE_TTL_MS,
+  W3C_MATCH_DETAIL_CACHE_TTL_MS,
+  W3C_MATCH_PAGE_SIZE,
+  W3C_MAX_MATCH_PAGES_PER_SEASON,
+  W3C_REVALIDATE_SECONDS,
+} from "@/lib/w3cConfig";
+
+/* =====================================================
+   URL BUILDERS
+===================================================== */
+
+const API_BASE = "https://website-backend.w3champions.com/api";
+
+export function buildPlayerProfileUrl(battletag: string) {
+  return `${API_BASE}/players/${encodeURIComponent(battletag)}`;
+}
+
+export function buildPersonalSettingsUrl(battletag: string) {
+  return `${API_BASE}/personal-settings/${encodeURIComponent(battletag)}`;
+}
+
+export function buildLadderLeagueUrl(
+  league: number,
+  gateway = W3C_GATEWAY,
+  gameMode = 1,
+  season = W3C_CURRENT_SEASON
+) {
+  return (
+    `${API_BASE}/ladder/${league}` +
+    `?gateWay=${gateway}` +
+    `&gameMode=${gameMode}` +
+    `&season=${season}`
+  );
+}
+
+export function buildCountryLadderUrl(
+  country: string,
+  gateway = W3C_GATEWAY,
+  gameMode = 1,
+  season = W3C_CURRENT_SEASON
+) {
+  return (
+    `${API_BASE}/ladder/country/${encodeURIComponent(country)}` +
+    `?gateWay=${gateway}` +
+    `&gameMode=${gameMode}` +
+    `&season=${season}`
+  );
+}
+
+export function buildMatchSearchUrl(
+  battletag: string,
+  season = W3C_CURRENT_SEASON,
+  offset = 0,
+  pageSize = W3C_MATCH_PAGE_SIZE,
+  gateway = W3C_GATEWAY
+) {
+  return (
+    `${API_BASE}/matches/search` +
+    `?playerId=${encodeURIComponent(battletag)}` +
+    `&gateway=${gateway}` +
+    `&season=${season}` +
+    `&offset=${offset}` +
+    `&pageSize=${pageSize}`
+  );
+}
+
+export function buildMatchDetailUrl(matchId: string) {
+  return `${API_BASE}/matches/${matchId}`;
+}
 
 /* =====================================================
    FETCH (SINGLE SOURCE OF TRUTH)
@@ -28,7 +100,7 @@ async function fetchWithDedup(
 
   if (!req) {
     req = fetchFn(url, {
-      next: { revalidate: 300 },
+      next: { revalidate: W3C_REVALIDATE_SECONDS },
       ...init,
     });
 
@@ -59,32 +131,23 @@ export async function fetchJson<T = any>(
 }
 
 /* =====================================================
-   CONSTANTS
+   MATCH FETCH (SINGLE MATCH PATH)
 ===================================================== */
-
-const GATEWAY = 20;
-const PAGE_SIZE = 50;
-const MAX_PAGES_PER_SEASON = 2000;
-
-/* =====================================================
-   MATCH FETCH (Parallel + memory cache)
-===================================================== */
-
-const MATCH_CACHE_TTL = 10 * 60 * 1000;
 
 const matchCache = new Map<string, { ts: number; data: any[] }>();
+const matchDetailCache = new Map<string, { ts: number; data: any }>();
 
 function normalizeMatches(payload: any): any[] {
   if (!payload) return [];
   if (Array.isArray(payload)) return payload;
-  if (payload.matches) return payload.matches;
-  if (payload.data?.matches) return payload.data.matches;
+  if (Array.isArray(payload.matches)) return payload.matches;
+  if (Array.isArray(payload.data?.matches)) return payload.data.matches;
   if (payload.match) return [payload.match];
   return [];
 }
 
 async function fetchSeasonMatches(
-  encodedTag: string,
+  canonicalBattleTag: string,
   season: number
 ): Promise<any[]> {
   const all: any[] = [];
@@ -92,46 +155,48 @@ async function fetchSeasonMatches(
   let offset = 0;
   let done = false;
 
-  const BATCH_SIZE = 10;
+  const batchSize = 10;
 
   while (!done) {
-    const promises: Promise<any[]>[] = new Array(BATCH_SIZE);
+    const tasks: Promise<any[]>[] = new Array(batchSize);
 
-    for (let i = 0; i < BATCH_SIZE; i++) {
-      const off = offset + i * PAGE_SIZE;
+    for (let i = 0; i < batchSize; i++) {
+      const off = offset + i * W3C_MATCH_PAGE_SIZE;
 
-      const url =
-        "https://website-backend.w3champions.com/api/matches/search" +
-        `?playerId=${encodedTag}` +
-        `&gateway=${GATEWAY}` +
-        `&season=${season}` +
-        `&offset=${off}` +
-        `&pageSize=${PAGE_SIZE}`;
-
-      promises[i] = fetchJson<any>(url).then(normalizeMatches);
+      tasks[i] = fetchJson<any>(
+        buildMatchSearchUrl(
+          canonicalBattleTag,
+          season,
+          off,
+          W3C_MATCH_PAGE_SIZE,
+          W3C_GATEWAY
+        )
+      ).then(normalizeMatches);
     }
 
-    const results = await Promise.all(promises);
+    const results = await Promise.all(tasks);
 
     for (let i = 0; i < results.length; i++) {
-      const matches = results[i];
+      const rows = results[i];
 
-      if (!matches.length) {
+      if (!rows.length) {
         done = true;
         break;
       }
 
-      all.push(...matches);
+      all.push(...rows);
 
-      if (matches.length < PAGE_SIZE) {
+      if (rows.length < W3C_MATCH_PAGE_SIZE) {
         done = true;
         break;
       }
     }
 
-    offset += BATCH_SIZE * PAGE_SIZE;
+    offset += batchSize * W3C_MATCH_PAGE_SIZE;
 
-    if (offset >= PAGE_SIZE * MAX_PAGES_PER_SEASON) break;
+    if (offset >= W3C_MATCH_PAGE_SIZE * W3C_MAX_MATCH_PAGES_PER_SEASON) {
+      break;
+    }
   }
 
   return all;
@@ -139,24 +204,22 @@ async function fetchSeasonMatches(
 
 export async function fetchAllMatches(
   canonicalBattleTag: string,
-  seasons: number[] = [23]
+  seasons: number[] = [W3C_CURRENT_SEASON]
 ): Promise<any[]> {
   if (!canonicalBattleTag) return [];
 
-  const key =
-    `${canonicalBattleTag.toLowerCase()}-${seasons.join(",")}`;
+  const orderedSeasons = [...seasons].sort((a, b) => a - b);
+  const key = `${canonicalBattleTag.toLowerCase()}|${orderedSeasons.join(",")}`;
 
   const now = Date.now();
   const cached = matchCache.get(key);
 
-  if (cached && now - cached.ts < MATCH_CACHE_TTL) {
+  if (cached && now - cached.ts < W3C_MATCH_CACHE_TTL_MS) {
     return cached.data;
   }
 
-  const encodedTag = encodeURIComponent(canonicalBattleTag);
-
   const seasonResults = await Promise.all(
-    seasons.map((s) => fetchSeasonMatches(encodedTag, s))
+    orderedSeasons.map((season) => fetchSeasonMatches(canonicalBattleTag, season))
   );
 
   const allMatches = seasonResults.flat();
@@ -180,7 +243,6 @@ export function getPlayerAndOpponent(
   if (!match || !Array.isArray(match.teams)) return null;
 
   const lower = canonicalBattleTag.toLowerCase();
-
   const players: any[] = [];
 
   for (let i = 0; i < match.teams.length; i++) {
@@ -213,30 +275,19 @@ export function getPlayerAndOpponent(
    MATCH DETAIL
 ===================================================== */
 
-const MATCH_DETAIL_TTL = 10 * 60 * 1000;
-
-const matchDetailCache = new Map<
-  string,
-  { ts: number; data: any }
->();
-
 export async function fetchMatchDetail(
   matchId: string
 ): Promise<any | null> {
   if (!matchId) return null;
 
   const now = Date.now();
-
   const cached = matchDetailCache.get(matchId);
 
-  if (cached && now - cached.ts < MATCH_DETAIL_TTL) {
+  if (cached && now - cached.ts < W3C_MATCH_DETAIL_CACHE_TTL_MS) {
     return cached.data;
   }
 
-  const url =
-    `https://website-backend.w3champions.com/api/matches/${matchId}`;
-
-  const json = await fetchJson<any>(url);
+  const json = await fetchJson<any>(buildMatchDetailUrl(matchId));
 
   if (json) {
     matchDetailCache.set(matchId, {

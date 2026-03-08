@@ -139,7 +139,6 @@ export default async function VsPlayerPage({ params }: PageProps) {
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto text-xs md:text-sm px-3 md:px-0">
-
       <PlayerHeader
         battletag={canonicalBt}
         subtitle="Performance Stats (All Races) · Season 24"
@@ -148,7 +147,7 @@ export default async function VsPlayerPage({ params }: PageProps) {
       <Section title="Overview">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
-            label="Overall (Season 23)"
+            label="Overall (Season 24)"
             value={pct(overall.winrate)}
             sub={`${overall.wins}-${overall.losses} · ${overall.games}`}
           />
@@ -185,7 +184,6 @@ export default async function VsPlayerPage({ params }: PageProps) {
       <Section title="Extreme Gap (Favored)">
         <Table rows={favoredLarge} colorFn={colorFavoredExtreme} />
       </Section>
-
     </div>
   );
 }

@@ -1,16 +1,19 @@
+// src/services/playerRaceLadder.ts
+
 import { unstable_cache } from "next/cache";
 
 import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
 
 import {
-  fetchAllLeagues,
   buildInputs,
   buildPaged,
   computeSoS,
-} from "./ladderCore";
+  fetchAllLeagues,
+} from "@/services/ladderCore";
 
 import {
   buildLadder,
+  type LadderInputRow,
   type LadderRow,
 } from "@/lib/ladderEngine";
 
@@ -57,50 +60,75 @@ async function _getPlayerRaceLadder(
   page = 1,
   pageSize = 50
 ): Promise<PlayerRaceLadderResponse | null> {
-
   const battletag = inputBattleTag
     ? await resolveBattleTagViaSearch(inputBattleTag)
     : null;
 
   const battletagLower = battletag?.toLowerCase();
-
   const raceId = RACE_ID[race];
 
   const allRows = await fetchAllLeagues();
 
-  const raceRows = [];
-  for (const r of allRows) {
-    if (r.race === raceId) raceRows.push(r);
+  const raceRows: any[] = [];
+  for (let i = 0; i < allRows.length; i++) {
+    const row = allRows[i];
+    if (row.race === raceId) raceRows.push(row);
   }
 
   const inputs = buildInputs(raceRows);
+  const baseline = buildLadder(inputs);
 
-  /* compute SoS BEFORE ranking */
-  await computeSoS(inputs, raceId);
+  const { visible, top } = buildPaged(baseline, page, pageSize);
 
-  /* build ladder after SoS exists */
-  const ladder = buildLadder(inputs);
+  const pageInputs: LadderInputRow[] = new Array(visible.length);
 
-  /* paginate ladder */
-  const { visible, top } = buildPaged(
-    ladder,
-    page,
-    pageSize
-  );
+  for (let i = 0; i < visible.length; i++) {
+    const row = visible[i];
 
-  const me = battletagLower
-    ? ladder.find(
-        (r) => r.battletag.toLowerCase() === battletagLower
-      ) ?? null
-    : null;
+    pageInputs[i] = {
+      battletag: row.battletag,
+      mmr: row.mmr,
+      wins: row.wins,
+      games: row.games,
+      sos: null,
+    };
+  }
+
+  await computeSoS(pageInputs, raceId);
+
+  const updatedVisible = buildLadder(pageInputs);
+
+  let me: LadderRow | null = null;
+
+  if (battletagLower) {
+    for (let i = 0; i < updatedVisible.length; i++) {
+      const row = updatedVisible[i];
+
+      if (row.battletag.toLowerCase() === battletagLower) {
+        me = row;
+        break;
+      }
+    }
+
+    if (!me) {
+      for (let i = 0; i < baseline.length; i++) {
+        const row = baseline[i];
+
+        if (row.battletag.toLowerCase() === battletagLower) {
+          me = row;
+          break;
+        }
+      }
+    }
+  }
 
   return {
     battletag: battletag ?? "",
     race,
     me,
     top,
-    poolSize: ladder.length,
-    full: visible,
+    poolSize: baseline.length,
+    full: updatedVisible,
     updatedAtUtc: new Date().toISOString(),
   };
 }
@@ -115,14 +143,8 @@ const _getPlayerRaceLadderCached = unstable_cache(
     race: RaceKey,
     page?: number,
     pageSize?: number
-  ) =>
-    _getPlayerRaceLadder(
-      inputBattleTag,
-      race,
-      page,
-      pageSize
-    ),
-  ["w3c-player-race-ladder-v1"],
+  ) => _getPlayerRaceLadder(inputBattleTag, race, page, pageSize),
+  ["w3c-player-race-ladder-v2"],
   { revalidate: 300 }
 );
 

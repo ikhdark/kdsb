@@ -8,7 +8,11 @@ type PageProps = {
   params: Promise<{ battletag: string }>;
 };
 
-function Rows({ rows }: { rows: { label: string; wins: number; losses: number; winrate: number }[] }) {
+function Rows({
+  rows,
+}: {
+  rows: { label: string; wins: number; losses: number; winrate: number }[];
+}) {
   return (
     <>
       {rows.map((row) => (
@@ -36,10 +40,9 @@ export default async function HeroesPage({ params }: PageProps) {
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto text-xs md:text-sm px-3 md:px-0">
-
       <PlayerHeader
         battletag={data.battletag}
-        subtitle="Hero Stats (All races) · Season 24 (Games under 120 seconds excluded)"
+        subtitle="Hero Stats (All races) · Season 24"
       />
 
       <Section title="W/L by Hero Count">
@@ -65,7 +68,6 @@ export default async function HeroesPage({ params }: PageProps) {
       <Section title="Worst Winrates vs Opponent Heroes Any Stage Of The Game (Min 5 games)">
         <Rows rows={data.worstOverall} />
       </Section>
-
     </div>
   );
 }

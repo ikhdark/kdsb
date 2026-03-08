@@ -1,16 +1,18 @@
+// src/services/playerLadder.ts
+
 import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
 
 import {
-  fetchAllLeagues,
   buildInputs,
   buildPaged,
   computeSoS,
-} from "./ladderCore";
+  fetchAllLeagues,
+} from "@/services/ladderCore";
 
 import {
   buildLadder,
-  type LadderRow,
   type LadderInputRow,
+  type LadderRow,
 } from "@/lib/ladderEngine";
 
 /* =========================
@@ -35,7 +37,6 @@ async function _getPlayerLadder(
   page = 1,
   pageSize = 50
 ): Promise<PlayerLadderResponse | null> {
-
   const battletag = inputBattleTag
     ? await resolveBattleTagViaSearch(inputBattleTag)
     : null;
@@ -45,50 +46,47 @@ async function _getPlayerLadder(
   const rows = await fetchAllLeagues();
   const inputs = buildInputs(rows);
 
-  /* baseline ladder (MMR only) */
-
-  const ladder = buildLadder(inputs);
-
-  const { visible, top } = buildPaged(
-    ladder,
-    page,
-    pageSize
-  );
-
-  /* compute SoS only for visible players */
-
-  await computeSoS(visible);
-
-  /* rebuild visible rows with SoS */
+  const baseline = buildLadder(inputs);
+  const { visible, top } = buildPaged(baseline, page, pageSize);
 
   const pageInputs: LadderInputRow[] = new Array(visible.length);
 
   for (let i = 0; i < visible.length; i++) {
-
-    const p = visible[i];
+    const row = visible[i];
 
     pageInputs[i] = {
-      battletag: p.battletag,
-      mmr: p.mmr,
-      wins: p.wins,
-      games: p.games,
-      sos: p.sos,
+      battletag: row.battletag,
+      mmr: row.mmr,
+      wins: row.wins,
+      games: row.games,
+      sos: null,
     };
   }
+
+  await computeSoS(pageInputs);
 
   const updatedVisible = buildLadder(pageInputs);
 
   let me: LadderRow | null = null;
 
   if (battletagLower) {
+    for (let i = 0; i < updatedVisible.length; i++) {
+      const row = updatedVisible[i];
 
-    for (let i = 0; i < ladder.length; i++) {
-
-      const r = ladder[i];
-
-      if (r.battletag.toLowerCase() === battletagLower) {
-        me = r;
+      if (row.battletag.toLowerCase() === battletagLower) {
+        me = row;
         break;
+      }
+    }
+
+    if (!me) {
+      for (let i = 0; i < baseline.length; i++) {
+        const row = baseline[i];
+
+        if (row.battletag.toLowerCase() === battletagLower) {
+          me = row;
+          break;
+        }
       }
     }
   }
@@ -97,7 +95,7 @@ async function _getPlayerLadder(
     battletag: battletag ?? "",
     me,
     top,
-    poolSize: ladder.length,
+    poolSize: baseline.length,
     full: updatedVisible,
     updatedAtUtc: new Date().toISOString(),
   };
@@ -112,9 +110,5 @@ export async function getPlayerLadder(
   page = 1,
   pageSize = 50
 ) {
-  return _getPlayerLadder(
-    inputBattleTag,
-    page,
-    pageSize
-  );
+  return _getPlayerLadder(inputBattleTag, page, pageSize);
 }

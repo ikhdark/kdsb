@@ -3,51 +3,55 @@
 import { unstable_cache } from "next/cache";
 
 import {
-  getPlayerAndOpponent,
-  fetchJson,
-} from "@/lib/w3cUtils";
-
-import { getMatchesCached } from "@/services/matchCache";
+  buildLadder,
+  type LadderInputRow,
+  type LadderRow,
+} from "@/lib/ladderEngine";
 
 import { flattenCountryLadder } from "@/lib/ranking";
+import {
+  buildLadderLeagueUrl,
+  fetchJson,
+  getPlayerAndOpponent,
+} from "@/lib/w3cUtils";
 
 import {
-  type LadderRow,
-  type LadderInputRow,
-} from "@/lib/ladderEngine";
+  W3C_CURRENT_SEASON,
+  W3C_GATEWAY,
+  W3C_GAME_MODE_1V1,
+  W3C_MIN_DURATION_SECONDS,
+  W3C_MIN_GAMES,
+  W3C_REVALIDATE_SECONDS,
+} from "@/lib/w3cConfig";
+
+import { getMatchesCached } from "@/services/matchCache";
 
 /* =====================================================
    CONFIG
 ===================================================== */
 
-const SEASON = 24;
-const GAME_MODE = 1;
-const GATEWAY = 20;
+const SEASON = W3C_CURRENT_SEASON;
+const GAME_MODE = W3C_GAME_MODE_1V1;
+const GATEWAY = W3C_GATEWAY;
 
-const MIN_GAMES = 5;
+const MIN_GAMES = W3C_MIN_GAMES;
 const MIN_LEAGUE = 0;
 const MAX_LEAGUE = 50;
 
 const SOS_CONCURRENCY = 25;
+const SOS_DIFF_SCALE = 300;
 
 /* =====================================================
    FETCH ALL LEAGUES (UNCACHED CORE)
 ===================================================== */
 
 async function _fetchAllLeagues() {
-
-  const requests = new Array(MAX_LEAGUE - MIN_LEAGUE + 1);
+  const requests: Promise<any[]>[] = new Array(MAX_LEAGUE - MIN_LEAGUE + 1);
 
   for (let league = MIN_LEAGUE; league <= MAX_LEAGUE; league++) {
-
-    const url =
-      `https://website-backend.w3champions.com/api/ladder/${league}` +
-      `?gateWay=${GATEWAY}` +
-      `&gameMode=${GAME_MODE}` +
-      `&season=${SEASON}`;
-
-    requests[league] =
-      fetchJson<any[]>(url).then((r) => r ?? []);
+    requests[league - MIN_LEAGUE] = fetchJson<any[]>(
+      buildLadderLeagueUrl(league, GATEWAY, GAME_MODE, SEASON)
+    ).then((rows) => rows ?? []);
   }
 
   const results = await Promise.all(requests);
@@ -62,7 +66,7 @@ async function _fetchAllLeagues() {
 export const fetchAllLeagues = unstable_cache(
   async () => _fetchAllLeagues(),
   ["w3c-all-leagues"],
-  { revalidate: 300 }
+  { revalidate: W3C_REVALIDATE_SECONDS }
 );
 
 /* =====================================================
@@ -70,35 +74,33 @@ export const fetchAllLeagues = unstable_cache(
 ===================================================== */
 
 export function buildInputs(rows: any[]): LadderInputRow[] {
-
   const best = new Map<string, any>();
 
   for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const key = row?.battleTagLower;
 
-    const r = rows[i];
-    const key = r.battleTagLower;
-
-    if (!key) continue;
+    if (!key || !row?.battleTag) continue;
 
     const prev = best.get(key);
 
-    if (!prev || r.mmr > prev.mmr) {
-      best.set(key, r);
+    if (!prev || (row.mmr ?? 0) > (prev.mmr ?? 0)) {
+      best.set(key, row);
     }
   }
 
   const inputs: LadderInputRow[] = [];
 
-  for (const r of best.values()) {
-
-    if ((r.games ?? 0) < MIN_GAMES) continue;
-    if ((r.mmr ?? 0) <= 0) continue;
+  for (const row of best.values()) {
+    if ((row.games ?? 0) < MIN_GAMES) continue;
+    if ((row.mmr ?? 0) <= 0) continue;
+    if (!row.battleTag) continue;
 
     inputs.push({
-      battletag: r.battleTag,
-      mmr: r.mmr,
-      wins: r.wins,
-      games: r.games,
+      battletag: row.battleTag,
+      mmr: row.mmr,
+      wins: row.wins,
+      games: row.games,
       sos: null,
     });
   }
@@ -110,8 +112,6 @@ export function buildInputs(rows: any[]): LadderInputRow[] {
    SoS ENGINE
 ===================================================== */
 
-const SOS_DIFF_SCALE = 300;
-
 function weightByDiffAbs(diffAbs: number) {
   return 1 / (1 + diffAbs / SOS_DIFF_SCALE);
 }
@@ -120,66 +120,57 @@ export async function computeSoS(
   rows: LadderInputRow[],
   raceId?: number
 ) {
-
   for (let i = 0; i < rows.length; i += SOS_CONCURRENCY) {
-
     const end = Math.min(i + SOS_CONCURRENCY, rows.length);
-
     const tasks = new Array(end - i);
 
     for (let j = i; j < end; j++) {
-
       const row = rows[j];
 
       tasks[j - i] = (async () => {
-
-        const matches =
-          await getMatchesCached(row.battletag, [SEASON]);
+        const matches = await getMatchesCached(row.battletag, [SEASON]);
 
         let weightedSum = 0;
         let weightSum = 0;
 
         for (let k = 0; k < matches.length; k++) {
-
-          const m = matches[k];
+          const match = matches[k];
 
           if (
-            m.gameMode !== GAME_MODE ||
-            m.durationInSeconds < 120
-          ) continue;
+            match?.gameMode !== GAME_MODE ||
+            match?.durationInSeconds < W3C_MIN_DURATION_SECONDS
+          ) {
+            continue;
+          }
 
-          const pair = getPlayerAndOpponent(m, row.battletag);
+          const pair = getPlayerAndOpponent(match, row.battletag);
           if (!pair) continue;
 
-          if (raceId && raceId !== 0 && pair.me.race !== raceId)
+          if (raceId && raceId !== 0 && pair.me?.race !== raceId) {
             continue;
+          }
 
           const oppRaw =
-            pair.opp.oldMmr ??
-            pair.opp.newMmr ??
-            pair.opp.mmr ??
-            (pair.opp as any).oldMmrValue ??
-            (pair.opp as any).rating ??
-            (pair.opp as any).mmrValue;
+            pair.opp?.oldMmr ??
+            pair.opp?.newMmr ??
+            pair.opp?.mmr ??
+            (pair.opp as any)?.oldMmrValue ??
+            (pair.opp as any)?.rating ??
+            (pair.opp as any)?.mmrValue;
 
-          const opp =
-            typeof oppRaw === "string"
-              ? Number(oppRaw)
-              : oppRaw;
+          const oppMmr =
+            typeof oppRaw === "string" ? Number(oppRaw) : oppRaw;
 
-          if (!Number.isFinite(opp)) continue;
+          if (!Number.isFinite(oppMmr)) continue;
 
-          const diff = opp - row.mmr;
+          const diff = oppMmr - row.mmr;
+          const weight = weightByDiffAbs(Math.abs(diff));
 
-          const w = weightByDiffAbs(Math.abs(diff));
-
-          weightedSum += diff * w;
-          weightSum += w;
+          weightedSum += diff * weight;
+          weightSum += weight;
         }
 
-        row.sos =
-          weightSum ? weightedSum / weightSum : null;
-
+        row.sos = weightSum ? weightedSum / weightSum : null;
       })();
     }
 
@@ -196,12 +187,13 @@ export function buildPaged(
   page: number,
   pageSize: number
 ) {
-
-  const start = (page - 1) * pageSize;
+  const safePage = Math.max(1, Math.trunc(page || 1));
+  const safePageSize = Math.max(1, Math.trunc(pageSize || 50));
+  const start = (safePage - 1) * safePageSize;
 
   return {
     ladder,
-    visible: ladder.slice(start, start + pageSize),
-    top: ladder.slice(0, pageSize),
+    visible: ladder.slice(start, start + safePageSize),
+    top: ladder.slice(0, safePageSize),
   };
 }

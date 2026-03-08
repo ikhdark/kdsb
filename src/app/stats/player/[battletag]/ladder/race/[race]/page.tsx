@@ -48,21 +48,30 @@ export default async function RaceLadderPage({
 
   const rawPage = Math.max(1, Number(page) || 1);
 
-  const data = await getPlayerRaceLadder(
+  const initial = await getPlayerRaceLadder(
     tag,
     race,
     rawPage,
     PAGE_SIZE
   );
 
+  if (!initial) {
+    return <EmptyState message="No ladder data available yet" />;
+  }
+
+  const totalPages = Math.max(1, Math.ceil(initial.poolSize / PAGE_SIZE));
+  const currentPage = Math.min(rawPage, totalPages);
+
+  const data =
+    currentPage === rawPage
+      ? initial
+      : await getPlayerRaceLadder(tag, race, currentPage, PAGE_SIZE);
+
   if (!data?.full?.length) {
     return <EmptyState message="No ladder data available yet" />;
   }
 
-  const { battletag: canonicalBt, full: rows, poolSize } = data;
-
-  const totalPages = Math.max(1, Math.ceil(poolSize / PAGE_SIZE));
-  const currentPage = Math.min(rawPage, totalPages);
+  const { battletag: canonicalBt, poolSize } = data;
 
   const base = `/stats/player/${encodeURIComponent(
     canonicalBt
@@ -73,10 +82,10 @@ export default async function RaceLadderPage({
       title={canonicalBt}
       subtitle={`${raceLabel(race)} Ladder · Season 24 · ${poolSize.toLocaleString()} players`}
       base={base}
-      rows={data.full.map(r => ({
-  ...r,
-  sos: r.sos ?? 0,
-}))}
+      rows={data.full.map((r) => ({
+        ...r,
+        sos: r.sos ?? 0,
+      }))}
       poolSize={poolSize}
       currentPage={currentPage}
       totalPages={totalPages}

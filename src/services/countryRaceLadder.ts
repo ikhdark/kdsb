@@ -1,16 +1,27 @@
 // src/services/countryRaceLadder.ts
 
 import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
-import { buildInputs, buildPaged, computeSoS } from "./ladderCore";
-import { fetchCountryLadder } from "@/services/w3cApi";
 import { flattenCountryLadder } from "@/lib/ranking";
 import { COUNTRY_OVERRIDE } from "@/lib/countryOverrides";
 
+import { fetchCountryLadder } from "@/services/w3cApi";
+import {
+  buildInputs,
+  buildPaged,
+  computeSoS,
+} from "@/services/ladderCore";
+
 import {
   buildLadder,
-  type LadderRow,
   type LadderInputRow,
+  type LadderRow,
 } from "@/lib/ladderEngine";
+
+import {
+  W3C_CURRENT_SEASON,
+  W3C_GATEWAY,
+  W3C_GAME_MODE_1V1,
+} from "@/lib/w3cConfig";
 
 /* =====================================================
    TYPES
@@ -40,15 +51,15 @@ const RACE_ID: Record<RaceKey, number> = {
   random: 0,
 };
 
-const SEASON = 24;
-const GATEWAY = 20;
-const GAMEMODE = 1;
+const SEASON = W3C_CURRENT_SEASON;
+const GATEWAY = W3C_GATEWAY;
+const GAMEMODE = W3C_GAME_MODE_1V1;
 
 /* =====================================================
    HELPERS
 ===================================================== */
 
-const getBT = (r: any) => r?.battleTag ?? r?.battletag ?? "";
+const getBT = (row: any) => row?.battleTag ?? row?.battletag ?? "";
 
 function empty(country: string, race: RaceKey): CountryRaceLadderResponse {
   return {
@@ -78,7 +89,6 @@ export async function getCountryRaceLadder(
     : null;
 
   const canonicalLower = canonicalTag?.toLowerCase();
-
   const raceId = RACE_ID[race];
   const countryUpper = country.toUpperCase();
 
@@ -91,65 +101,68 @@ export async function getCountryRaceLadder(
 
   if (!payload) return null;
 
-  const rows = flattenCountryLadder(payload ?? []);
+  const rows = flattenCountryLadder(payload);
   const byTag = new Map<string, any>();
 
   for (let i = 0; i < rows.length; i++) {
-    const r = rows[i];
+    const row = rows[i];
 
-    if (r.race !== raceId) continue;
+    if (row.race !== raceId) continue;
 
-    const bt = getBT(r);
+    const bt = getBT(row);
     if (!bt) continue;
 
     const override = COUNTRY_OVERRIDE[bt];
-    if (override && override.from.toUpperCase() === countryUpper) continue;
+    if (override && override.from.toUpperCase() === countryUpper) {
+      continue;
+    }
 
-    byTag.set(bt, r);
+    byTag.set(bt, row);
   }
 
   const injectTargets = Object.entries(COUNTRY_OVERRIDE).filter(
-    ([, o]) => o.to.toUpperCase() === countryUpper
+    ([, override]) => override.to.toUpperCase() === countryUpper
   );
 
   if (injectTargets.length) {
     const byFrom = new Map<string, string[]>();
 
     for (let i = 0; i < injectTargets.length; i++) {
-      const [bt, o] = injectTargets[i];
-      const from = o.from.toUpperCase();
+      const [bt, override] = injectTargets[i];
+      const from = override.from.toUpperCase();
 
-      let arr = byFrom.get(from);
-      if (!arr) {
-        arr = [];
-        byFrom.set(from, arr);
+      let list = byFrom.get(from);
+      if (!list) {
+        list = [];
+        byFrom.set(from, list);
       }
 
-      arr.push(bt);
+      list.push(bt);
     }
 
     const fromCountries = [...byFrom.keys()];
     const fromResults = await Promise.all(
-      fromCountries.map((c) =>
-        fetchCountryLadder(c, GATEWAY, GAMEMODE, SEASON)
+      fromCountries.map((fromCountry) =>
+        fetchCountryLadder(fromCountry, GATEWAY, GAMEMODE, SEASON)
       )
     );
 
     for (let idx = 0; idx < fromCountries.length; idx++) {
       const battletags = byFrom.get(fromCountries[idx]) ?? [];
       const fromPayload = fromResults[idx];
+
       if (!fromPayload) continue;
 
       const fromRows = flattenCountryLadder(fromPayload);
       const lookup = new Map<string, any>();
 
       for (let i = 0; i < fromRows.length; i++) {
-        const r = fromRows[i];
+        const row = fromRows[i];
 
-        if (r.race !== raceId) continue;
+        if (row.race !== raceId) continue;
 
-        const bt = getBT(r);
-        if (bt) lookup.set(bt, r);
+        const bt = getBT(row);
+        if (bt) lookup.set(bt, row);
       }
 
       for (let i = 0; i < battletags.length; i++) {
@@ -171,13 +184,13 @@ export async function getCountryRaceLadder(
   const pageInputs: LadderInputRow[] = new Array(visible.length);
 
   for (let i = 0; i < visible.length; i++) {
-    const p = visible[i];
+    const row = visible[i];
 
     pageInputs[i] = {
-      battletag: p.battletag,
-      mmr: p.mmr,
-      wins: p.wins,
-      games: p.games,
+      battletag: row.battletag,
+      mmr: row.mmr,
+      wins: row.wins,
+      games: row.games,
       sos: null,
     };
   }
@@ -190,20 +203,20 @@ export async function getCountryRaceLadder(
 
   if (canonicalLower) {
     for (let i = 0; i < updatedVisible.length; i++) {
-      const r = updatedVisible[i];
+      const row = updatedVisible[i];
 
-      if (r.battletag.toLowerCase() === canonicalLower) {
-        me = r;
+      if (row.battletag.toLowerCase() === canonicalLower) {
+        me = row;
         break;
       }
     }
 
     if (!me) {
       for (let i = 0; i < baseline.length; i++) {
-        const r = baseline[i];
+        const row = baseline[i];
 
-        if (r.battletag.toLowerCase() === canonicalLower) {
-          me = r;
+        if (row.battletag.toLowerCase() === canonicalLower) {
+          me = row;
           break;
         }
       }

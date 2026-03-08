@@ -1,10 +1,7 @@
 // src/services/vsCountry.ts
 
-import { unstable_cache } from "next/cache";
-
-import { fetchPlayerProfile } from "./w3cApi";
-import { fetchAllMatches } from "../lib/w3cUtils";
-import { resolveBattleTagViaSearch } from "../lib/w3cBattleTagResolver";
+import { fetchPlayerProfile } from "@/services/w3cApi";
+import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
 
 import {
   iso2,
@@ -14,11 +11,17 @@ import {
 } from "@/lib/countryIso";
 
 import { raceLabel } from "@/lib/w3cRaces";
+import { getMatchesCached } from "@/services/matchCache";
+
+import {
+  W3C_CURRENT_SEASON,
+  W3C_MIN_DURATION_SECONDS,
+} from "@/lib/w3cConfig";
 
 /* -------------------- CONSTANTS -------------------- */
 
-const MIN_DURATION_SECONDS = 120;
-const SEASONS = [24];
+const MIN_DURATION_SECONDS = W3C_MIN_DURATION_SECONDS;
+const SEASONS = [W3C_CURRENT_SEASON] as const;
 
 /* -------------------- TYPES -------------------- */
 
@@ -69,11 +72,11 @@ export type W3CCountryStatsResponse = {
 
 /* -------------------- HELPERS -------------------- */
 
-function safeDecode(s: string): string {
+function safeDecode(value: string): string {
   try {
-    return decodeURIComponent(s);
+    return decodeURIComponent(value);
   } catch {
-    return s;
+    return value;
   }
 }
 
@@ -92,49 +95,47 @@ function pickOpponent1v1(
   if (!Array.isArray(match?.teams)) return null;
 
   const players: any[] = [];
-  for (const t of match.teams) {
-    if (Array.isArray(t?.players)) {
-      for (const p of t.players) players.push(p);
+
+  for (let i = 0; i < match.teams.length; i++) {
+    const team = match.teams[i];
+
+    if (Array.isArray(team?.players)) {
+      for (let j = 0; j < team.players.length; j++) {
+        players.push(team.players[j]);
+      }
     }
   }
 
   if (players.length !== 2) return null;
 
   const self = players.find(
-    (p) => normalizeBT(p?.battleTag) === selfLower
+    (player) => normalizeBT(player?.battleTag) === selfLower
   );
   if (!self) return null;
 
-  const opp = players.find((p) => p !== self);
+  const opp = players.find((player) => player !== self);
   if (!opp) return null;
 
   return { self, opp };
 }
 
-/* -------------------- CORE (UNCACHED) -------------------- */
+/* -------------------- CORE -------------------- */
 
-async function _getW3CCountryStats(
-  inputBattletag: string
+async function _getW3CCountryStatsByCanonical(
+  canonicalTag: string
 ): Promise<W3CCountryStatsResponse | null> {
-  const raw = safeDecode(String(inputBattletag ?? "")).trim();
-  if (!raw) return null;
-
-  const canonicalTag =
-    (await resolveBattleTagViaSearch(raw)) || raw;
-
   const profile = await fetchPlayerProfile(canonicalTag);
   const targetLower = canonicalTag.toLowerCase();
 
   let homeCountry = resolveCountryFromProfile(profile);
+  const matches = await getMatchesCached(canonicalTag, SEASONS);
 
-  const matches = await fetchAllMatches(canonicalTag, SEASONS);
-
-  // Fallback: infer home country from match rows
   if (!homeCountry) {
     const counts = new Map<string, number>();
 
-    for (const m of matches) {
-      const pair = pickOpponent1v1(m, targetLower);
+    for (let i = 0; i < matches.length; i++) {
+      const match = matches[i];
+      const pair = pickOpponent1v1(match, targetLower);
       if (!pair) continue;
 
       const cc =
@@ -147,8 +148,7 @@ async function _getW3CCountryStats(
     }
 
     if (counts.size) {
-      homeCountry = [...counts.entries()]
-        .sort((a, b) => b[1] - a[1])[0][0];
+      homeCountry = [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
     }
   }
 
@@ -157,12 +157,13 @@ async function _getW3CCountryStats(
   const countryStats = new Map<string, CountryAgg>();
   let totalTimeSec = 0;
 
-  for (const m of matches) {
-    const dur = Number(m?.durationInSeconds);
-    if (!Number.isFinite(dur) || dur < MIN_DURATION_SECONDS)
-      continue;
+  for (let i = 0; i < matches.length; i++) {
+    const match = matches[i];
 
-    const pair = pickOpponent1v1(m, targetLower);
+    const dur = Number(match?.durationInSeconds);
+    if (!Number.isFinite(dur) || dur < MIN_DURATION_SECONDS) continue;
+
+    const pair = pickOpponent1v1(match, targetLower);
     if (!pair) continue;
 
     const { self, opp } = pair;
@@ -178,50 +179,53 @@ async function _getW3CCountryStats(
     const selfOld = Number(self?.oldMmr);
     const oppOld = Number(opp?.oldMmr);
 
-    let cs = countryStats.get(oppCC);
-    if (!cs) {
-      cs = {
+    let agg = countryStats.get(oppCC);
+
+    if (!agg) {
+      agg = {
         games: 0,
         wins: 0,
         losses: 0,
-        oppSet: new Set(),
-        race: new Map(),
+        oppSet: new Set<string>(),
+        race: new Map<number, CountryRaceRow>(),
         mmr: { sumOpp: 0, sumSelf: 0, n: 0 },
         time: { sum: 0, n: 0 },
       };
-      countryStats.set(oppCC, cs);
+
+      countryStats.set(oppCC, agg);
     }
 
-    cs.games++;
-    won ? cs.wins++ : cs.losses++;
+    agg.games++;
+    if (won) agg.wins++;
+    else agg.losses++;
 
-    if (opp?.battleTag)
-      cs.oppSet.add(normalizeBT(opp.battleTag));
+    if (opp?.battleTag) {
+      agg.oppSet.add(normalizeBT(opp.battleTag));
+    }
 
     if (Number.isFinite(raceId)) {
-      const r =
-        cs.race.get(raceId) ?? {
+      const raceAgg =
+        agg.race.get(raceId) ?? {
           games: 0,
           wins: 0,
           losses: 0,
         };
 
-      r.games++;
-      won ? r.wins++ : r.losses++;
-      cs.race.set(raceId, r);
+      raceAgg.games++;
+      if (won) raceAgg.wins++;
+      else raceAgg.losses++;
+
+      agg.race.set(raceId, raceAgg);
     }
 
-    if (
-      Number.isFinite(selfOld) &&
-      Number.isFinite(oppOld)
-    ) {
-      cs.mmr.sumOpp += oppOld;
-      cs.mmr.sumSelf += selfOld;
-      cs.mmr.n++;
+    if (Number.isFinite(selfOld) && Number.isFinite(oppOld)) {
+      agg.mmr.sumOpp += oppOld;
+      agg.mmr.sumSelf += selfOld;
+      agg.mmr.n++;
     }
 
-    cs.time.sum += dur;
-    cs.time.n++;
+    agg.time.sum += dur;
+    agg.time.n++;
     totalTimeSec += dur;
   }
 
@@ -234,58 +238,52 @@ async function _getW3CCountryStats(
     };
   }
 
-  const rows = [...countryStats.entries()].map(
-    ([cc, cs]) => ({
+  const countries = [...countryStats.entries()]
+    .map(([cc, agg]) => ({
       country: cc,
       label: countryLabel(cc),
-      games: cs.games,
-      wins: cs.wins,
-      losses: cs.losses,
-      winRate: safeDiv(cs.wins, cs.games),
-      uniqueOpponents: cs.oppSet.size,
-      avgGamesPerOpponent: safeDiv(
-        cs.games,
-        cs.oppSet.size
-      ),
-      avgOpponentMMR: cs.mmr.n
-        ? cs.mmr.sumOpp / cs.mmr.n
-        : null,
-      avgSelfMMR: cs.mmr.n
-        ? cs.mmr.sumSelf / cs.mmr.n
-        : null,
-      timePlayedSeconds: cs.time.sum,
-      timeShare: totalTimeSec
-        ? cs.time.sum / totalTimeSec
-        : 0,
-      avgGameSeconds: cs.time.n
-        ? cs.time.sum / cs.time.n
-        : null,
-      races: [...cs.race.entries()].map(
-        ([id, r]) => ({
+      games: agg.games,
+      wins: agg.wins,
+      losses: agg.losses,
+      winRate: safeDiv(agg.wins, agg.games),
+      uniqueOpponents: agg.oppSet.size,
+      avgGamesPerOpponent: safeDiv(agg.games, agg.oppSet.size),
+      avgOpponentMMR: agg.mmr.n ? agg.mmr.sumOpp / agg.mmr.n : null,
+      avgSelfMMR: agg.mmr.n ? agg.mmr.sumSelf / agg.mmr.n : null,
+      timePlayedSeconds: agg.time.sum,
+      timeShare: totalTimeSec ? agg.time.sum / totalTimeSec : 0,
+      avgGameSeconds: agg.time.n ? agg.time.sum / agg.time.n : null,
+      races: [...agg.race.entries()]
+        .map(([id, raceAgg]) => ({
           raceId: id,
           race: raceLabel(id),
-          games: r.games,
-          wins: r.wins,
-          losses: r.losses,
-          winRate: safeDiv(r.wins, r.games),
-        })
-      ),
-    })
-  );
+          games: raceAgg.games,
+          wins: raceAgg.wins,
+          losses: raceAgg.losses,
+          winRate: safeDiv(raceAgg.wins, raceAgg.games),
+        }))
+        .sort((a, b) => b.games - a.games),
+    }))
+    .sort((a, b) => b.games - a.games);
 
   return {
     battletag: canonicalTag,
     homeCountry,
     homeCountryLabel: countryLabel(homeCountry),
-    countries: rows.sort((a, b) => b.games - a.games),
+    countries,
   };
 }
 
-/* -------------------- CACHED EXPORT -------------------- */
+/* -------------------- PUBLIC -------------------- */
 
-export const getW3CCountryStats = unstable_cache(
-  async (inputBattletag: string) =>
-    _getW3CCountryStats(inputBattletag),
-  ["w3c-country-stats"],
-  { revalidate: 300 }
-);
+export async function getW3CCountryStats(
+  inputBattletag: string
+): Promise<W3CCountryStatsResponse | null> {
+  const raw = safeDecode(String(inputBattletag ?? "")).trim();
+  if (!raw) return null;
+
+  const canonicalTag =
+    (await resolveBattleTagViaSearch(raw)) || raw;
+
+  return _getW3CCountryStatsByCanonical(canonicalTag);
+}

@@ -2,40 +2,38 @@
 
 import { unstable_cache } from "next/cache";
 
-import { fetchJson } from "@/lib/w3cUtils";
 import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
+import { fetchJson, buildMatchSearchUrl } from "@/lib/w3cUtils";
+import {
+  W3C_CURRENT_SEASON,
+  W3C_GATEWAY,
+  W3C_MATCH_PAGE_SIZE,
+} from "@/lib/w3cConfig";
 
 /* -------------------- CONSTANTS -------------------- */
 
-const SEASON = 24;
-const GATEWAY = 20;
-const PAGE_SIZE = 50;
+const SEASON = W3C_CURRENT_SEASON;
+const GATEWAY = W3C_GATEWAY;
+const PAGE_SIZE = W3C_MATCH_PAGE_SIZE;
 
 /* -------------------- CORE (UNCACHED) -------------------- */
 
 async function _fetchMatchHistory(inputBattletag: string) {
-
   const canonical =
     (await resolveBattleTagViaSearch(inputBattletag)) ||
     inputBattletag;
 
-  const url =
-    `https://website-backend.w3champions.com/api/matches/search` +
-    `?playerId=${encodeURIComponent(canonical)}` +
-    `&gateway=${GATEWAY}` +
-    `&offset=0&pageSize=${PAGE_SIZE}` +
-    `&season=${SEASON}`;
+  const json = await fetchJson<any>(
+    buildMatchSearchUrl(canonical, SEASON, 0, PAGE_SIZE, GATEWAY)
+  );
 
-  const json = await fetchJson<any>(url);
   if (!json?.matches) return [];
 
   const out: any[] = [];
 
   for (let i = 0; i < json.matches.length; i++) {
-
-    const m = extractMatch(json.matches[i], canonical);
-
-    if (m) out.push(m);
+    const match = extractMatch(json.matches[i], canonical);
+    if (match) out.push(match);
   }
 
   return out;
@@ -52,22 +50,19 @@ export const fetchMatchHistory = unstable_cache(
 /* -------------------- EXTRACTOR -------------------- */
 
 function extractMatch(match: any, battletag: string) {
-
   const tagLower = battletag.toLowerCase();
 
-  const teams = match.teams;
+  const teams = match?.teams;
   if (!Array.isArray(teams)) return null;
 
   let me: any = null;
   let opponent: any = null;
 
   for (let i = 0; i < teams.length; i++) {
-
     const players = teams[i]?.players;
     if (!Array.isArray(players)) continue;
 
     for (let j = 0; j < players.length; j++) {
-
       const p = players[j];
       const tag = p?.battleTag?.toLowerCase();
 

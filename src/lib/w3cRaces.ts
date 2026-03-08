@@ -1,6 +1,6 @@
 // src/lib/w3cRaces.ts
 
-import type { RaceKey } from "@/services/countryRaceLadder";
+export type RaceKey = "human" | "orc" | "elf" | "undead" | "random";
 
 export const W3C_RACE_IDS = [1, 2, 4, 8, 0] as const;
 

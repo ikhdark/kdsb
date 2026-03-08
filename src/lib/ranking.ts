@@ -16,7 +16,7 @@ export type FlattenedLadderRow = {
 };
 
 /* =========================
-   helpers
+   HELPERS
 ========================= */
 
 const toNum = (v: unknown): number | null => {
@@ -31,12 +31,68 @@ const toNum = (v: unknown): number | null => {
 };
 
 const toStr = (v: unknown): string | null =>
-  typeof v === "string" && v.trim().length ? v.trim() : null;
+  typeof v === "string" && v.trim().length > 0
+    ? v.trim()
+    : null;
 
 const looksLikeBattleTag = (s: string) => s.includes("#");
 
+function pickCountry(
+  obj: Record<string, unknown>,
+  player?: Record<string, unknown>
+): string | null {
+  const country =
+    toStr(obj.country) ??
+    toStr(obj.countryCode) ??
+    toStr(obj.location) ??
+    toStr(obj.region) ??
+    toStr(player?.country) ??
+    toStr(player?.countryCode) ??
+    toStr(player?.location) ??
+    toStr(player?.region) ??
+    toStr(player?.profileCountry) ??
+    null;
+
+  return country ? country.toUpperCase() : null;
+}
+
+function pickBattleTag(
+  obj: Record<string, unknown>,
+  player?: Record<string, unknown>
+): string | null {
+  const player1Id = toStr(obj.player1Id ?? player?.player1Id);
+
+  if (player1Id && looksLikeBattleTag(player1Id)) {
+    return player1Id;
+  }
+
+  return (
+    toStr(obj.battleTag) ??
+    toStr(obj.battletag) ??
+    toStr(player?.battleTag) ??
+    toStr(player?.battletag) ??
+    null
+  );
+}
+
+function pickPlayerId(
+  obj: Record<string, unknown>,
+  player?: Record<string, unknown>
+): string | null {
+  const idCandidate =
+    toStr(obj.playerId) ??
+    toStr(player?.playerId) ??
+    toStr(obj.id);
+
+  if (!idCandidate || looksLikeBattleTag(idCandidate)) {
+    return null;
+  }
+
+  return idCandidate;
+}
+
 /* =========================
-   FLATTEN COUNTRY LADDER
+   FLATTEN LADDER PAYLOAD
 ========================= */
 
 export function flattenCountryLadder(payload: unknown): FlattenedLadderRow[] {
@@ -44,9 +100,10 @@ export function flattenCountryLadder(payload: unknown): FlattenedLadderRow[] {
   const seen = new Set<string>();
 
   const pushRow = (row: FlattenedLadderRow) => {
-    const id = row.battleTagLower ?? row.playerIdLower ?? "";
-    const key = `${row.race}|${id}`;
+    const id = row.battleTagLower ?? row.playerIdLower;
+    if (!id) return;
 
+    const key = `${row.race}|${id}`;
     if (seen.has(key)) return;
 
     seen.add(key);
@@ -72,61 +129,18 @@ export function flattenCountryLadder(payload: unknown): FlattenedLadderRow[] {
         ? (obj.player as Record<string, unknown>)
         : undefined;
 
-    /* ===== numeric fields ===== */
-
     const race = toNum(obj.race);
     const mmr = toNum(obj.mmr ?? player?.mmr);
     const games = toNum(obj.games ?? player?.games);
-
-    const winsRaw =
+    const wins =
       toNum(obj.wins ?? player?.wins ?? obj.won ?? player?.won) ?? 0;
 
-    /* ===== country ===== */
-
-    const country =
-      toStr(obj.country) ??
-      toStr(obj.countryCode) ??
-      toStr(obj.location) ??
-      toStr(obj.region) ??
-      toStr(player?.country) ??
-      toStr(player?.countryCode) ??
-      toStr(player?.location) ??
-      toStr(player?.region) ??
-      toStr(player?.profileCountry) ??
-      null;
-
-    /* ===== tag detection ===== */
-
-    const tagCandidate =
-      toStr(obj.battleTag) ??
-      toStr(obj.battletag) ??
-      toStr(player?.battleTag) ??
-      toStr(player?.battletag);
-
-    const player1Id = toStr(obj.player1Id ?? player?.player1Id);
-
-    const idCandidate =
-      toStr(obj.playerId) ??
-      toStr(player?.playerId) ??
-      toStr(obj.id);
-
-    let battleTag: string | null = null;
-    let playerId: string | null = null;
-
-    if (player1Id && looksLikeBattleTag(player1Id)) {
-      battleTag = player1Id;
-    } else {
-      battleTag = tagCandidate;
-    }
-
-    if (idCandidate && !looksLikeBattleTag(idCandidate)) {
-      playerId = idCandidate;
-    }
+    const battleTag = pickBattleTag(obj, player);
+    const playerId = pickPlayerId(obj, player);
+    const country = pickCountry(obj, player);
 
     const battleTagLower = battleTag?.toLowerCase();
     const playerIdLower = playerId?.toLowerCase();
-
-    /* ===== push row ===== */
 
     if (
       race !== null &&
@@ -138,7 +152,7 @@ export function flattenCountryLadder(payload: unknown): FlattenedLadderRow[] {
         race,
         mmr: Math.round(mmr),
         games: Math.trunc(games),
-        wins: Math.trunc(winsRaw),
+        wins: Math.trunc(wins),
         country,
         battleTag: battleTag ?? undefined,
         battleTagLower,
@@ -146,12 +160,10 @@ export function flattenCountryLadder(payload: unknown): FlattenedLadderRow[] {
       });
     }
 
-    /* ===== recurse ===== */
-
-    for (const k in obj) {
-      const v = obj[k];
-      if (v && typeof v === "object") {
-        visit(v);
+    for (const key in obj) {
+      const value = obj[key];
+      if (value && typeof value === "object") {
+        visit(value);
       }
     }
   };

@@ -4,6 +4,9 @@
 // Replicates W3Champions search-bar behavior.
 // DO NOT lowercase, uppercase, or guess casing elsewhere.
 
+import { fetchJson } from "@/lib/w3cUtils";
+import { W3C_MEMORY_CACHE_TTL_MS } from "@/lib/w3cConfig";
+
 type GlobalSearchResult = {
   battleTag: string;
   name: string;
@@ -15,7 +18,7 @@ type GlobalSearchResult = {
    CACHE
 ===================================================== */
 
-const SEARCH_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const SEARCH_CACHE_TTL = W3C_MEMORY_CACHE_TTL_MS;
 const SEARCH_TIMEOUT_MS = 2500;
 
 const searchCache = new Map<
@@ -57,10 +60,22 @@ function decodeInput(input: unknown): string {
 function parseBattleTag(raw: string): { name: string; id: string } | null {
   if (!raw.includes("#")) return null;
 
-  const [name, id] = raw.split("#");
+  const parts = raw.split("#");
+  if (parts.length !== 2) return null;
+
+  const name = parts[0]?.trim();
+  const id = parts[1]?.trim();
+
   if (!name || !id) return null;
 
   return { name, id };
+}
+
+function buildGlobalSearchUrl(name: string) {
+  return (
+    "https://website-backend.w3champions.com/api/players/global-search" +
+    `?search=${encodeURIComponent(name)}&pageSize=100`
+  );
 }
 
 /* =====================================================
@@ -70,14 +85,17 @@ function parseBattleTag(raw: string): { name: string; id: string } | null {
 async function globalSearchByName(
   name: string
 ): Promise<GlobalSearchResult[] | null> {
+  const key = name.trim().toLowerCase();
+  if (!key) return null;
+
   const now = Date.now();
 
-  const cached = searchCache.get(name);
+  const cached = searchCache.get(key);
   if (cached && now - cached.ts < SEARCH_CACHE_TTL) {
     return cached.results;
   }
 
-  const inFlight = searchInFlight.get(name);
+  const inFlight = searchInFlight.get(key);
   if (inFlight) return inFlight;
 
   const request = (async () => {
@@ -85,18 +103,10 @@ async function globalSearchByName(
     const timer = setTimeout(() => controller.abort(), SEARCH_TIMEOUT_MS);
 
     try {
-      const res = await fetch(
-        `https://website-backend.w3champions.com/api/players/global-search` +
-          `?search=${encodeURIComponent(name)}&pageSize=100`,
-        {
-          signal: controller.signal,
-          next: { revalidate: 300 },
-        }
-      );
+      const json = await fetchJson<unknown>(buildGlobalSearchUrl(name), {
+        signal: controller.signal,
+      });
 
-      if (!res.ok) return null;
-
-      const json = (await res.json()) as unknown;
       return Array.isArray(json) ? (json as GlobalSearchResult[]) : null;
     } catch {
       return null;
@@ -105,19 +115,19 @@ async function globalSearchByName(
     }
   })();
 
-  searchInFlight.set(name, request);
+  searchInFlight.set(key, request);
 
   try {
     const results = await request;
 
-    searchCache.set(name, {
+    searchCache.set(key, {
       ts: Date.now(),
       results,
     });
 
     return results;
   } finally {
-    searchInFlight.delete(name);
+    searchInFlight.delete(key);
   }
 }
 
@@ -158,18 +168,21 @@ export async function resolveBattleTagViaSearch(
     const targetSuffix = `#${parsed.id}`.toLowerCase();
 
     const matches = results.filter(
-      (r) =>
-        typeof r.battleTag === "string" &&
-        r.battleTag.toLowerCase().endsWith(targetSuffix)
+      (result) =>
+        typeof result?.battleTag === "string" &&
+        result.battleTag.toLowerCase().endsWith(targetSuffix)
     );
 
     if (!matches.length) {
       return raw;
     }
 
-    matches.sort(
-      (a, b) => (b.seasons?.length ?? 0) - (a.seasons?.length ?? 0)
-    );
+    matches.sort((a, b) => {
+      const seasonDiff = (b.seasons?.length ?? 0) - (a.seasons?.length ?? 0);
+      if (seasonDiff !== 0) return seasonDiff;
+
+      return a.battleTag.localeCompare(b.battleTag);
+    });
 
     return matches[0].battleTag;
   })();

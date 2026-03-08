@@ -1,7 +1,11 @@
 // src/services/w3cApi.ts
-// Next.js-friendly ESM/TypeScript (network layer only)
 
 import { fetchJson } from "@/lib/w3cUtils";
+import {
+  buildCountryLadderUrl,
+  buildPersonalSettingsUrl,
+  buildPlayerProfileUrl,
+} from "@/lib/w3cUtils";
 
 /* =========================
    TYPES
@@ -46,8 +50,6 @@ export async function fetchPlayerProfile(
     };
   }
 
-  const btEnc = encodeURIComponent(battletag);
-
   const base: PlayerProfile = {
     battletag,
     playerId: null,
@@ -56,10 +58,7 @@ export async function fetchPlayerProfile(
     playerAkaCountry: null,
   };
 
-  const json =
-    await fetchJson<any>(
-      `https://website-backend.w3champions.com/api/players/${btEnc}`
-    );
+  const json = await fetchJson<any>(buildPlayerProfileUrl(battletag));
 
   if (json) {
     const canonical =
@@ -77,10 +76,7 @@ export async function fetchPlayerProfile(
     };
   }
 
-  const fallback =
-    await fetchJson<any>(
-      `https://website-backend.w3champions.com/api/personal-settings/${btEnc}`
-    );
+  const fallback = await fetchJson<any>(buildPersonalSettingsUrl(battletag));
 
   if (!fallback) return base;
 
@@ -105,11 +101,9 @@ export async function fetchCountryLadder(
 ): Promise<CountryLadderPayload> {
   if (!country) return [];
 
-  const url =
-    `https://website-backend.w3champions.com/api/ladder/country/${encodeURIComponent(
-      country
-    )}?gateWay=${gateway}&gameMode=${gameMode}&season=${season}`;
+  const json = await fetchJson<unknown[]>(
+    buildCountryLadderUrl(country, gateway, gameMode, season)
+  );
 
-  const json = await fetchJson<unknown[]>(url);
   return Array.isArray(json) ? json : [];
 }

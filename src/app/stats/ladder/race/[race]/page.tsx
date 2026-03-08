@@ -37,30 +37,45 @@ export default async function RaceGlobalPage({
 
   const pageNum = Math.max(1, Number(page) || 1);
 
-  const data = await getPlayerRaceLadder(
+  const initial = await getPlayerRaceLadder(
     undefined,
     race,
     pageNum,
     PAGE_SIZE
   );
 
-  if (!data?.full?.length) {
+  if (!initial) {
     return <EmptyState message="No ladder data available yet" />;
   }
 
-  const totalPages = Math.max(1, Math.ceil(data.poolSize / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(initial.poolSize / PAGE_SIZE));
+  const currentPage = Math.min(pageNum, totalPages);
+
+  const data =
+    currentPage === pageNum
+      ? initial
+      : await getPlayerRaceLadder(
+          undefined,
+          race,
+          currentPage,
+          PAGE_SIZE
+        );
+
+  if (!data?.full?.length) {
+    return <EmptyState message="No ladder data available yet" />;
+  }
 
   return (
     <LadderPageUI
       title={`Global ${RACE_LABEL[race]} Ladder`}
       subtitle={`Season 24 · ${data.poolSize.toLocaleString()} players · Rank = 80% MMR + 15% SoS (game-scaled) + 5% activity`}
       base={`/stats/ladder/race/${race}`}
-      rows={data.full.map(r => ({
-  ...r,
-  sos: r.sos ?? 0,
-}))}
+      rows={data.full.map((r) => ({
+        ...r,
+        sos: r.sos ?? 0,
+      }))}
       poolSize={data.poolSize}
-      currentPage={Math.min(pageNum, totalPages)}
+      currentPage={currentPage}
       totalPages={totalPages}
       highlight={highlight}
     />

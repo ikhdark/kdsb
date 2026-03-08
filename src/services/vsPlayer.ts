@@ -1,3 +1,5 @@
+// src/services/vsPlayer.ts
+
 import { resolveBattleTagViaSearch } from "@/lib/w3cBattleTagResolver";
 import { getPlayerMatchAnalytics } from "@/services/playerMatchAnalytics";
 import type { NormalizedMatch } from "@/services/playerMatchAnalytics";
@@ -13,7 +15,7 @@ type WL = {
   winrate: number;
 };
 
-type SideStats= {
+type SideStats = {
   overall: WL;
 
   avgDurationSec: number;
@@ -53,12 +55,8 @@ export type ServerUsage = {
   nodeId: number | null;
   name: string | null;
   games: number;
-  share: number; // 0..1
+  share: number;
 };
-
-/* =========================
-   NEW: race breakdown
-========================= */
 
 export type RaceBreakdownRow = {
   race: string;
@@ -81,7 +79,7 @@ export type VsPlayerResponse = {
   statsA: SideStats;
   statsB: SideStats;
 
-  raceBreakdown: RaceBreakdownRow[]; // ✅ added
+  raceBreakdown: RaceBreakdownRow[];
 
   servers: ServerUsage[];
   mostUsedServer: ServerUsage | null;
@@ -102,13 +100,15 @@ export type VsPlayerResponse = {
    HELPERS
 ====================================================== */
 
-const avg = (arr: number[]) =>
-  arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+function avg(arr: number[]): number {
+  return arr.length
+    ? arr.reduce((sum, value) => sum + value, 0) / arr.length
+    : 0;
+}
 
 function avgNullable(arr: Array<number | null | undefined>): number | null {
-  const xs = arr.filter((x): x is number => typeof x === "number");
-  if (!xs.length) return null;
-  return avg(xs);
+  const xs = arr.filter((value): value is number => typeof value === "number");
+  return xs.length ? avg(xs) : null;
 }
 
 function makeWL(wins: number, games: number): WL {
@@ -150,7 +150,7 @@ function buildSideStats(args: {
     avgDurationSec: avg(args.durations),
 
     mmr: {
-      totalMmrGain: args.mmrGain.reduce((a, b) => a + b, 0),
+      totalMmrGain: args.mmrGain.reduce((sum, value) => sum + value, 0),
     },
 
     economy: {
@@ -180,8 +180,29 @@ function buildSideStats(args: {
   };
 }
 
-function serverKey(s: NormalizedMatch["server"]) {
-  return `${s.provider ?? "?"}|${s.nodeId ?? "?"}|${s.name ?? "?"}`;
+function emptySideStats(): SideStats {
+  return buildSideStats({
+    wins: 0,
+    games: 0,
+    durations: [],
+    mmrGain: [],
+    gold: [],
+    lumber: [],
+    upkeep: [],
+    unitsProduced: [],
+    unitsKilled: [],
+    largestArmy: [],
+    heroesKilled: [],
+    itemsObtained: [],
+    mercsHired: [],
+    xp: [],
+    avgPing: [],
+    heroUsage: {},
+  });
+}
+
+function serverKey(server: NormalizedMatch["server"]) {
+  return `${server.provider ?? "?"}|${server.nodeId ?? "?"}|${server.name ?? "?"}`;
 }
 
 /* ======================================================
@@ -192,11 +213,14 @@ export async function getVsPlayer(
   inputA: string,
   inputB: string
 ): Promise<VsPlayerResponse | null> {
-  if (!inputA || !inputB) return null;
+  const rawA = inputA?.trim();
+  const rawB = inputB?.trim();
+
+  if (!rawA || !rawB) return null;
 
   const [tagA, tagB] = await Promise.all([
-    resolveBattleTagViaSearch(inputA),
-    resolveBattleTagViaSearch(inputB),
+    resolveBattleTagViaSearch(rawA),
+    resolveBattleTagViaSearch(rawB),
   ]);
 
   if (!tagA || !tagB) return null;
@@ -208,39 +232,21 @@ export async function getVsPlayer(
 
   if (!aAnalytics || !bAnalytics) return null;
 
-  // intersect by match id
-  const bIds = new Set(bAnalytics.matches.map((m) => m.id));
+  const bIds = new Set(bAnalytics.matches.map((match) => match.id));
 
   const shared = aAnalytics.matches
-    .filter((m) => bIds.has(m.id))
+    .filter((match) => bIds.has(match.id))
     .sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
 
   if (!shared.length) {
-    const empty = buildSideStats({
-      wins: 0,
-      games: 0,
-      durations: [],
-      mmrGain: [],
-      gold: [],
-      lumber: [],
-      upkeep: [],
-      unitsProduced: [],
-      unitsKilled: [],
-      largestArmy: [],
-      heroesKilled: [],
-      itemsObtained: [],
-      mercsHired: [],
-      xp: [],
-      avgPing: [],
-      heroUsage: {},
-    });
+    const empty = emptySideStats();
 
     return {
       playerA: tagA,
       playerB: tagB,
       statsA: empty,
       statsB: empty,
-      raceBreakdown: [], // ✅ added
+      raceBreakdown: [],
       servers: [],
       mostUsedServer: null,
       maps: [],
@@ -248,90 +254,68 @@ export async function getVsPlayer(
     };
   }
 
-  /* ======================================================
-     AGGREGATION (single pass, EVERYTHING)
-  ====================================================== */
-
   const durations: number[] = [];
 
   let winsA = 0;
   let winsB = 0;
 
-  // A arrays
   const aGain: number[] = [];
-
   const aGold: number[] = [];
   const aLumber: number[] = [];
   const aUpkeep: number[] = [];
-
   const aUnitsProduced: number[] = [];
   const aUnitsKilled: number[] = [];
   const aLargestArmy: number[] = [];
-
   const aHeroesKilled: number[] = [];
   const aItems: number[] = [];
   const aMercs: number[] = [];
   const aXP: number[] = [];
-
   const aAvgPing: Array<number | null> = [];
 
-  // B arrays
   const bGain: number[] = [];
-
   const bGold: number[] = [];
   const bLumber: number[] = [];
   const bUpkeep: number[] = [];
-
   const bUnitsProduced: number[] = [];
   const bUnitsKilled: number[] = [];
   const bLargestArmy: number[] = [];
-
   const bHeroesKilled: number[] = [];
   const bItems: number[] = [];
   const bMercs: number[] = [];
   const bXP: number[] = [];
-
   const bAvgPing: Array<number | null> = [];
 
-  // hero usage
   const heroA: Record<string, { games: number; wins: number }> = {};
   const heroB: Record<string, { games: number; wins: number }> = {};
 
-  // map stats (wins by A/B)
-  const mapAgg: Record<string, { games: number; winsA: number; winsB: number }> =
-    {};
-
-  // server usage
+  const mapAgg: Record<string, { games: number; winsA: number; winsB: number }> = {};
   const serverAgg: Record<
     string,
     { provider: string | null; nodeId: number | null; name: string | null; games: number }
   > = {};
-
-  /* =========================
-     NEW: race aggregation
-  ========================= */
 
   const raceAgg: Record<
     string,
     { aWins: number; aLosses: number; bWins: number; bLosses: number }
   > = {};
 
-  for (const g of shared) {
-    durations.push(g.durationSeconds);
+  for (let i = 0; i < shared.length; i++) {
+    const game = shared[i];
 
-    // Determine which side in this normalized record is A/B
-    const sideA = g.me.battletag === tagA ? g.me : g.opp;
-    const sideB = g.me.battletag === tagA ? g.opp : g.me;
+    durations.push(game.durationSeconds);
+
+    const sideA =
+      game.me.battletag.toLowerCase() === tagA.toLowerCase() ? game.me : game.opp;
+    const sideB =
+      game.me.battletag.toLowerCase() === tagA.toLowerCase() ? game.opp : game.me;
 
     const aWon = sideA.won;
     if (aWon) winsA++;
     else winsB++;
 
-    // MMR
     aGain.push(sideA.mmrGain);
     bGain.push(sideB.mmrGain);
 
-    // Economy
     aGold.push(sideA.score.goldCollected);
     aLumber.push(sideA.score.lumberCollected);
     aUpkeep.push(sideA.score.goldUpkeepLost);
@@ -340,7 +324,6 @@ export async function getVsPlayer(
     bLumber.push(sideB.score.lumberCollected);
     bUpkeep.push(sideB.score.goldUpkeepLost);
 
-    // Units
     aUnitsProduced.push(sideA.score.unitsProduced);
     aUnitsKilled.push(sideA.score.unitsKilled);
     aLargestArmy.push(sideA.score.largestArmy);
@@ -349,7 +332,6 @@ export async function getVsPlayer(
     bUnitsKilled.push(sideB.score.unitsKilled);
     bLargestArmy.push(sideB.score.largestArmy);
 
-    // Hero score
     aHeroesKilled.push(sideA.score.heroesKilled);
     aItems.push(sideA.score.itemsObtained);
     aMercs.push(sideA.score.mercsHired);
@@ -360,26 +342,25 @@ export async function getVsPlayer(
     bMercs.push(sideB.score.mercsHired);
     bXP.push(sideB.score.expGained);
 
-    // Network
     aAvgPing.push(sideA.avgPing);
     bAvgPing.push(sideB.avgPing);
 
-    // Hero usage counts
-    for (const h of sideA.heroes) {
-      heroA[h.name] ??= { games: 0, wins: 0 };
-      heroA[h.name].games++;
-      if (sideA.won) heroA[h.name].wins++;
+    for (let j = 0; j < sideA.heroes.length; j++) {
+      const hero = sideA.heroes[j];
+      heroA[hero.name] ??= { games: 0, wins: 0 };
+      heroA[hero.name].games++;
+      if (sideA.won) heroA[hero.name].wins++;
     }
 
-    for (const h of sideB.heroes) {
-      heroB[h.name] ??= { games: 0, wins: 0 };
-      heroB[h.name].games++;
-      if (sideB.won) heroB[h.name].wins++;
+    for (let j = 0; j < sideB.heroes.length; j++) {
+      const hero = sideB.heroes[j];
+      heroB[hero.name] ??= { games: 0, wins: 0 };
+      heroB[hero.name].games++;
+      if (sideB.won) heroB[hero.name].wins++;
     }
 
-    // ✅ NEW: Race breakdown
-    const raceA = sideA.race ?? "Unknown";
-    const raceB = sideB.race ?? "Unknown";
+    const raceA = sideA.race || "Unknown";
+    const raceB = sideB.race || "Unknown";
 
     raceAgg[raceA] ??= { aWins: 0, aLosses: 0, bWins: 0, bLosses: 0 };
     raceAgg[raceB] ??= { aWins: 0, aLosses: 0, bWins: 0, bLosses: 0 };
@@ -390,83 +371,87 @@ export async function getVsPlayer(
     if (sideB.won) raceAgg[raceB].bWins++;
     else raceAgg[raceB].bLosses++;
 
-    // Map
-    mapAgg[g.map] ??= { games: 0, winsA: 0, winsB: 0 };
-    mapAgg[g.map].games++;
-    aWon ? mapAgg[g.map].winsA++ : mapAgg[g.map].winsB++;
+    const map = game.map || "Unknown";
+    mapAgg[map] ??= { games: 0, winsA: 0, winsB: 0 };
+    mapAgg[map].games++;
+    if (aWon) mapAgg[map].winsA++;
+    else mapAgg[map].winsB++;
 
-    // Server usage
-    const sKey = serverKey(g.server);
-    serverAgg[sKey] ??= {
-      provider: g.server.provider,
-      nodeId: g.server.nodeId,
-      name: g.server.name,
+    const key = serverKey(game.server);
+    serverAgg[key] ??= {
+      provider: game.server.provider,
+      nodeId: game.server.nodeId,
+      name: game.server.name,
       games: 0,
     };
-    serverAgg[sKey].games++;
+    serverAgg[key].games++;
   }
 
-  const maps = Object.entries(mapAgg).map(([map, v]) => ({
-    map,
-    games: v.games,
-    winsA: v.winsA,
-    winsB: v.winsB,
-    winrateA: v.winsA / v.games,
-    winrateB: v.winsB / v.games,
-  }));
+  const maps = Object.entries(mapAgg)
+    .map(([map, value]) => ({
+      map,
+      games: value.games,
+      winsA: value.winsA,
+      winsB: value.winsB,
+      winrateA: value.games ? value.winsA / value.games : 0,
+      winrateB: value.games ? value.winsB / value.games : 0,
+    }))
+    .sort((a, b) => {
+      if (b.games !== a.games) return b.games - a.games;
+      return a.map.localeCompare(b.map);
+    });
 
   const servers: ServerUsage[] = Object.values(serverAgg)
-    .sort((x, y) => y.games - x.games)
-    .map((s) => ({
-      ...s,
-      share: s.games / shared.length,
+    .sort((a, b) => b.games - a.games)
+    .map((server) => ({
+      ...server,
+      share: shared.length ? server.games / shared.length : 0,
     }));
 
   const mostUsedServer = servers.length ? servers[0] : null;
 
-  // ✅ NEW: build raceBreakdown rows (sorted by total games desc)
   const raceBreakdown: RaceBreakdownRow[] = Object.entries(raceAgg)
-    .map(([race, r]) => {
-      const aGames = r.aWins + r.aLosses;
-      const bGames = r.bWins + r.bLosses;
+    .map(([race, value]) => {
+      const aGames = value.aWins + value.aLosses;
+      const bGames = value.bWins + value.bLosses;
 
       return {
         race,
         aGames,
-        aWins: r.aWins,
-        aLosses: r.aLosses,
-        aWinrate: aGames ? r.aWins / aGames : 0,
+        aWins: value.aWins,
+        aLosses: value.aLosses,
+        aWinrate: aGames ? value.aWins / aGames : 0,
 
         bGames,
-        bWins: r.bWins,
-        bLosses: r.bLosses,
-        bWinrate: bGames ? r.bWins / bGames : 0,
+        bWins: value.bWins,
+        bLosses: value.bLosses,
+        bWinrate: bGames ? value.bWins / bGames : 0,
       };
     })
-    .sort((x, y) => (y.aGames + y.bGames) - (x.aGames + x.bGames));
+    .sort((a, b) => {
+      const totalA = a.aGames + a.bGames;
+      const totalB = b.aGames + b.bGames;
+
+      if (totalB !== totalA) return totalB - totalA;
+      return a.race.localeCompare(b.race);
+    });
 
   const statsA = buildSideStats({
     wins: winsA,
     games: shared.length,
     durations,
-
     mmrGain: aGain,
-
     gold: aGold,
     lumber: aLumber,
     upkeep: aUpkeep,
-
     unitsProduced: aUnitsProduced,
     unitsKilled: aUnitsKilled,
     largestArmy: aLargestArmy,
-
     heroesKilled: aHeroesKilled,
     itemsObtained: aItems,
     mercsHired: aMercs,
     xp: aXP,
-
     avgPing: aAvgPing,
-
     heroUsage: heroA,
   });
 
@@ -474,24 +459,18 @@ export async function getVsPlayer(
     wins: winsB,
     games: shared.length,
     durations,
-
     mmrGain: bGain,
-
     gold: bGold,
     lumber: bLumber,
     upkeep: bUpkeep,
-
     unitsProduced: bUnitsProduced,
     unitsKilled: bUnitsKilled,
     largestArmy: bLargestArmy,
-
     heroesKilled: bHeroesKilled,
     itemsObtained: bItems,
     mercsHired: bMercs,
     xp: bXP,
-
     avgPing: bAvgPing,
-
     heroUsage: heroB,
   });
 
@@ -500,14 +479,10 @@ export async function getVsPlayer(
     playerB: tagB,
     statsA,
     statsB,
-
-    raceBreakdown, // ✅ added
-
+    raceBreakdown,
     servers,
     mostUsedServer,
-
     maps,
-
     games: shared,
   };
 }
