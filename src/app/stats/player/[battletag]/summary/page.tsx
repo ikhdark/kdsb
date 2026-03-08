@@ -181,7 +181,7 @@ export default async function PlayerPage({ params }: PageProps) {
       )}
 
       {s && (
-        <Section title="Top 2 Race Peak MMRs (Last 2 Seasons)">
+        <Section title="Top 2 Race MMR Peaks for Season 24 (Only one will show if a player only has one ranked race)">
           {s.top2Peaks.length ? (
             s.top2Peaks.map(
               (p: { race: string; mmr: number; season: number }) => (
