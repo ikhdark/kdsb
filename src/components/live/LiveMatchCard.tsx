@@ -10,6 +10,7 @@ const RACE_MAP: Record<number, string> = {
 
 type Player = {
   name: string
+  battleTag: string
   oldMmr: number
   race: number
   mmrIfWin: number
@@ -50,7 +51,7 @@ function PlayerBlock({
   return (
     <div className={`min-w-0 ${textAlign} space-y-1`}>
       <Link
-        href={`/stats/player/${encodeURIComponent(player.name)}/summary`}
+        href={`/stats/player/${encodeURIComponent(player.battleTag)}/summary`}
         className={`block truncate text-base sm:text-xl font-semibold text-black dark:text-white hover:underline ${textAlign}`}
       >
         {player.name}

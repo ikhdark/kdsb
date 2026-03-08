@@ -81,7 +81,7 @@ export default async function PlayerPage({ params }: PageProps) {
     <div className="space-y-8 max-w-6xl mx-auto text-xs md:text-sm px-3 md:px-0">
       <PlayerHeader
         battletag={rankData?.battletag ?? s?.battletag ?? canonicalTag}
-        subtitle="Player Stats · Seasons 23-24"
+        subtitle="Player Stats · Season 24"
       />
 
       {s && (
@@ -183,17 +183,26 @@ export default async function PlayerPage({ params }: PageProps) {
       {s && (
         <Section title="Top 2 Race Peak MMRs (Last 2 Seasons)">
           {s.top2Peaks.length ? (
-            s.top2Peaks.map((p) => (
-              <div key={p.race} className="flex justify-between text-sm tabular-nums">
-                <span className="font-medium">{p.race}</span>
-                <span className="font-semibold">
-                  {p.mmr}{" "}
-                  <span className="text-xs font-normal">(Season {p.season})</span>
-                </span>
-              </div>
-            ))
+            s.top2Peaks.map(
+              (p: { race: string; mmr: number; season: number }) => (
+                <div
+                  key={p.race}
+                  className="flex justify-between text-sm tabular-nums"
+                >
+                  <span className="font-medium">{p.race}</span>
+                  <span className="font-semibold">
+                    {p.mmr}{" "}
+                    <span className="text-xs font-normal">
+                      (Season {p.season})
+                    </span>
+                  </span>
+                </div>
+              )
+            )
           ) : (
-            <div className="text-gray-500 text-sm">No peak data available</div>
+            <div className="text-gray-500 text-sm">
+              No peak data available
+            </div>
           )}
         </Section>
       )}
