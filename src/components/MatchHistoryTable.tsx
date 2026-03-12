@@ -158,6 +158,19 @@ const highestWin = useMemo(() => {
     );
 }, [filtered]);
 
+const mmrSwingByRace = useMemo(() => {
+  const out: Record<number, number> = {};
+
+  for (const m of filtered) {
+    if (typeof m.mmrGain !== "number") continue;
+
+    if (!out[m.myRace]) out[m.myRace] = 0;
+    out[m.myRace] += m.mmrGain;
+  }
+
+  return out;
+}, [filtered]);
+
   const vsRaceBreakdown = useMemo(() => {
     const out: Record<number, Record<number, { wins: number; losses: number }>> =
       {};
@@ -245,18 +258,32 @@ const highestWin = useMemo(() => {
             return (
               <div key={myRace} className="space-y-2">
                 {/* Your race label */}
-                <div className="flex items-center gap-2 font-semibold">
-                  {myIcon && (
-                    <img
-                      src={myIcon}
-                      width={20}
-                      height={20}
-                      alt=""
-                      className="shrink-0"
-                    />
-                  )}
-                  <span className="truncate">{raceLabel(myRace)}</span>
-                </div>
+<div className="flex items-center gap-2 font-semibold">
+  {myIcon && (
+    <img
+      src={myIcon}
+      width={20}
+      height={20}
+      alt=""
+      className="shrink-0"
+    />
+  )}
+
+  <span className="truncate">{raceLabel(myRace)}</span>
+
+  {typeof mmrSwingByRace[myRace] === "number" && (
+    <span
+      className={`text-sm font-medium ${
+        mmrSwingByRace[myRace] >= 0
+          ? "text-emerald-600"
+          : "text-rose-600"
+      }`}
+    >
+      ({mmrSwingByRace[myRace] >= 0 ? "+" : ""}
+      {mmrSwingByRace[myRace]})
+    </span>
+  )}
+</div>
 
                 {/* Opponent rows */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 pl-2 sm:pl-4 md:pl-6">
