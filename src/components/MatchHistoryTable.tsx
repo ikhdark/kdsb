@@ -233,7 +233,7 @@ const highestWin = useMemo(() => {
 
       {/* W/L vs RACES (VISIBLE) */}
       <div className="space-y-2">
-        <div className="text-xs uppercase text-gray-500">
+        <div className="text-sm uppercase text-gray-500">
           W/L vs Races (last 50)
         </div>
 
@@ -309,7 +309,7 @@ const highestWin = useMemo(() => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 text-sm">
         {/* HIGHEST WIN */}
         <div className="rounded border p-3 md:p-4 bg-white dark:bg-gray-900">
-          <div className="text-xs uppercase text-gray-500">Highest MMR Win</div>
+          <div className="text-sm uppercase text-gray-500">Highest MMR Win</div>
 
           <div className="mt-2">
             {highestWin ? (
@@ -379,7 +379,7 @@ const highestWin = useMemo(() => {
 
         {/* LOWEST LOSS */}
         <div className="rounded border p-3 md:p-4 bg-white dark:bg-gray-900">
-          <div className="text-xs uppercase text-gray-500">Lowest MMR Loss</div>
+          <div className="text-sm uppercase text-gray-500">Lowest MMR Loss</div>
 
           <div className="mt-2">
             {lowestLoss ? (
@@ -469,11 +469,11 @@ const highestWin = useMemo(() => {
                   {resultText}
                 </div>
 
-                <div className="text-xs text-gray-500 shrink-0">
+                <div className="text-sm text-gray-500 shrink-0">
                   {formatDuration(m.duration)}
                 </div>
 
-                <div className="text-xs text-gray-500 truncate min-w-0 text-right">
+                <div className="text-sm text-gray-500 truncate min-w-0 text-right">
                   {m.map}
                 </div>
               </div>
@@ -505,25 +505,29 @@ const highestWin = useMemo(() => {
                         />
                       )}
 
-                      <span className="font-medium truncate">
-                        {m.opponentTag}
-                      </span>
+<span
+  className={`font-medium truncate ${
+    m.won ? "text-rose-600" : "text-emerald-600"
+  }`}
+>
+  {m.opponentTag}
+</span>
 
                     </div>
 
                     {/* Opp MMR numbers (show if we have old OR new) */}
                     {typeof m.oppOldMmr === "number" ? (
-                      <div className="text-xs text-gray-500 ml-6">
+                      <div className="text-sm text-gray-500 ml-6">
                         {m.oppOldMmr}
                         {typeof m.oppNewMmr === "number" ? ` → ${m.oppNewMmr}` : ""}
                       </div>
                     ) : typeof m.oppNewMmr === "number" ? (
-                      <div className="text-xs text-gray-500 ml-6">
+                      <div className="text-sm text-gray-500 ml-6">
                         {m.oppNewMmr}
                       </div>
                     ) : null}
 
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 ml-6">
+                    <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500 ml-6">
                       {m.oppHeroes?.map((h, i) => (
                         <div key={i} className="flex items-center gap-1">
                           <img
@@ -551,22 +555,28 @@ const highestWin = useMemo(() => {
                           className="shrink-0"
                         />
                       )}
-                      <span className="font-medium truncate">{player}</span>
+                      <span
+  className={`font-medium truncate ${
+    m.won ? "text-emerald-600" : "text-rose-600"
+  }`}
+>
+  {player}
+</span>
 
                       <span
                         className={`${mmrDeltaClass(
                           myDelta
-                        )} text-xs font-medium shrink-0`}
+                        )} text-sm font-medium shrink-0`}
                       >
                         ({mmrDeltaText(myDelta)})
                       </span>
                     </div>
 
-                    <div className="text-xs text-gray-500 ml-6">
+                    <div className="text-sm text-gray-500 ml-6">
                       {m.oldMmr} → {m.newMmr}
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 ml-6">
+                    <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500 ml-6">
                       {m.myHeroes?.map((h, i) => (
                         <div key={i} className="flex items-center gap-1">
                           <img
