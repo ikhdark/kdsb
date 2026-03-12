@@ -4,8 +4,9 @@ import { useCallback, useMemo } from "react";
 import { useBattleTagAutocomplete } from "@/hooks/useBattleTagAutocomplete";
 
 const INPUT_BASE = "border rounded px-3 py-2 w-full";
+
 const DROPDOWN_BASE =
-  "absolute z-50 mt-1 w-full bg-white border rounded shadow";
+  "absolute z-50 mt-1 w-full bg-white border rounded shadow max-h-64 overflow-y-auto";
 
 export default function BattleTagInput({
   value,
@@ -18,7 +19,7 @@ export default function BattleTagInput({
 }) {
   const { results, clear } = useBattleTagAutocomplete(value);
 
-  const visible = useMemo(() => results.slice(0, 6), [results]);
+  const visible = results;
 
   const select = useCallback(
     (tag: string) => {
