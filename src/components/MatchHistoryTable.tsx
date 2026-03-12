@@ -1,5 +1,5 @@
 "use client";
-
+import Link from "next/link";
 import { useMemo, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import BattleTagInput from "@/components/BattleTagInput";
@@ -532,13 +532,14 @@ const mmrSwingByRace = useMemo(() => {
                         />
                       )}
 
-<span
+<Link
+  href={`/stats/player/${encodeURIComponent(m.opponentTag ?? "")}/summary`}
   className={`font-medium truncate ${
     m.won ? "text-rose-600" : "text-emerald-600"
-  }`}
+  } hover:underline`}
 >
   {m.opponentTag}
-</span>
+</Link>
 
                     </div>
 
@@ -582,13 +583,14 @@ const mmrSwingByRace = useMemo(() => {
                           className="shrink-0"
                         />
                       )}
-                      <span
+<Link
+  href={`/stats/player/${encodeURIComponent(player)}/summary`}
   className={`font-medium truncate ${
     m.won ? "text-emerald-600" : "text-rose-600"
-  }`}
+  } hover:underline`}
 >
   {player}
-</span>
+</Link>
 
                       <span
                         className={`${mmrDeltaClass(
