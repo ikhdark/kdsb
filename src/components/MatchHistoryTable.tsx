@@ -136,23 +136,27 @@ export default function MatchHistoryTable({
   const wins = useMemo(() => filtered.filter((m) => m.won).length, [filtered]);
   const losses = filtered.length - wins;
 
-  const highestWin = useMemo(() => {
-    return filtered
-      .filter((m) => m.won && typeof m.oldMmr === "number")
-      .reduce<MatchRow | null>(
-        (best, m) => (!best || m.oldMmr > best.oldMmr ? m : best),
-        null
-      );
-  }, [filtered]);
+const highestWin = useMemo(() => {
+  return filtered
+    .filter((m) => m.won && typeof m.oppOldMmr === "number")
+    .reduce<MatchRow | null>(
+      (best, m) =>
+        !best || (m.oppOldMmr ?? 0) > (best.oppOldMmr ?? 0) ? m : best,
+      null
+    );
+}, [filtered]);
 
   const lowestLoss = useMemo(() => {
-    return filtered
-      .filter((m) => !m.won && typeof m.oldMmr === "number")
-      .reduce<MatchRow | null>(
-        (best, m) => (!best || m.oldMmr < best.oldMmr ? m : best),
-        null
-      );
-  }, [filtered]);
+  return filtered
+    .filter((m) => !m.won && typeof m.oppOldMmr === "number")
+    .reduce<MatchRow | null>(
+      (best, m) =>
+        !best || (m.oppOldMmr ?? Infinity) < (best.oppOldMmr ?? Infinity)
+          ? m
+          : best,
+      null
+    );
+}, [filtered]);
 
   const vsRaceBreakdown = useMemo(() => {
     const out: Record<number, Record<number, { wins: number; losses: number }>> =
