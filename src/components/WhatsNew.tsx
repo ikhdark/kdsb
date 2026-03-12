@@ -6,8 +6,7 @@ const CARD =
   "mx-auto max-w-xl rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 text-sm shadow-sm";
 
 const ITEMS = [
-  'Added "Live 1v1 Matches" (1.8)',
-  'Added "Player Match History and Player vs Player History" (1.9)',
+  'Now Fully Live',
 ] as const;
 
 /* ================================= */
