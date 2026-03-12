@@ -28,7 +28,7 @@ function Board({
   rows: { label: string; a: number | string; b: number | string }[];
 }) {
   return (
-    <div className="rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
+    <div className="rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-visible">
       <div className="grid grid-cols-[1fr_auto_1fr] text-xs font-semibold uppercase px-3 py-2 bg-gray-100 dark:bg-gray-800">
         <div className="text-left">{aLabel}</div>
         <div className="text-center text-gray-600 dark:text-gray-300">

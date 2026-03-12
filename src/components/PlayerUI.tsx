@@ -7,7 +7,7 @@ import { PLAYER_LABELS } from "@/lib/playerLabels";
 ========================================= */
 
 const CARD_BASE =
-  "rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-md overflow-hidden";
+  "rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-md";
 
 const SECTION_BASE = `${CARD_BASE} p-5 space-y-4`;
 
