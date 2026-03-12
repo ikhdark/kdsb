@@ -17,7 +17,7 @@ export default function WhatsNew({
 }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div className={className ? `${CARD} ${className}` : CARD} {...props}>
-      <h2 className="mb-3 font-semibold">What’s New</h2>
+      <h2 className="mb-3 font-semibold">What’s New (Alpha 2.0) </h2>
 
       <ul className="space-y-1 text-gray-600 dark:text-gray-400">
         {ITEMS.map((item) => (
