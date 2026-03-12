@@ -737,131 +737,129 @@ export async function getPlayerSummary(
     const player = await getPlayerSnapshot(inputTag);
     if (!player) return null;
 
-    const { canonical, lower, matches } = player;
+    const { canonical, lower, profile } = player;
 
-    if (!matches.length) {
-      return {
-        summary: {
-          battletag: canonical,
-          mostPlayedAllTime: "Unknown",
-          mostPlayedThisSeason: "Unknown",
-          highestCurrentRace: null,
-          highestCurrentMMR: null,
-          lastPlayedLadder: null,
-          lastPlayedRace: {},
-          top2Peaks: [],
-        },
-      };
-    }
+    /* ---------------------------------------------
+       CURRENT LADDER DATA
+    --------------------------------------------- */
+
+    const rankData = await getW3CRank(canonical);
+
+    const ranks = rankData?.ranks ?? [];
+
+    const highest = ranks
+      .slice()
+      .sort((a, b) => b.mmr - a.mmr)[0];
+
+    const highestCurrentRace = highest?.race ?? null;
+    const highestCurrentMMR = highest?.mmr ?? null;
+
+    /* ---------------------------------------------
+       MOST PLAYED (PROFILE LADDER STATS)
+    --------------------------------------------- */
+
+    const ladderStats = (profile as any)?.ladderStats ?? [];
 
     const raceGamesAll: Record<string, number> = {};
     const raceGamesSeason: Record<string, number> = {};
+
+    for (const stat of ladderStats) {
+      const race = raceLabel(stat?.race) ?? "Unknown";
+
+      const games = Number(stat?.games ?? 0);
+      if (!games) continue;
+
+      raceGamesAll[race] = (raceGamesAll[race] ?? 0) + games;
+
+      if (stat?.season === SEASON) {
+        raceGamesSeason[race] =
+          (raceGamesSeason[race] ?? 0) + games;
+      }
+    }
+
+    const mostPlayedAllTime =
+      Object.entries(raceGamesAll)
+        .sort((a, b) => b[1] - a[1])[0]?.[0] ?? "Unknown";
+
+    const mostPlayedThisSeason =
+      Object.entries(raceGamesSeason)
+        .sort((a, b) => b[1] - a[1])[0]?.[0] ?? "Unknown";
+
+    /* ---------------------------------------------
+       LAST PLAYED MATCH (LIGHT FETCH)
+    --------------------------------------------- */
+
+  const recentMatches = await getMatchesCached(
+  canonical,
+  [SEASON]
+);
+    let lastPlayedLadder: Date | null = null;
     const lastPlayedRace: Record<string, Date> = {};
 
-    const raceMMR: Record<string, number> = {};
-    const raceMMRAt: Record<string, number> = {};
-    const peaks: Record<
-      string,
-      { race: string; mmr: number; season: number }
-    > = {};
-
-    let lastPlayedLadder: Date | null = null;
-
-    for (let i = 0; i < matches.length; i++) {
-      const match = matches[i];
-
+    for (const match of recentMatches ?? []) {
       if (match?.gameMode !== GAMEMODE) continue;
-      if ((match?.durationInSeconds ?? 0) < MIN_DURATION_SECONDS) continue;
 
       const date = toDate(match?.startTime);
       if (!date) continue;
 
+      if (!lastPlayedLadder || date > lastPlayedLadder) {
+        lastPlayedLadder = date;
+      }
+
       const players =
-        match?.teams?.flatMap((team: { players?: any[] }) => team.players ?? []) ??
-        [];
+        match?.teams?.flatMap((t: any) => t.players ?? []) ?? [];
 
       const me = players.find(
-        (p: { battleTag?: string }) =>
-          p?.battleTag?.toLowerCase() === lower
+        (p: any) => p?.battleTag?.toLowerCase() === lower
       );
 
       if (!me) continue;
 
       const race = raceLabel(me?.race) ?? "Unknown";
 
-      raceGamesAll[race] = (raceGamesAll[race] || 0) + 1;
-
       if (!lastPlayedRace[race] || date > lastPlayedRace[race]) {
         lastPlayedRace[race] = date;
       }
-
-      if (!lastPlayedLadder || date > lastPlayedLadder) {
-        lastPlayedLadder = date;
-      }
-
-      if (match?.season === SEASON) {
-        raceGamesSeason[race] = (raceGamesSeason[race] || 0) + 1;
-
-        const mmr =
-          toNumber(me?.newMmr) ??
-          toNumber(me?.currentMmr) ??
-          toNumber(me?.oldMmr);
-
-        if (mmr != null) {
-          const t = date.getTime();
-
-          if (t >= (raceMMRAt[race] ?? -1)) {
-            raceMMRAt[race] = t;
-            raceMMR[race] = mmr;
-          }
-        }
-      }
-
-      const currentMmr = toNumber(me?.currentMmr);
-      if (currentMmr != null) {
-        if (!peaks[race] || currentMmr > peaks[race].mmr) {
-          peaks[race] = {
-            race,
-            mmr: currentMmr,
-            season: match.season,
-          };
-        }
-      }
     }
 
-    const mostPlayedAllTime =
-      Object.entries(raceGamesAll).sort((a, b) => b[1] - a[1])[0]?.[0] ??
-      "Unknown";
+    /* ---------------------------------------------
+       PEAKS (FROM CURRENT LADDER DATA)
+    --------------------------------------------- */
 
-    const mostPlayedThisSeason =
-      Object.entries(raceGamesSeason).sort((a, b) => b[1] - a[1])[0]?.[0] ??
-      "Unknown";
-
-    const highest =
-      Object.entries(raceMMR).sort((a, b) => b[1] - a[1])[0];
-
-    const highestRace = highest?.[0] ?? null;
-
-    const top2Peaks = Object.values(peaks)
+    const top2Peaks = ranks
+      .map((r) => ({
+        race: r.race,
+        mmr: r.mmr,
+        season: SEASON,
+      }))
       .sort((a, b) => b.mmr - a.mmr)
       .slice(0, 2);
+
+    /* ---------------------------------------------
+       RESULT
+    --------------------------------------------- */
 
     return {
       summary: {
         battletag: canonical,
+
         mostPlayedAllTime,
         mostPlayedThisSeason,
-        highestCurrentRace: highestRace,
-        highestCurrentMMR: highestRace
-          ? raceMMR[highestRace] ?? null
+
+        highestCurrentRace,
+        highestCurrentMMR,
+
+        lastPlayedLadder: lastPlayedLadder
+          ? lastPlayedLadder.toISOString()
           : null,
-        lastPlayedLadder: lastPlayedLadder?.toISOString() ?? null,
+
         lastPlayedRace: Object.fromEntries(
-          Object.entries(lastPlayedRace).map(([race, value]) => [
+          Object.entries(lastPlayedRace).map(([race, date]) => [
             race,
-            value.toISOString(),
+            date.toISOString(),
           ])
         ),
+
         top2Peaks,
       },
     };
