@@ -125,7 +125,6 @@ type CountryRankResult = {
 export type PlayerSummaryResponse = {
   summary: {
     battletag: string;
-    mostPlayedAllTime: string;
     mostPlayedThisSeason: string;
     highestCurrentRace: string | null;
     highestCurrentMMR: number | null;
@@ -737,7 +736,7 @@ export async function getPlayerSummary(
     const player = await getPlayerSnapshot(inputTag);
     if (!player) return null;
 
-    const { canonical, lower, profile } = player;
+    const { canonical, lower } = player;
 
     /* ---------------------------------------------
        CURRENT LADDER DATA
@@ -755,48 +754,53 @@ export async function getPlayerSummary(
     const highestCurrentMMR = highest?.mmr ?? null;
 
     /* ---------------------------------------------
-       MOST PLAYED (PROFILE LADDER STATS)
+       FETCH MATCHES
     --------------------------------------------- */
 
-    const ladderStats = (profile as any)?.ladderStats ?? [];
+    const recentMatches = await getMatchesCached(
+      canonical,
+      [SEASON]
+    );
 
-    const raceGamesAll: Record<string, number> = {};
+    /* ---------------------------------------------
+       MOST PLAYED (CURRENT SEASON)
+    --------------------------------------------- */
+
     const raceGamesSeason: Record<string, number> = {};
 
-    for (const stat of ladderStats) {
-      const race = raceLabel(stat?.race) ?? "Unknown";
+    for (const match of recentMatches ?? []) {
 
-      const games = Number(stat?.games ?? 0);
-      if (!games) continue;
+      if (match?.gameMode !== GAMEMODE) continue;
 
-      raceGamesAll[race] = (raceGamesAll[race] ?? 0) + games;
+      const players =
+        match?.teams?.flatMap((t: any) => t.players ?? []) ?? [];
 
-      if (stat?.season === SEASON) {
-        raceGamesSeason[race] =
-          (raceGamesSeason[race] ?? 0) + games;
+      const me = players.find(
+        (p: any) => p?.battleTag?.toLowerCase() === lower
+      );
+
+      if (!me) continue;
+
+      const race = raceLabel(me?.race) ?? "Unknown";
+
+      if (match?.season === SEASON) {
+        raceGamesSeason[race] = (raceGamesSeason[race] ?? 0) + 1;
       }
     }
-
-    const mostPlayedAllTime =
-      Object.entries(raceGamesAll)
-        .sort((a, b) => b[1] - a[1])[0]?.[0] ?? "Unknown";
 
     const mostPlayedThisSeason =
       Object.entries(raceGamesSeason)
         .sort((a, b) => b[1] - a[1])[0]?.[0] ?? "Unknown";
 
     /* ---------------------------------------------
-       LAST PLAYED MATCH (LIGHT FETCH)
+       LAST PLAYED MATCH
     --------------------------------------------- */
 
-  const recentMatches = await getMatchesCached(
-  canonical,
-  [SEASON]
-);
     let lastPlayedLadder: Date | null = null;
     const lastPlayedRace: Record<string, Date> = {};
 
     for (const match of recentMatches ?? []) {
+
       if (match?.gameMode !== GAMEMODE) continue;
 
       const date = toDate(match?.startTime);
@@ -823,7 +827,7 @@ export async function getPlayerSummary(
     }
 
     /* ---------------------------------------------
-       PEAKS (FROM CURRENT LADDER DATA)
+       PEAKS
     --------------------------------------------- */
 
     const top2Peaks = ranks
@@ -843,7 +847,6 @@ export async function getPlayerSummary(
       summary: {
         battletag: canonical,
 
-        mostPlayedAllTime,
         mostPlayedThisSeason,
 
         highestCurrentRace,

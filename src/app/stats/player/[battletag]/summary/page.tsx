@@ -96,10 +96,6 @@ export default async function PlayerPage({ params }: PageProps) {
               }
             />
             <StatCard
-              label="Most Played (All Time)"
-              value={s.mostPlayedAllTime ?? "N/A"}
-            />
-            <StatCard
               label="Most Played (Current Season)"
               value={s.mostPlayedThisSeason ?? "N/A"}
             />
@@ -107,7 +103,7 @@ export default async function PlayerPage({ params }: PageProps) {
 
           <section className="grid gap-4 sm:grid-cols-2">
             <StatCard label="Last Ladder Game" value={lastPlayedAny} />
-            <StatCard label="Last Highest-Race Game" value={lastPlayedHighest} />
+            <StatCard label="Last Highest-MMR Race Game" value={lastPlayedHighest} />
           </section>
         </>
       )}
