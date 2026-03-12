@@ -66,18 +66,27 @@ export default async function RaceGlobalPage({
   }
 
   return (
-    <LadderPageUI
-      title={`Global ${RACE_LABEL[race]} Ladder`}
-      subtitle={`Season 24 · ${data.poolSize.toLocaleString()} players · Rank = 80% MMR + 15% SoS (game-scaled) + 5% activity`}
-      base={`/stats/ladder/race/${race}`}
-      rows={data.full.map((r) => ({
-        ...r,
-        sos: r.sos ?? 0,
-      }))}
-      poolSize={data.poolSize}
-      currentPage={currentPage}
-      totalPages={totalPages}
-      highlight={highlight}
-    />
+    <div>
+      <LadderPageUI
+        title={`Global ${RACE_LABEL[race]} Ladder`}
+        subtitle={`Season 24 · ${data.poolSize.toLocaleString()} players · Score = 0.80·MMR + 0.15·SoS + 0.05·Activity − Decay`}
+        base={`/stats/ladder/race/${race}`}
+        rows={data.full.map((r) => ({
+          ...r,
+          sos: r.sos ?? 0,
+        }))}
+        poolSize={data.poolSize}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        highlight={highlight}
+      />
+
+      <div className="mt-3 text-xs text-gray-500 space-y-1">
+        <div>MMR — player rating</div>
+        <div>SoS — strength of schedule</div>
+        <div>Activity — games played normalization</div>
+        <div>Decay — penalty for very low game counts</div>
+      </div>
+    </div>
   );
 }

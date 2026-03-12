@@ -31,10 +31,11 @@ export type LadderRow = {
 };
 
 /* =========================================
-   LADDER SCORING v2.2
+   LADDER SCORING v2.3
    - MMR authoritative
    - SoS ramps slowly
    - Activity proportional (minor stabilizer)
+   - Low-activity decay
 ========================================= */
 
 const W_MMR = 0.80;
@@ -44,20 +45,57 @@ const W_ACTIVITY = 0.05;
 const SOS_CONFIDENCE_K = 10;
 const SCORE_SCALE = 10;
 
+/* =========================================
+   DECAY SETTINGS
+========================================= */
+
+const DECAY_START_GAMES = 30;
+const DECAY_FULL_GAMES = 5;
+const MAX_DECAY_PENALTY = 150;
+
 function activityScore(games: number): number {
   const STEP = 5;
   const MAX_GAMES = 200;
   const MAX_SCORE = 200;
 
-  const safeGames = Number.isFinite(games) ? Math.max(0, Math.trunc(games)) : 0;
-  const bucket = Math.min(Math.floor(safeGames / STEP) * STEP, MAX_GAMES);
+  const safeGames = Number.isFinite(games)
+    ? Math.max(0, Math.trunc(games))
+    : 0;
+
+  const bucket = Math.min(
+    Math.floor(safeGames / STEP) * STEP,
+    MAX_GAMES
+  );
 
   return (bucket / MAX_GAMES) * MAX_SCORE;
 }
 
 function confidence(games: number, k: number): number {
-  const safeGames = Number.isFinite(games) ? Math.max(0, games) : 0;
+  const safeGames = Number.isFinite(games)
+    ? Math.max(0, games)
+    : 0;
+
   return safeGames / (safeGames + k);
+}
+
+/* =========================================
+   ACTIVITY DECAY
+========================================= */
+
+function decayPenalty(games: number): number {
+  const safeGames = Number.isFinite(games)
+    ? Math.max(0, games)
+    : 0;
+
+  if (safeGames >= DECAY_START_GAMES) return 0;
+
+  const progress =
+    (DECAY_START_GAMES - safeGames) /
+    (DECAY_START_GAMES - DECAY_FULL_GAMES);
+
+  const clamped = Math.min(1, Math.max(0, progress));
+
+  return clamped * MAX_DECAY_PENALTY;
 }
 
 function computeScore(
@@ -66,28 +104,32 @@ function computeScore(
   games: number
 ): number {
   const safeMmr = Number.isFinite(mmr) ? mmr : 0;
-  const safeGames = Number.isFinite(games) ? Math.max(0, games) : 0;
-
-  // If SoS delta not available yet, treat as equal opponents (0 delta)
-  const delta = typeof sosDelta === "number" && Number.isFinite(sosDelta)
-    ? sosDelta
+  const safeGames = Number.isFinite(games)
+    ? Math.max(0, games)
     : 0;
 
-  // SoS ramps with sample size
+  const delta =
+    typeof sosDelta === "number" && Number.isFinite(sosDelta)
+      ? sosDelta
+      : 0;
+
   const conf = confidence(safeGames, SOS_CONFIDENCE_K);
 
-  // Convert delta into an effective rating for blending
   const sosEff = safeMmr + delta * conf;
 
-  // Activity normalized relative to rating scale
-  const activityNormalized = (activityScore(safeGames) / 200) * safeMmr;
+  const activityNormalized =
+    (activityScore(safeGames) / 200) * safeMmr;
 
   const raw =
     safeMmr * W_MMR +
     sosEff * W_SOS +
     activityNormalized * W_ACTIVITY;
 
-  return Math.round((raw / SCORE_SCALE) * 10) / 10;
+  const decay = decayPenalty(safeGames);
+
+  const finalScore = raw - decay;
+
+  return Math.round((finalScore / SCORE_SCALE) * 10) / 10;
 }
 
 function formatDisplayName(battletag: string): string {
@@ -97,20 +139,33 @@ function formatDisplayName(battletag: string): string {
 
 export function buildLadder(rows: LadderInputRow[]): LadderRow[] {
   const ladder: LadderRow[] = rows.map((row) => {
-    const wins = Number.isFinite(row.wins) ? Math.max(0, Math.trunc(row.wins)) : 0;
-    const games = Number.isFinite(row.games) ? Math.max(0, Math.trunc(row.games)) : 0;
+    const wins = Number.isFinite(row.wins)
+      ? Math.max(0, Math.trunc(row.wins))
+      : 0;
+
+    const games = Number.isFinite(row.games)
+      ? Math.max(0, Math.trunc(row.games))
+      : 0;
+
     const losses = Math.max(0, games - wins);
 
     return {
       rank: 0,
       battletag: row.battletag,
       displayName: formatDisplayName(row.battletag),
-      mmr: Number.isFinite(row.mmr) ? Math.round(row.mmr) : 0,
+
+      mmr: Number.isFinite(row.mmr)
+        ? Math.round(row.mmr)
+        : 0,
+
       sos:
-        typeof row.sos === "number" && Number.isFinite(row.sos)
+        typeof row.sos === "number" &&
+        Number.isFinite(row.sos)
           ? row.sos
           : null,
+
       score: computeScore(row.mmr, row.sos, games),
+
       wins,
       losses,
       games,
