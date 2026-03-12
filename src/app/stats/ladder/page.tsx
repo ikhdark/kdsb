@@ -29,7 +29,7 @@ export default async function Page({
     <div>
       <LadderPageUI
         title="Global Ladder"
-        subtitle={`Season 24 · ${data.poolSize.toLocaleString()} players · Score = 0.80·MMR + 0.15·SoS + 0.05·Activity − Decay`}
+        subtitle={`Season 24 · ${data.poolSize.toLocaleString()} players · Score = 0.80·MMR + 0.15·SoS (Postive SoS = Stronger Schedule) + 0.05·Activity − Decay`}
         base="/stats/ladder"
         rows={data.full.map((r) => ({
           ...r,
