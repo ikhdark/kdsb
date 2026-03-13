@@ -2,7 +2,6 @@ import "@/css/satoshi.css";
 import "@/css/style.css";
 
 import { GoogleAnalytics } from "@next/third-parties/google";
-import Script from "next/script";
 import Sidebar from "@/components/Layouts/sidebar";
 import Analytics from "@/components/Analytics";
 import { Header } from "@/components/Layouts/header";
@@ -10,7 +9,6 @@ import type { Metadata } from "next";
 import NextTopLoader from "nextjs-toploader";
 import type { PropsWithChildren } from "react";
 import { Providers } from "./providers";
-
 
 export const metadata: Metadata = {
   title: {
@@ -57,16 +55,7 @@ export default function RootLayout({ children }: PropsWithChildren) {
           </div>
         </Providers>
 
-        {/* Google Analytics */}
         <GoogleAnalytics gaId="G-5QB5E0KBCL" />
-
-        {/* Plausible */}
-        <Script
-          defer
-          data-domain="w3cstats.com"
-          src="https://plausible.io/js/script.js"
-          strategy="afterInteractive"
-        />
       </body>
     </html>
   );
