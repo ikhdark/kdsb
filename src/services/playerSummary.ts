@@ -826,19 +826,43 @@ export async function getPlayerSummary(
       }
     }
 
-    /* ---------------------------------------------
-       PEAKS
-    --------------------------------------------- */
+    
+/* ---------------------------------------------
+   PEAKS (from match history)
+--------------------------------------------- */
 
-    const top2Peaks = ranks
-      .map((r) => ({
-        race: r.race,
-        mmr: r.mmr,
-        season: SEASON,
-      }))
-      .sort((a, b) => b.mmr - a.mmr)
-      .slice(0, 2);
+const peakByRace: Record<string, number> = {};
 
+for (const match of recentMatches ?? []) {
+  if (match?.gameMode !== GAMEMODE) continue;
+
+  const players =
+    match?.teams?.flatMap((t: any) => t.players ?? []) ?? [];
+
+  const me = players.find(
+    (p: any) => p?.battleTag?.toLowerCase() === lower
+  );
+
+  if (!me) continue;
+
+  const race = raceLabel(me?.race) ?? "Unknown";
+
+  const mmr = toNumber(me?.currentMmr);
+
+  if (mmr == null) continue;
+
+  peakByRace[race] = Math.max(peakByRace[race] ?? 0, mmr);
+}
+
+const top2Peaks = Object.entries(peakByRace)
+  .map(([race, mmr]) => ({
+    race,
+    mmr,
+    season: SEASON,
+  }))
+  .sort((a, b) => b.mmr - a.mmr)
+  .slice(0, 2);
+  
     /* ---------------------------------------------
        RESULT
     --------------------------------------------- */
