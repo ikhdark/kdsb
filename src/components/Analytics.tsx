@@ -37,5 +37,13 @@ export default function Analytics() {
     }
   }, [pathname]);
 
+  if (
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" ||
+      window.location.hostname.includes("vercel.app"))
+  ) {
+    return null;
+  }
+
   return <VercelAnalytics />;
 }
