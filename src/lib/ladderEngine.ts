@@ -49,7 +49,7 @@ const SCORE_SCALE = 10;
    DECAY SETTINGS
 ========================================= */
 
-const DECAY_START_GAMES = 30;
+const DECAY_START_GAMES = 50;
 const DECAY_FULL_GAMES = 5;
 const MAX_DECAY_PENALTY = 150;
 
